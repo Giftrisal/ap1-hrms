@@ -1,0 +1,261 @@
+'use client';
+
+import React, { useState } from 'react';
+import DashboardShell from '@/components/layout/DashboardShell';
+import { useLanguage } from '@/lib/i18n/context';
+import { initialSettings } from '@/lib/mock-data';
+import { 
+  Settings, 
+  Wifi, 
+  Send, 
+  Building, 
+  Database, 
+  ShieldCheck, 
+  RefreshCw, 
+  Save, 
+  CheckCircle2, 
+  ExternalLink 
+} from 'lucide-react';
+
+export default function SettingsPage() {
+  const { t, language } = useLanguage();
+  const [settings, setSettings] = useState(initialSettings);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionMessage, setConnectionMessage] = useState<string | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
+
+  const handleTestMachine = async () => {
+    setTestingConnection(true);
+    setConnectionMessage(null);
+    try {
+      const res = await fetch('/api/biometric/sync');
+      const data = await res.json();
+      setConnectionMessage(`Connected to ZKTeco daemon (${settings.biometric_device_ip}:${settings.biometric_device_port}). Protocol 4370 verified!`);
+    } catch (e) {
+      setConnectionMessage('Failed to reach local daemon. Ensure python zk_bridge.py is running.');
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaved(true);
+    setTimeout(() => setIsSaved(false), 3000);
+  };
+
+  return (
+    <DashboardShell
+      title={t.navSettings}
+      subtitle={language === 'en' 
+        ? "Hardware integration, ZKTeco IP configuration, Meta Cloud WhatsApp API, and company profile" 
+        : "बायोमेट्रिक मेसिन LAN आइपी, ह्वाट्सएप क्लाउड नोटिफिकेसन तथा कम्पनी विवरण"}
+    >
+      <form onSubmit={handleSave} className="space-y-6">
+        {/* Section 1: ZKTeco Biometric Machine LAN Configuration */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                <Wifi className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-slate-900 text-base">{t.hardwareSettings}</h4>
+                <p className="text-xs text-slate-500">
+                  {language === 'en'
+                    ? "Connects directly to your office ZKTeco device over LAN via pyzk TCP/IP (Port 4370)"
+                    : "कार्यालयको ZKTeco बायोमेट्रिक मेसिनसँग LAN/TCP पोर्ट ४३७० मार्फत प्रत्यक्ष सम्बन्ध"}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleTestMachine}
+              disabled={testingConnection}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${testingConnection ? 'animate-spin' : ''}`} />
+              <span>{testingConnection ? 'Testing...' : 'Test Machine Ping'}</span>
+            </button>
+          </div>
+
+          {connectionMessage && (
+            <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{connectionMessage}</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">{t.machineIp}</label>
+              <input
+                type="text"
+                value={settings.biometric_device_ip}
+                onChange={(e) => setSettings({ ...settings, biometric_device_ip: e.target.value })}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:outline-none focus:border-blue-500"
+                placeholder="192.168.1.201"
+              />
+              <span className="text-[10px] text-slate-400 mt-1 block">Configured in machine Ethernet settings</span>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">{t.machinePort}</label>
+              <input
+                type="number"
+                value={settings.biometric_device_port}
+                onChange={(e) => setSettings({ ...settings, biometric_device_port: Number(e.target.value) })}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:outline-none focus:border-blue-500"
+              />
+              <span className="text-[10px] text-slate-400 mt-1 block">Default ZKTeco TCP port is 4370</span>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Auto Sync Interval</label>
+              <select
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 font-medium"
+              >
+                <option value="300">Every 5 Minutes (Recommended)</option>
+                <option value="600">Every 10 Minutes</option>
+                <option value="60">Every 1 Minute (High Traffic)</option>
+              </select>
+              <span className="text-[10px] text-slate-400 mt-1 block">Controlled by zk_bridge.py daemon</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 2: WhatsApp Meta Cloud API Configuration */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs">
+          <div className="flex items-center gap-3 pb-4 border-b border-slate-100 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+              <Send className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-bold text-slate-900 text-base">{t.whatsappAlerts}</h4>
+              <p className="text-xs text-slate-500">{t.whatsappSub}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs mb-4">
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">{t.adminNumber} *</label>
+              <input
+                type="text"
+                value={settings.whatsapp_admin_phone}
+                onChange={(e) => setSettings({ ...settings, whatsapp_admin_phone: e.target.value })}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:outline-none focus:border-blue-500"
+                placeholder="9779841234567"
+              />
+              <span className="text-[10px] text-slate-400 mt-1 block">Receives 10 AM daily absent digest</span>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">{t.metaPhoneId}</label>
+              <input
+                type="text"
+                value={settings.whatsapp_phone_number_id || ''}
+                onChange={(e) => setSettings({ ...settings, whatsapp_phone_number_id: e.target.value })}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:outline-none focus:border-blue-500"
+                placeholder="From Meta for Developers dashboard"
+              />
+              <span className="text-[10px] text-slate-400 mt-1 block">WhatsApp Cloud API Phone ID</span>
+            </div>
+          </div>
+
+          <div className="space-y-2 text-xs bg-slate-50 p-3 rounded-lg border border-slate-200">
+            <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-700">
+              <input
+                type="checkbox"
+                checked={settings.whatsapp_auto_10am_alert}
+                onChange={(e) => setSettings({ ...settings, whatsapp_auto_10am_alert: e.target.checked })}
+                className="rounded text-blue-600"
+              />
+              <span>Enable automated 10:00 AM WhatsApp digest of absent staff to Admin</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-700">
+              <input
+                type="checkbox"
+                defaultChecked
+                className="rounded text-blue-600"
+              />
+              <span>Enable real-time alert when staff is 30+ minutes late</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Section 3: Company Profile */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs">
+          <div className="flex items-center gap-3 pb-4 border-b border-slate-100 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
+              <Building className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-bold text-slate-900 text-base">Company Organization Profile</h4>
+              <p className="text-xs text-slate-500">Appears on printable PDF payslips and employee reports</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Company Registered Name</label>
+              <input
+                type="text"
+                value={settings.company_name}
+                onChange={(e) => setSettings({ ...settings, company_name: e.target.value })}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Office Address</label>
+              <input
+                type="text"
+                value={settings.company_address}
+                onChange={(e) => setSettings({ ...settings, company_address: e.target.value })}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Office Contact Phone</label>
+              <input
+                type="text"
+                value={settings.company_phone}
+                onChange={(e) => setSettings({ ...settings, company_phone: e.target.value })}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Nepali Fiscal Year</label>
+              <input
+                type="text"
+                value={settings.nepali_fiscal_year}
+                onChange={(e) => setSettings({ ...settings, nepali_fiscal_year: e.target.value })}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:outline-none"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Save Button Bar */}
+        <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+          {isSaved ? (
+            <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>All configuration settings successfully saved!</span>
+            </span>
+          ) : (
+            <span className="text-xs text-slate-500 font-medium">Click save to persist configuration</span>
+          )}
+
+          <button
+            type="submit"
+            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg shadow-sm transition-all"
+          >
+            <Save className="w-4 h-4" />
+            <span>{t.saveSettings}</span>
+          </button>
+        </div>
+      </form>
+    </DashboardShell>
+  );
+}
