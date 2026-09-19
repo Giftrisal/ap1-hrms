@@ -24,6 +24,7 @@ export interface Employee {
   role: UserRole;
   status: 'active' | 'on_leave' | 'resigned' | 'terminated';
   join_date: string;
+  dob?: string; // YYYY-MM-DD
   base_salary: number;
   bank_name?: string;
   bank_account_number?: string;
@@ -190,3 +191,43 @@ export interface SystemSettings {
   late_penalty_rule: 'three_late_half_day' | 'per_minute' | 'fixed_amount';
   late_penalty_amount: number;
 }
+
+export type FieldDutyType = 'FIELD_VISIT' | 'WORK_FROM_HOME' | 'CLIENT_MEETING' | 'OFFICIAL_TOUR';
+
+export interface FieldDutyRequest {
+  id: string;
+  employee_id: string;
+  employee_name?: string;
+  employee_photo?: string;
+  department_name?: string;
+  type: FieldDutyType;
+  start_date: string;
+  end_date: string;
+  location: string;
+  purpose: string;
+  status: 'pending' | 'approved' | 'rejected';
+  applied_at: string;
+  approved_by?: string;
+  remarks?: string;
+}
+
+export type AssetCategory = 'Laptop' | 'Desktop' | 'Mobile / SIM' | 'Vehicle' | 'Office Access / Key' | 'Equipment';
+
+export interface CompanyAsset {
+  id: string;
+  name: string;
+  asset_code: string;
+  category: AssetCategory;
+  serial_number?: string;
+  assigned_to_id?: string;
+  assigned_to_name?: string;
+  assigned_to_photo?: string;
+  department_name?: string;
+  assigned_date?: string;
+  condition: 'Brand New' | 'Good' | 'Fair' | 'Under Repair' | 'Damaged';
+  status: 'Assigned' | 'Available' | 'Maintenance' | 'Retired';
+  purchase_date?: string;
+  purchase_cost?: number;
+  notes?: string;
+}
+

@@ -17,8 +17,19 @@ import {
   Download,
   Search,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Cake,
+  Gift,
+  PartyPopper,
+  Sparkles,
+  Send,
+  MapPin,
+  PackageCheck,
+  Smartphone,
+  Calendar
 } from 'lucide-react';
+import Link from 'next/link';
+import { getNepaliDate } from '@/lib/nepali-date';
 import * as XLSX from 'xlsx';
 
 export default function DashboardPage() {
@@ -26,6 +37,19 @@ export default function DashboardPage() {
   const [attendanceList, setAttendanceList] = useState(generateTodayAttendance());
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('ALL');
+  const [greetingModal, setGreetingModal] = useState<{
+    isOpen: boolean;
+    name: string;
+    type: 'birthday' | 'anniversary';
+    detail: string;
+    phone?: string;
+  }>({
+    isOpen: false,
+    name: '',
+    type: 'birthday',
+    detail: ''
+  });
+  const [greetingSuccess, setGreetingSuccess] = useState(false);
 
   // Key metrics
   const totalStaff = initialEmployees.length;
@@ -173,6 +197,161 @@ export default function DashboardPage() {
           </div>
           <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
             <CalendarOff className="w-6 h-6" />
+          </div>
+        </div>
+      </div>
+
+      {/* Celebrations, Milestones & Quick Shortcuts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Birthday & Anniversary Celebrations Widget */}
+        <div className="lg:col-span-2 bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-purple-500/10 border border-amber-200/80 rounded-2xl p-5 shadow-xs relative overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200/60 pb-3 mb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20">
+                <PartyPopper className="w-5 h-5 animate-bounce" />
+              </div>
+              <div>
+                <h4 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-1.5">
+                  <span>🎉 Celebrations & Milestones (आजका जन्मोत्सव तथा वार्षिकोत्सव)</span>
+                </h4>
+                <p className="text-xs text-slate-600">
+                  Daily staff recognition, work anniversaries, and automated team wishes
+                </p>
+              </div>
+            </div>
+            <span className="self-start sm:self-auto px-2.5 py-1 bg-amber-100/80 text-amber-800 text-[11px] font-bold rounded-full border border-amber-300">
+              {getNepaliDate().formattedNp}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Today's Birthday */}
+            <div className="bg-white/90 backdrop-blur-xs p-3.5 rounded-xl border border-amber-200 shadow-2xs flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <img
+                    src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150"
+                    alt="Samikshya Gautam"
+                    className="w-11 h-11 rounded-full object-cover border-2 border-amber-400"
+                  />
+                  <span className="absolute -bottom-1 -right-1 text-sm">🎂</span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-bold text-slate-900 text-xs sm:text-sm">Samikshya Gautam</p>
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-pink-100 text-pink-700">Today</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">Sr. Full Stack Engineer</p>
+                  <p className="text-[11px] text-amber-700 font-semibold mt-0.5">Birthday Today! 🎂</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setGreetingModal({
+                  isOpen: true,
+                  name: 'Samikshya Gautam',
+                  type: 'birthday',
+                  detail: 'Wishing you a very Happy Birthday from all of us at Goinfi! May this year bring tremendous joy and success!',
+                  phone: '+977-9841100104'
+                })}
+                className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+              >
+                <Gift className="w-3.5 h-3.5" /> Wish
+              </button>
+            </div>
+
+            {/* Today's Work Anniversary */}
+            <div className="bg-white/90 backdrop-blur-xs p-3.5 rounded-xl border border-purple-200 shadow-2xs flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <img
+                    src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150"
+                    alt="Pooja Thapa"
+                    className="w-11 h-11 rounded-full object-cover border-2 border-purple-400"
+                  />
+                  <span className="absolute -bottom-1 -right-1 text-sm">🎖️</span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-bold text-slate-900 text-xs sm:text-sm">Pooja Thapa</p>
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-100 text-purple-700">3rd Year</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">HR Manager</p>
+                  <p className="text-[11px] text-purple-700 font-semibold mt-0.5">3 Years at Goinfi! 🌟</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setGreetingModal({
+                  isOpen: true,
+                  name: 'Pooja Thapa',
+                  type: 'anniversary',
+                  detail: 'Congratulations on completing 3 wonderful years at Goinfi! Thank you for your leadership and dedication!',
+                  phone: '+977-9841100102'
+                })}
+                className="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" /> Greet
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Feature Shortcuts Card */}
+        <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-xs flex flex-col justify-between space-y-3">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Quick Portals & Tools</span>
+            <span className="text-[10px] font-semibold bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded border border-blue-500/30">
+              Active
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 text-xs">
+            <Link
+              href="/field-duty"
+              className="flex items-center justify-between p-2.5 bg-slate-800 hover:bg-slate-700/80 rounded-xl transition-colors border border-slate-700/60"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                  <MapPin className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-semibold text-white">Field Duty & WFH</p>
+                  <p className="text-[10px] text-slate-400">Client visits & remote approvals</p>
+                </div>
+              </div>
+              <span className="text-[11px] text-blue-400 font-semibold">Open →</span>
+            </Link>
+
+            <Link
+              href="/assets"
+              className="flex items-center justify-between p-2.5 bg-slate-800 hover:bg-slate-700/80 rounded-xl transition-colors border border-slate-700/60"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <PackageCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-semibold text-white">Asset Inventory</p>
+                  <p className="text-[10px] text-slate-400">Laptops, SIMs, Vehicles handover</p>
+                </div>
+              </div>
+              <span className="text-[11px] text-emerald-400 font-semibold">Open →</span>
+            </Link>
+
+            <Link
+              href="/portal"
+              className="flex items-center justify-between p-2.5 bg-slate-800 hover:bg-slate-700/80 rounded-xl transition-colors border border-slate-700/60"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center">
+                  <Smartphone className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-semibold text-white">Staff Self-Service</p>
+                  <p className="text-[10px] text-slate-400">Employee punch & payslip portal</p>
+                </div>
+              </div>
+              <span className="text-[11px] text-purple-400 font-semibold">Open →</span>
+            </Link>
           </div>
         </div>
       </div>
@@ -413,6 +592,98 @@ export default function DashboardPage() {
           </a>
         </div>
       </div>
+
+      {/* Greeting Modal */}
+      {greetingModal.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white ${
+                  greetingModal.type === 'birthday' ? 'bg-amber-500' : 'bg-purple-600'
+                }`}>
+                  {greetingModal.type === 'birthday' ? <Cake className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    {greetingModal.type === 'birthday' ? '🎂 Birthday Wishes' : '🎖️ Work Anniversary Greeting'}
+                  </h3>
+                  <p className="text-xs text-slate-500">{greetingModal.name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setGreetingModal({ ...greetingModal, isOpen: false });
+                  setGreetingSuccess(false);
+                }}
+                className="text-slate-400 hover:text-slate-600 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {greetingSuccess ? (
+              <div className="py-6 text-center space-y-2">
+                <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto animate-bounce" />
+                <h4 className="font-bold text-slate-900 text-base">Wishes Sent Successfully!</h4>
+                <p className="text-xs text-slate-600">
+                  {greetingModal.name} लाई शुभकामना सन्देश पठाइयो! 🎉
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Greeting Message (शुभकामना सन्देश)
+                  </label>
+                  <textarea
+                    rows={4}
+                    defaultValue={greetingModal.detail}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500 text-slate-800"
+                  />
+                </div>
+
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1">
+                  <p className="font-bold">✨ Delivery Channels:</p>
+                  <p>• Official Company Slack / Email Broadcast to all 32+ staff</p>
+                  <p>• Personal WhatsApp greeting to {greetingModal.phone}</p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    onClick={() => {
+                      if (greetingModal.phone) {
+                        const msg = encodeURIComponent(`🎉 Dear ${greetingModal.name}, ${greetingModal.detail} Warm wishes from Goinfi Team!`);
+                        window.open(`https://wa.me/${greetingModal.phone.replace(/[^0-9]/g, '')}?text=${msg}`, '_blank');
+                      }
+                      setGreetingSuccess(true);
+                      setTimeout(() => {
+                        setGreetingSuccess(false);
+                        setGreetingModal({ ...greetingModal, isOpen: false });
+                      }, 2000);
+                    }}
+                    className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5" /> Send via WhatsApp
+                  </button>
+                  <button
+                    onClick={() => {
+                      setGreetingSuccess(true);
+                      setTimeout(() => {
+                        setGreetingSuccess(false);
+                        setGreetingModal({ ...greetingModal, isOpen: false });
+                      }, 2000);
+                    }}
+                    className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" /> Broadcast Email
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </DashboardShell>
   );
 }

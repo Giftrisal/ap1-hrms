@@ -1,4 +1,4 @@
-import { Employee, Department, Shift, DailyAttendance, PublicHoliday, LeaveRequest, AdvanceSalary, PayrollRecord, SystemSettings } from './types';
+import { Employee, Department, Shift, DailyAttendance, PublicHoliday, LeaveRequest, AdvanceSalary, PayrollRecord, SystemSettings, FieldDutyRequest, CompanyAsset } from './types';
 
 export const initialDepartments: Department[] = [
   { id: 'dept-1', name: 'Executive Management', code: 'EXEC', description: 'C-Suite and executive direction', employee_count: 1 },
@@ -68,7 +68,8 @@ export const initialEmployees: Employee[] = [
     designation: 'HR Manager',
     role: 'hr',
     status: 'active',
-    join_date: '2022-03-15',
+    join_date: '2023-09-16',
+    dob: '1994-11-20',
     base_salary: 75000,
     bank_name: 'Nabil Bank',
     bank_account_number: '02198301928301',
@@ -89,6 +90,7 @@ export const initialEmployees: Employee[] = [
     role: 'admin',
     status: 'active',
     join_date: '2022-02-01',
+    dob: '1993-05-14',
     base_salary: 95000,
     bank_name: 'Global IME Bank',
     bank_account_number: '30192839102910',
@@ -109,6 +111,7 @@ export const initialEmployees: Employee[] = [
     role: 'employee',
     status: 'active',
     join_date: '2022-06-10',
+    dob: '1996-09-16',
     base_salary: 80000,
     bank_name: 'Siddhartha Bank',
     bank_account_number: '49102938102910',
@@ -773,3 +776,155 @@ export function generateTodayAttendance(): DailyAttendance[] {
     };
   });
 }
+
+export const initialFieldDutyRequests: FieldDutyRequest[] = [
+  {
+    id: 'fdr-1',
+    employee_id: 'emp-104',
+    employee_name: 'Samikshya Gautam',
+    employee_photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+    department_name: 'Software Engineering',
+    type: 'CLIENT_MEETING',
+    start_date: '2026-09-16',
+    end_date: '2026-09-16',
+    location: 'Nabil Bank Head Office, Teendhara, Kathmandu',
+    purpose: 'Core Banking API Integration & UAT Deployment',
+    status: 'approved',
+    applied_at: '2026-09-15T16:20:00Z',
+    approved_by: 'Aayush Shrestha',
+    remarks: 'Approved for full-day on-site client deployment'
+  },
+  {
+    id: 'fdr-2',
+    employee_id: 'emp-107',
+    employee_name: 'Manoj Basnet',
+    employee_photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+    department_name: 'Software Engineering',
+    type: 'WORK_FROM_HOME',
+    start_date: '2026-09-17',
+    end_date: '2026-09-17',
+    location: 'Home (Bhaktapur)',
+    purpose: 'Post-release overnight server patch monitoring',
+    status: 'pending',
+    applied_at: '2026-09-16T11:00:00Z'
+  },
+  {
+    id: 'fdr-3',
+    employee_id: 'emp-114',
+    employee_name: 'Suman Shrestha',
+    employee_photo: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150',
+    department_name: 'Digital Marketing',
+    type: 'FIELD_VISIT',
+    start_date: '2026-09-18',
+    end_date: '2026-09-19',
+    location: 'Pokhara Event Center',
+    purpose: 'Client video shoot & expo brand sponsorship coverage',
+    status: 'approved',
+    applied_at: '2026-09-14T09:30:00Z',
+    approved_by: 'Pooja Thapa',
+    remarks: 'Approved with travel allowance'
+  }
+];
+
+export const initialAssets: CompanyAsset[] = [
+  {
+    id: 'ast-1',
+    name: 'MacBook Pro 16" M2 Pro (32GB / 1TB)',
+    asset_code: 'GOINFI-LAP-001',
+    category: 'Laptop',
+    serial_number: 'C02GK99P0MD6',
+    assigned_to_id: 'emp-103',
+    assigned_to_name: 'Bibek Sharma',
+    assigned_to_photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+    department_name: 'Software Engineering',
+    assigned_date: '2023-01-10',
+    condition: 'Good',
+    status: 'Assigned',
+    purchase_cost: 360000,
+    purchase_date: '2023-01-05',
+    notes: 'Includes official MagSafe charger and leather sleeve'
+  },
+  {
+    id: 'ast-2',
+    name: 'Dell Latitude 5440 Core i7 (16GB)',
+    asset_code: 'GOINFI-LAP-002',
+    category: 'Laptop',
+    serial_number: '8BVCX92',
+    assigned_to_id: 'emp-104',
+    assigned_to_name: 'Samikshya Gautam',
+    assigned_to_photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+    department_name: 'Software Engineering',
+    assigned_date: '2023-06-15',
+    condition: 'Good',
+    status: 'Assigned',
+    purchase_cost: 165000,
+    purchase_date: '2023-06-10'
+  },
+  {
+    id: 'ast-3',
+    name: 'Nepal Telecom (NTC) Postpaid SIM (9851000001)',
+    asset_code: 'GOINFI-SIM-001',
+    category: 'Mobile / SIM',
+    serial_number: '89977011293849',
+    assigned_to_id: 'emp-102',
+    assigned_to_name: 'Pooja Thapa',
+    assigned_to_photo: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
+    department_name: 'Human Resources',
+    assigned_date: '2023-02-01',
+    condition: 'Good',
+    status: 'Assigned',
+    notes: 'HR Helpline number, monthly corporate plan'
+  },
+  {
+    id: 'ast-4',
+    name: 'Office Main Floor RFID Master Keycard #04',
+    asset_code: 'GOINFI-KEY-004',
+    category: 'Office Access / Key',
+    serial_number: 'RFID-99021',
+    assigned_to_id: 'emp-101',
+    assigned_to_name: 'Aayush Shrestha',
+    assigned_to_photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+    department_name: 'Executive Management',
+    assigned_date: '2022-01-01',
+    condition: 'Brand New',
+    status: 'Assigned'
+  },
+  {
+    id: 'ast-5',
+    name: 'Sony A7 IV 4K Mirrorless Camera + 24-70mm GM Lens',
+    asset_code: 'GOINFI-CAM-001',
+    category: 'Equipment',
+    serial_number: 'SN-4819203',
+    assigned_to_id: 'emp-114',
+    assigned_to_name: 'Suman Shrestha',
+    assigned_to_photo: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150',
+    department_name: 'Digital Marketing',
+    assigned_date: '2024-03-01',
+    condition: 'Good',
+    status: 'Assigned',
+    purchase_cost: 480000
+  },
+  {
+    id: 'ast-6',
+    name: 'Dell UltraSharp 27" 4K Monitor (U2723QE)',
+    asset_code: 'GOINFI-MON-007',
+    category: 'Equipment',
+    serial_number: 'CN-09381-XYZ',
+    condition: 'Brand New',
+    status: 'Available',
+    purchase_cost: 85000,
+    notes: 'In IT storage room rack B3'
+  },
+  {
+    id: 'ast-7',
+    name: 'Hero Splendor Plus 100cc (Ba 84 Pa 9102)',
+    asset_code: 'GOINFI-VEH-001',
+    category: 'Vehicle',
+    serial_number: 'ENG-910293-CH',
+    condition: 'Good',
+    status: 'Available',
+    purchase_cost: 215000,
+    notes: 'Assigned for bank runs and local courier visits'
+  }
+];
+
