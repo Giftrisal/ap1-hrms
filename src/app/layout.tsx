@@ -24,6 +24,17 @@ export const metadata: Metadata = {
   title: "AP1 Staff & HR Portal | Goinfi HRMS",
   description: "AP1 Television HD Staff Portal - Attendance, Leave, Payslips & Digital ID",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon-192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/icon-512.png', type: 'image/png', sizes: '512x512' },
+    ],
+    shortcut: '/favicon.ico',
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",

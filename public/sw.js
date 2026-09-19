@@ -1,7 +1,11 @@
 // AP1 Staff Portal Service Worker (PWA Auto-Update Enabled)
-const CACHE_NAME = 'ap1-staff-portal-v2';
+const CACHE_NAME = 'ap1-staff-portal-v3';
 const PRECACHE_ASSETS = [
   '/portal',
+  '/favicon.ico',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/apple-touch-icon.png',
   '/ap1-logo.png',
   '/manifest.webmanifest'
 ];
