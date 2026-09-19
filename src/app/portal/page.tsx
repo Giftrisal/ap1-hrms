@@ -862,7 +862,7 @@ export default function StaffPortalPage() {
   // If no staff is currently logged into the mobile app: Show Clean Login / Signup / Reset Screen
   if (!activeEmployee) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 font-sans">
+      <div className="min-h-[100dvh] max-w-full overflow-x-hidden bg-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 font-sans safe-top safe-bottom overscroll-none touch-pan-y">
         {/* Top Header */}
         <div className="flex items-center justify-between pt-2">
           <div className="flex items-center gap-2.5">
@@ -1489,9 +1489,9 @@ export default function StaffPortalPage() {
 
   // LOGGED-IN MOBILE STAFF PORTAL INTERFACE
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans pb-20">
+    <div className="min-h-[100dvh] max-w-full overflow-x-hidden bg-slate-950 text-slate-100 flex flex-col font-sans pb-28 overscroll-none touch-pan-y">
       {/* Top Mobile App Header */}
-      <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-4 py-3">
+      <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-4 py-3 safe-top">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <img src="/ap1-logo.png" alt="AP1 HD" className="h-7 w-auto object-contain drop-shadow" />
@@ -1921,7 +1921,7 @@ export default function StaffPortalPage() {
       </main>
 
       {/* FIXED MOBILE BOTTOM NAVIGATION BAR */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 py-1.5 px-3">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 pt-1.5 px-3 safe-bottom select-none">
         <div className="max-w-lg mx-auto grid grid-cols-4 gap-1 text-center">
           <button
             onClick={() => setMobileTab('home')}

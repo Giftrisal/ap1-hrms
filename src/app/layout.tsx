@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n/context";
@@ -10,6 +10,15 @@ const poppins = Poppins({
   variable: "--font-poppins",
   display: "swap",
 });
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#020617",
+};
 
 export const metadata: Metadata = {
   title: "AP1 Staff & HR Portal | Goinfi HRMS",
@@ -30,6 +39,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`h-full ${poppins.variable}`}>
       <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -42,7 +55,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full bg-slate-100 text-slate-900 font-sans antialiased flex flex-col">
+      <body className="min-h-full bg-slate-100 text-slate-900 font-sans antialiased flex flex-col overscroll-y-none">
         <AuthProvider>
           <LanguageProvider>
             {children}
