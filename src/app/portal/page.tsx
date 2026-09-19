@@ -173,7 +173,10 @@ export default function StaffPortalPage() {
     }
   }, [resendTimer]);
 
-  // Sync staff directory from backend API so all mobile and desktop devices have current staff
+  // Centralized registrations fetched from server to enforce one-time signup limit
+  const [serverRegistrations, setServerRegistrations] = useState<any[]>([]);
+
+  // Sync staff directory and registrations from backend API
   useEffect(() => {
     const fetchStaff = async () => {
       try {
@@ -185,6 +188,9 @@ export default function StaffPortalPage() {
             if (typeof window !== 'undefined') {
               localStorage.setItem('goinfi_staff_list', JSON.stringify(data.staff));
             }
+          }
+          if (data.success && Array.isArray(data.registrations)) {
+            setServerRegistrations(data.registrations);
           }
         }
       } catch (err) {
@@ -215,6 +221,22 @@ export default function StaffPortalPage() {
     }
   };
 
+  // Helper to check if staff is already registered (either locally or on server)
+  const checkIsStaffAlreadyRegistered = (pin: string | number) => {
+    if (!pin) return null;
+    const pinStr = String(pin).trim();
+    const serverReg = serverRegistrations.find(r => String(r.pin) === pinStr);
+    if (serverReg && (serverReg.status === 'APPROVED' || serverReg.status === 'PENDING_APPROVAL')) {
+      return serverReg;
+    }
+    const creds = getStoredCredentials();
+    const localCred = creds[pinStr];
+    if (localCred && (localCred.status === 'APPROVED' || localCred.status === 'PENDING_APPROVAL')) {
+      return localCred;
+    }
+    return null;
+  };
+
   const saveStoredCredential = (cred: StaffAuthCredential) => {
     if (typeof window === 'undefined') return;
     try {
@@ -241,12 +263,24 @@ export default function StaffPortalPage() {
     e => e.biometric_pin === resetPin
   ) || null;
 
-  // Auto-populate phone and photo when staff is selected during signup
+  // Auto-populate phone and photo when staff is selected during signup (with strict 1-time check)
   const handleSelectSignupStaff = (pin: string) => {
     setSignupPin(pin);
     setSignupError('');
+    if (!pin) return;
+
     const emp = employees.find(e => e.biometric_pin === pin);
     if (emp) {
+      const existing = checkIsStaffAlreadyRegistered(pin);
+      if (existing) {
+        if (existing.status === 'APPROVED') {
+          setSignupError(`Staff member ${emp.full_name} (PIN #${pin}) is ALREADY REGISTERED and approved. One-time signup limit applies. Please click "Back to Login" to sign in.`);
+        } else {
+          setSignupError(`Registration for ${emp.full_name} (PIN #${pin}) has already been submitted and is waiting for HR Admin approval. Duplicate registration is not allowed.`);
+        }
+        return;
+      }
+
       const digits = (emp.phone || '').replace(/[^0-9]/g, '');
       const clean = digits.startsWith('977') && digits.length === 13 ? digits.substring(3) : digits;
       // If it looks like a placeholder, don't pre-fill or pre-fill with editable 98...
@@ -402,6 +436,17 @@ export default function StaffPortalPage() {
       return;
     }
 
+    // Hard one-time registration limit check
+    const existing = checkIsStaffAlreadyRegistered(signupPin);
+    if (existing) {
+      if (existing.status === 'APPROVED') {
+        setSignupError(`Staff member ${emp.full_name} (PIN #${signupPin}) is ALREADY REGISTERED and approved. Each staff is strictly limited to ONE-TIME signup. Please click "Back to Login".`);
+      } else {
+        setSignupError(`Registration for ${emp.full_name} (PIN #${signupPin}) has already been submitted and is waiting for HR approval. Duplicate registration is blocked.`);
+      }
+      return;
+    }
+
     const cleanPhone = signupPhone.replace(/[^0-9]/g, '');
     if (!cleanPhone || cleanPhone.length < 10) {
       setSignupError('Please enter a valid 10-digit mobile number (e.g. 9841XXXXXX).');
@@ -496,26 +541,31 @@ export default function StaffPortalPage() {
       const photoToSave = signupPhotoUrl || emp.photo_url || '';
 
       // Submit registration request to centralized staff database
-      try {
-        await fetch('/api/staff', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'submit_registration',
-            registration: {
-              pin: cleanPin,
-              phone: `+977-${cleanPhone}`,
-              password: signupPassword,
-              staffName: emp.full_name,
-              department_name: emp.department_name,
-              designation: emp.designation,
-              photo_url: photoToSave,
-              registeredAt: new Date().toISOString()
-            }
-          })
-        });
-      } catch (err) {
-        console.warn('Could not submit registration to API:', err);
+      const regRes = await fetch('/api/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'submit_registration',
+          registration: {
+            pin: cleanPin,
+            phone: `+977-${cleanPhone}`,
+            password: signupPassword,
+            staffName: emp.full_name,
+            department_name: emp.department_name,
+            designation: emp.designation,
+            photo_url: photoToSave,
+            registeredAt: new Date().toISOString()
+          }
+        })
+      });
+
+      const regData = await regRes.json();
+      if (!regRes.ok || !regData.success) {
+        throw new Error(regData.error || 'Registration failed. Staff may already be registered.');
+      }
+
+      if (regData.registrations && Array.isArray(regData.registrations)) {
+        setServerRegistrations(regData.registrations);
       }
 
       // Save credentials in local storage
@@ -1336,9 +1386,39 @@ export default function StaffPortalPage() {
               </div>
 
               {signupError && (
-                <div className="p-3 bg-red-950/70 border border-red-800 rounded-xl text-xs text-red-300 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                  <span>{signupError}</span>
+                <div className="p-3 bg-red-950/80 border border-red-800 rounded-xl text-xs text-red-300 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                    <span className="leading-relaxed">{signupError}</span>
+                  </div>
+                  {(signupError.includes('ALREADY REGISTERED') || signupError.includes('already been submitted')) && (
+                    <div className="pt-1 border-t border-red-800/60 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMode('login');
+                          setSignupStep(1);
+                          setLoginIdentifier(signupPin || '');
+                          setSignupError('');
+                        }}
+                        className="px-3 py-1.5 bg-gradient-to-r from-purple-700 to-fuchsia-700 hover:from-purple-600 hover:to-fuchsia-600 text-white font-bold rounded-lg text-xs shadow transition-transform active:scale-95 cursor-pointer"
+                      >
+                        Go to Login &rarr;
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMode('forgot_password');
+                          setResetStep(1);
+                          setResetPin(signupPin || '');
+                          setSignupError('');
+                        }}
+                        className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                      >
+                        Forgot Password?
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1353,9 +1433,14 @@ export default function StaffPortalPage() {
               {signupStep === 1 && (
                 <form onSubmit={handleSendSignupOtp} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                      Select Staff or Biometric PIN *
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                        Select Staff or Biometric PIN *
+                      </label>
+                      <span className="text-[10px] text-purple-300 font-semibold">
+                        One-Time Registration Only
+                      </span>
+                    </div>
                     <select
                       required
                       value={signupPin}
@@ -1363,11 +1448,20 @@ export default function StaffPortalPage() {
                       className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs font-medium text-slate-100 focus:outline-none focus:border-purple-500"
                     >
                       <option value="">-- Select your name ({employees.length} Staff) --</option>
-                      {employees.map(emp => (
-                        <option key={emp.id} value={emp.biometric_pin}>
-                          PIN #{emp.biometric_pin} - {emp.full_name} ({emp.designation})
-                        </option>
-                      ))}
+                      {employees.map(emp => {
+                        const existing = checkIsStaffAlreadyRegistered(emp.biometric_pin);
+                        const isReg = Boolean(existing);
+                        return (
+                          <option 
+                            key={emp.id} 
+                            value={emp.biometric_pin}
+                            disabled={isReg}
+                            className={isReg ? 'text-slate-500 bg-slate-900 line-through' : 'text-slate-100'}
+                          >
+                            PIN #{emp.biometric_pin} - {emp.full_name} ({emp.designation}) {isReg ? (existing?.status === 'APPROVED' ? '🔒 [ALREADY REGISTERED]' : '⏳ [PENDING APPROVAL]') : ''}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 

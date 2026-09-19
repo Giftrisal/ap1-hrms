@@ -69,6 +69,44 @@ export async function POST(req: NextRequest) {
       const cleanPin = String(reg.pin).trim();
       
       const existingIdx = registrationsDatabase.findIndex(r => String(r.pin) === cleanPin);
+      
+      // STRICT ONE-TIME SIGNUP LIMIT CHECK
+      if (existingIdx !== -1) {
+        const existing = registrationsDatabase[existingIdx];
+        if (existing.status === 'APPROVED') {
+          return NextResponse.json({
+            success: false,
+            error: `Staff account (PIN #${cleanPin}) is ALREADY REGISTERED and approved. One-time signup limit reached. Please sign in directly.`,
+            alreadyRegistered: true,
+            status: 'APPROVED'
+          }, { status: 400 });
+        }
+        if (existing.status === 'PENDING_APPROVAL') {
+          return NextResponse.json({
+            success: false,
+            error: `Registration for PIN #${cleanPin} is ALREADY SUBMITTED and currently awaiting HR approval. Duplicate registration is not allowed.`,
+            alreadyRegistered: true,
+            status: 'PENDING_APPROVAL'
+          }, { status: 400 });
+        }
+      }
+
+      // Check unique phone number across staff
+      const cleanPhoneDigits = (reg.phone || '').replace(/[^0-9]/g, '');
+      if (cleanPhoneDigits) {
+        const phoneHolder = registrationsDatabase.find(r => {
+          const digits = (r.phone || '').replace(/[^0-9]/g, '');
+          return digits && digits.length >= 10 && digits.endsWith(cleanPhoneDigits.slice(-10)) && String(r.pin) !== cleanPin;
+        });
+        if (phoneHolder) {
+          return NextResponse.json({
+            success: false,
+            error: `Mobile number ${reg.phone} is already linked to PIN #${phoneHolder.pin} (${phoneHolder.staffName}). Each staff member must register with their own phone number.`,
+            alreadyRegistered: true
+          }, { status: 400 });
+        }
+      }
+
       const newReg = {
         pin: cleanPin,
         phone: reg.phone,
