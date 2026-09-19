@@ -245,3 +245,17 @@ export interface CompanyAsset {
   notes?: string;
 }
 
+export interface OvertimePermission {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  biometric_pin: string;
+  date: string; // YYYY-MM-DD
+  approved_hours: number;
+  shift_name: string;
+  reason: string;
+  approved_by: string;
+  status: 'APPROVED' | 'PENDING' | 'REJECTED';
+  created_at: string;
+}
+

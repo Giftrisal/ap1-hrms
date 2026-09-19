@@ -1,4 +1,4 @@
-import { Employee, Department, Shift, DailyAttendance, PublicHoliday, LeaveRequest, AdvanceSalary, PayrollRecord, SystemSettings, FieldDutyRequest, CompanyAsset } from './types';
+import { Employee, Department, Shift, DailyAttendance, PublicHoliday, LeaveRequest, AdvanceSalary, PayrollRecord, SystemSettings, FieldDutyRequest, CompanyAsset, OvertimePermission } from './types';
 
 export const initialDepartments: Department[] = [
   { id: 'dept-1', name: 'Executive Management', code: 'EXEC', description: 'C-Suite and executive direction', employee_count: 0 },
@@ -44,24 +44,50 @@ export const saveStoredDepartments = (depts: Department[]) => {
 
 export const initialShifts: Shift[] = [
   {
-    id: 'shift-1',
-    name: 'Regular Morning Shift (9 AM - 5 PM)',
-    start_time: '09:00:00',
-    end_time: '17:00:00',
+    id: 'shift-morning',
+    name: 'Morning Shift (6:00 AM - 2:00 PM)',
+    start_time: '06:00:00',
+    end_time: '14:00:00',
+    grace_period_minutes: 15,
+    half_day_threshold_hours: 4.0,
+    full_day_hours: 8.0,
+    is_default: false
+  },
+  {
+    id: 'shift-day',
+    name: 'Day Shift (10:00 AM - 6:00 PM)',
+    start_time: '10:00:00',
+    end_time: '18:00:00',
     grace_period_minutes: 15,
     half_day_threshold_hours: 4.0,
     full_day_hours: 8.0,
     is_default: true
   },
   {
-    id: 'shift-2',
-    name: 'Flexible Tech Shift (10 AM - 6 PM)',
-    start_time: '10:00:00',
-    end_time: '18:00:00',
-    grace_period_minutes: 20,
+    id: 'shift-evening',
+    name: 'Evening Shift (2:00 PM - 10:00 PM)',
+    start_time: '14:00:00',
+    end_time: '22:00:00',
+    grace_period_minutes: 15,
     half_day_threshold_hours: 4.0,
     full_day_hours: 8.0,
     is_default: false
+  }
+];
+
+export const initialOvertimePermissions: OvertimePermission[] = [
+  {
+    id: 'ot-1',
+    employee_id: 'emp-1',
+    employee_name: 'Gift',
+    biometric_pin: '1',
+    date: new Date().toISOString().split('T')[0],
+    approved_hours: 2.0,
+    shift_name: 'Day Shift (10:00 AM - 6:00 PM)',
+    reason: 'Live News Broadcast Extended Special Coverage',
+    approved_by: 'HR Admin',
+    status: 'APPROVED',
+    created_at: new Date().toISOString()
   }
 ];
 
@@ -75,8 +101,8 @@ export const initialEmployees: Employee[] = [
     photo_url: "",
     department_id: "dept-6",
     department_name: "Operations & Broadcasting",
-    shift_id: "shift-1",
-    shift_name: "Regular Morning Shift (9 AM - 5 PM)",
+    shift_id: "shift-day",
+    shift_name: "Day Shift (10:00 AM - 6:00 PM)",
     designation: "Station Manager / Operations",
     role: "admin",
     status: "active",
