@@ -96,9 +96,7 @@ export default function ReportsPage() {
   return (
     <DashboardShell
       title={t.navReports}
-      subtitle={language === 'en' 
-        ? "Comprehensive HR intelligence, monthly staff attendance summaries, and exportable registers" 
-        : "समग्र मानव संसाधन विश्लेषण, मासिक हाजिरी प्रतिवेदन तथा डाउनलोड गर्न मिल्ने रिपोर्टहरू"}
+      subtitle="Comprehensive HR intelligence, monthly staff attendance summaries, and exportable registers"
     >
       {/* Top Report Type Selector & Actions */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">

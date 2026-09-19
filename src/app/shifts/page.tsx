@@ -15,9 +15,7 @@ export default function ShiftsPage() {
   return (
     <DashboardShell
       title={t.navShifts}
-      subtitle={language === 'en' 
-        ? "Configure work shifts, office start time, grace periods, and late arrival deduction rules" 
-        : "कार्यालय समय, सिफ्ट तालिका, छुट मिनेट तथा ढिलो दण्ड नियमहरू"}
+      subtitle="Configure work shifts, office start time, grace periods, and late arrival deduction rules"
     >
       {/* Shift Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -79,12 +77,10 @@ export default function ShiftsPage() {
           </div>
           <div>
             <h4 className="font-bold text-slate-900 text-base">
-              {language === 'en' ? 'Late Arrival Penalty Engine' : 'ढिलो हाजिरी दण्ड नियम'}
+              Late Arrival Penalty Engine
             </h4>
             <p className="text-xs text-slate-500">
-              {language === 'en' 
-                ? 'Automated salary deduction formula applied when staff punch in after the grace period'
-                : 'छुट मिनेटपछि पञ्च गर्दा लागु हुने स्वचालित तलब कट्टी नियम'}
+              Automated salary deduction formula applied when staff punch in after the grace period
             </p>
           </div>
         </div>
@@ -101,7 +97,7 @@ export default function ShiftsPage() {
             />
             <div>
               <p className="font-bold text-slate-900">
-                {language === 'en' ? '3 Late Arrivals = 0.5 Day Salary Deduction (Standard Nepal Rule)' : '३ पटक ढिलो = आधा दिन तलब कट्टी'}
+                3 Late Arrivals = 0.5 Day Salary Deduction (Standard Nepal Rule)
               </p>
               <p className="text-slate-500 mt-0.5">
                 Every 3 late arrivals in a payroll month automatically deducts 0.5 day's wage during monthly payroll.
@@ -120,7 +116,7 @@ export default function ShiftsPage() {
             />
             <div>
               <p className="font-bold text-slate-900">
-                {language === 'en' ? 'Fixed Fine per Late Punch (e.g. NPR 200)' : 'प्रत्येक ढिलोमा निश्चित जरिवाना (रु. २००)'}
+                Fixed Fine per Late Punch (e.g. NPR 200)
               </p>
               <p className="text-slate-500 mt-0.5">
                 Applies a constant fine for every punch occurring after grace period ends.

@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import DashboardShell from '@/components/layout/DashboardShell';
 import { useLanguage } from '@/lib/i18n/context';
 import { useAuth } from '@/lib/auth/auth-context';
-import { initialEmployees, initialDepartments } from '@/lib/mock-data';
-import { Employee } from '@/lib/types';
+import { initialEmployees, initialDepartments, getStoredDepartments, saveStoredDepartments } from '@/lib/mock-data';
+import { Employee, Department } from '@/lib/types';
 import { 
   Users, 
   Search, 
@@ -20,6 +21,7 @@ import {
   Calendar,
   CreditCard,
   Building,
+  Building2,
   CheckCircle2,
   X,
   Save,
@@ -28,7 +30,16 @@ import {
   Send,
   Sparkles,
   QrCode,
-  Printer
+  Printer,
+  Camera,
+  Upload,
+  MessageSquare,
+  History,
+  Radio,
+  Settings,
+  ExternalLink,
+  Copy,
+  RefreshCw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -41,10 +52,30 @@ export default function StaffPage() {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('goinfi_staff_list');
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
+        try {
+          const parsed = JSON.parse(saved);
+          // Permanently purge old 263 AP1 biometric staff so they never restore
+          const isOldBulk = Array.isArray(parsed) && (
+            parsed.length > 200 ||
+            parsed.some((e: any) => 
+              (typeof e.id === 'string' && e.id.startsWith('ap1-')) ||
+              e.id === 'emp-101' || e.full_name === 'Aayush Shrestha' ||
+              e.full_name === 'Yeshoda' || e.full_name === 'Roji Maharjan' ||
+              (e.id === 'emp-1' && e.full_name === 'Gift') ||
+              (e.id === 'emp-2' && e.full_name === 'NN-2')
+            )
+          );
+          if (isOldBulk) {
+            localStorage.removeItem('goinfi_staff_list');
+            return [];
+          }
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        } catch (e) {}
       }
     }
-    return initialEmployees;
+    return [];
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,6 +89,254 @@ export default function StaffPage() {
   const [staffBio, setStaffBio] = useState('');
   const [broadcastResult, setBroadcastResult] = useState<any>(null);
 
+  // SMS Broadcast & Notice Center State
+  const [isSmsModalOpen, setIsSmsModalOpen] = useState(false);
+  const [smsTab, setSmsTab] = useState<'bulk' | 'individual' | 'logs'>('bulk');
+  const [smsTargetDept, setSmsTargetDept] = useState<string>('ALL');
+  const [smsSelectedStaffId, setSmsSelectedStaffId] = useState<string>('');
+  const [smsCustomPhone, setSmsCustomPhone] = useState<string>('');
+  const [smsMessage, setSmsMessage] = useState<string>('');
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsStatusMsg, setSmsStatusMsg] = useState<{ type: 'success' | 'error' | 'warning'; text: string } | null>(null);
+  const [gatewaySavedNotice, setGatewaySavedNotice] = useState('');
+  const [smsGatewayConfig, setSmsGatewayConfig] = useState<{
+    provider: 'sparrow' | 'twozero' | 'aakash' | 'custom';
+    apiKey: string;
+    senderId: string;
+    apiUrl: string;
+  }>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('goinfi_sms_gateway_config');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return {
+      provider: 'twozero',
+      apiKey: 'sk_Fc6uqsPMOcEhunlMg4DKPW675opkXhAgqZ0KmQZZlA2chwPt2x13DVhfyzlO',
+      senderId: 'GOINFI',
+      apiUrl: 'https://sms.twozero.io/api/v1/sms/send'
+    };
+  });
+  const [smsLogs, setSmsLogs] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('goinfi_sms_logs');
+        return saved ? JSON.parse(saved) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  const handleOpenIndividualSms = (emp: Employee) => {
+    setSmsTab('individual');
+    setSmsSelectedStaffId(emp.id);
+    const digits = (emp.phone || '').replace(/[^0-9]/g, '');
+    const clean = digits.startsWith('977') && digits.length === 13 ? digits.substring(3) : digits;
+    setSmsCustomPhone(clean);
+    setSmsStatusMsg(null);
+    setIsSmsModalOpen(true);
+  };
+
+  const handleOpenBulkSms = (dept = 'ALL') => {
+    setSmsTab('bulk');
+    setSmsTargetDept(dept);
+    setSmsStatusMsg(null);
+    setIsSmsModalOpen(true);
+  };
+
+  const handleSendSmsBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSmsStatusMsg(null);
+
+    const trimmed = smsMessage.trim();
+    if (!trimmed) {
+      setSmsStatusMsg({ type: 'error', text: 'Please enter a message to send.' });
+      return;
+    }
+
+    let recipientList: any[] = [];
+    if (smsTab === 'bulk') {
+      const targetEmps = smsTargetDept === 'ALL' 
+        ? employees 
+        : employees.filter(e => e.department_name === smsTargetDept || e.department_id === smsTargetDept);
+
+      if (targetEmps.length === 0) {
+        setSmsStatusMsg({ type: 'error', text: 'No staff found in the selected department.' });
+        return;
+      }
+
+      recipientList = targetEmps.map(emp => ({
+        phone: emp.phone,
+        name: emp.full_name,
+        pin: emp.biometric_pin,
+        department: emp.department_name
+      }));
+    } else {
+      const chosen = employees.find(e => e.id === smsSelectedStaffId) || employees.find(e => e.biometric_pin === smsSelectedStaffId);
+      const phone = (smsCustomPhone || chosen?.phone || '').replace(/[^0-9]/g, '');
+      if (!phone || phone.length < 9) {
+        setSmsStatusMsg({ type: 'error', text: 'Please enter a valid 10-digit mobile number.' });
+        return;
+      }
+      recipientList = [{
+        phone,
+        name: chosen?.full_name || 'Staff',
+        pin: chosen?.biometric_pin || '0',
+        department: chosen?.department_name || 'AP1'
+      }];
+    }
+
+    setSmsSending(true);
+    try {
+      const res = await fetch('/api/sms/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: smsTab,
+          recipients: recipientList,
+          message: trimmed,
+          gatewayConfig: smsGatewayConfig
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        const errorText = data.error || 'Failed to send SMS. Please verify your SMS gateway balance and API key.';
+        setSmsStatusMsg({
+          type: 'error',
+          text: `❌ ${errorText}`
+        });
+        return;
+      }
+
+      const newLog = {
+        id: `sms-log-${Date.now()}`,
+        type: smsTab,
+        target: smsTab === 'bulk' ? (smsTargetDept === 'ALL' ? `All Staff (${recipientList.length})` : `${smsTargetDept} (${recipientList.length})`) : (recipientList[0]?.name || smsCustomPhone),
+        recipientCount: recipientList.length,
+        message: trimmed,
+        sentAt: new Date().toISOString(),
+        successCount: data.successCount,
+        failedCount: data.failedCount
+      };
+
+      const updatedLogs = [newLog, ...smsLogs];
+      setSmsLogs(updatedLogs);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('goinfi_sms_logs', JSON.stringify(updatedLogs));
+      }
+
+      setSmsStatusMsg({
+        type: 'success',
+        text: `✅ ${data.message || 'SMS broadcast dispatched successfully!'}`
+      });
+      setSmsMessage('');
+    } catch (err: any) {
+      setSmsStatusMsg({
+        type: 'error',
+        text: `❌ ${err.message || 'An error occurred while sending SMS.'}`
+      });
+    } finally {
+      setSmsSending(false);
+    }
+  };
+
+  // Dynamic Departments loaded from localStorage
+  const [departments, setDepartments] = useState<Department[]>(() => {
+    if (typeof window !== 'undefined') {
+      return getStoredDepartments();
+    }
+    return initialDepartments;
+  });
+
+  const saveDepartmentsList = (newList: Department[]) => {
+    setDepartments(newList);
+    saveStoredDepartments(newList);
+  };
+
+  // Department Modal State
+  const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
+  const [newDeptName, setNewDeptName] = useState('');
+  const [newDeptCode, setNewDeptCode] = useState('');
+  const [newDeptDesc, setNewDeptDesc] = useState('');
+  const [isQuickDeptOpen, setIsQuickDeptOpen] = useState(false);
+  const [quickDeptName, setQuickDeptName] = useState('');
+
+  const handleAddDepartment = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = newDeptName.trim();
+    if (!trimmed) {
+      alert('Please enter department name');
+      return;
+    }
+
+    const code = (newDeptCode.trim() || trimmed.substring(0, 4).toUpperCase()).replace(/[^A-Z0-9]/g, '') || 'DEPT';
+    const id = `dept-${Date.now()}`;
+    const newDept: Department = {
+      id,
+      name: trimmed,
+      code,
+      description: newDeptDesc.trim() || `${trimmed} Department`,
+      employee_count: 0
+    };
+
+    const updated = [...departments, newDept];
+    saveDepartmentsList(updated);
+    setNewDeptName('');
+    setNewDeptCode('');
+    setNewDeptDesc('');
+    showNotice(`✅ Department "${trimmed}" created successfully!`);
+  };
+
+  const handleQuickAddDept = (isEditing = false) => {
+    const trimmed = quickDeptName.trim();
+    if (!trimmed) return;
+
+    const code = trimmed.substring(0, 4).toUpperCase().replace(/[^A-Z0-9]/g, '') || 'DEPT';
+    const id = `dept-${Date.now()}`;
+    const newDept: Department = {
+      id,
+      name: trimmed,
+      code,
+      description: `${trimmed} Department`,
+      employee_count: 0
+    };
+
+    const updated = [...departments, newDept];
+    saveDepartmentsList(updated);
+
+    if (isEditing && editingStaff) {
+      setEditingStaff({ ...editingStaff, department_id: id, department_name: trimmed });
+    } else {
+      setFormData(prev => ({ ...prev, department_id: id }));
+    }
+
+    setQuickDeptName('');
+    setIsQuickDeptOpen(false);
+    showNotice(`✅ New Department "${trimmed}" created and selected!`);
+  };
+
+  const handleDeleteDepartment = (deptId: string, deptName: string) => {
+    const assignedCount = employees.filter(e => e.department_id === deptId || e.department_name === deptName).length;
+    if (assignedCount > 0) {
+      alert(
+        `Cannot delete department "${deptName}" because ${assignedCount} staff member(s) are currently in it. Please reassign them first.`
+      );
+      return;
+    }
+
+    if (!confirm(
+      `Are you sure you want to delete department "${deptName}"?`
+    )) return;
+
+    const updated = departments.filter(d => d.id !== deptId);
+    saveDepartmentsList(updated);
+    showNotice(`🗑️ Department "${deptName}" removed.`);
+  };
+
   const saveEmployeesList = (newList: Employee[]) => {
     setEmployees(newList);
     if (typeof window !== 'undefined') {
@@ -65,19 +344,10 @@ export default function StaffPage() {
     }
   };
 
-  const handleImportAp1Backup = async () => {
-    try {
-      const res = await fetch('/ap1_staff_list.json');
-      if (!res.ok) throw new Error('Could not fetch AP1 staff file');
-      const data: Employee[] = await res.json();
-      saveEmployeesList(data);
-      showNotice(
-        language === 'en'
-          ? `✅ Successfully loaded all ${data.length} AP1 employees from biometric backup!`
-          : `✅ बायोमेट्रिक मेसिनबाट सबै ${data.length} AP1 कर्मचारीहरू सफलतापूर्वक लोड गरियो!`
-      );
-    } catch (err) {
-      alert('Error loading staff: ' + err);
+  const handleClearAllStaff = () => {
+    if (confirm('Are you sure you want to delete all staff?')) {
+      saveEmployeesList([]);
+      showNotice('All staff cleared successfully. Ready for manual registration.');
     }
   };
 
@@ -87,16 +357,55 @@ export default function StaffPage() {
     email: '',
     phone: '+977-98',
     biometric_pin: '',
-    department_id: initialDepartments[1].id,
+    photo_url: '',
+    department_id: departments[0]?.id || 'dept-1',
     designation: '',
     base_salary: 40000,
-    join_date: new Date().toISOString().split('T')[0],
+    join_date: '',
+    dob: '',
     role: 'employee',
     status: 'active',
-    bank_name: 'NIC Asia Bank',
-    bank_account_number: '10928374829101',
-    pan_number: 'PAN69102910'
+    bank_name: 'Global IME Bank',
+    bank_account_number: '102000000001',
+    pan_number: 'PAN000001'
   });
+
+  const handleOpenEdit = (emp: Employee) => {
+    const today = new Date().toISOString().split('T')[0];
+    const isAutoOrToday = !emp.join_date || 
+      emp.join_date === today || 
+      emp.join_date === '2023-01-01' ||
+      emp.join_date === '2026-09-19' ||
+      emp.join_date === '2026-09-20' ||
+      (!(emp as any).is_joining_date_set && (emp.join_date === today || emp.join_date === '2023-01-01'));
+
+    setEditingStaff({
+      ...emp,
+      join_date: isAutoOrToday ? '' : emp.join_date,
+      dob: emp.dob || ''
+    });
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, isEditing = false) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Photo is too large! Please choose an image under 5MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      if (isEditing && editingStaff) {
+        setEditingStaff(prev => prev ? ({ ...prev, photo_url: result }) : null);
+      } else {
+        setFormData(prev => ({ ...prev, photo_url: result }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const filteredEmployees = employees.filter((emp) => {
     const matchesSearch = 
@@ -114,30 +423,48 @@ export default function StaffPage() {
       return;
     }
 
-    const dept = initialDepartments.find(d => d.id === formData.department_id);
+    const dept = departments.find(d => d.id === formData.department_id);
     const newEmp: Employee = {
       id: `emp-${Date.now()}`,
       biometric_pin: formData.biometric_pin!,
       full_name: formData.full_name!,
-      email: formData.email || `${formData.full_name.toLowerCase().replace(/\s+/g, '.')}@goinfi.com`,
+      email: formData.email || `${formData.full_name.toLowerCase().replace(/\s+/g, '.')}@ap1.tv`,
       phone: formData.phone || '+977-9800000000',
-      photo_url: `https://images.unsplash.com/photo-${1534528741775 + employees.length}?w=150`,
-      department_id: formData.department_id!,
-      department_name: dept?.name || 'Software Engineering',
+      photo_url: formData.photo_url || `https://images.unsplash.com/photo-${1534528741775 + employees.length}?w=150`,
+      department_id: formData.department_id || departments[0]?.id || 'dept-1',
+      department_name: dept?.name || 'Operations & Broadcasting',
       shift_id: 'shift-1',
-      shift_name: 'Regular Morning Shift',
-      designation: formData.designation || 'Specialist',
+      shift_name: 'Regular Morning Shift (9 AM - 5 PM)',
+      designation: formData.designation || 'Staff',
       role: formData.role || 'employee',
       status: 'active',
-      join_date: formData.join_date || new Date().toISOString().split('T')[0],
+      join_date: formData.join_date || '',
+      dob: formData.dob || undefined,
       base_salary: Number(formData.base_salary) || 40000,
-      bank_name: formData.bank_name || 'NIC Asia Bank',
-      bank_account_number: formData.bank_account_number || '10928374829101',
-      pan_number: formData.pan_number || 'PAN69102910'
+      bank_name: formData.bank_name || 'Global IME Bank',
+      bank_account_number: formData.bank_account_number || '102000000001',
+      pan_number: formData.pan_number || 'PAN000001'
     };
 
     saveEmployeesList([newEmp, ...employees]);
     setIsAddModalOpen(false);
+    setFormData({
+      full_name: '',
+      email: '',
+      phone: '+977-98',
+      biometric_pin: '',
+      photo_url: '',
+      department_id: departments[0]?.id || 'dept-1',
+      designation: '',
+      base_salary: 40000,
+      join_date: '',
+      dob: '',
+      role: 'employee',
+      status: 'active',
+      bank_name: 'Global IME Bank',
+      bank_account_number: '102000000001',
+      pan_number: 'PAN000001'
+    });
 
     // Auto-broadcast welcome introduction email if enabled!
     if (broadcastEmail) {
@@ -163,7 +490,7 @@ export default function StaffPage() {
         showNotice('Staff added. (Email notification queued)');
       }
     } else {
-      showNotice(language === 'en' ? 'New staff member added successfully!' : 'नयाँ कर्मचारी सफलतापूर्वक थपियो!');
+      showNotice('New staff member added successfully!');
     }
   };
 
@@ -195,25 +522,27 @@ export default function StaffPage() {
     e.preventDefault();
     if (!editingStaff) return;
 
-    const dept = initialDepartments.find(d => d.id === editingStaff.department_id);
+    const dept = departments.find(d => d.id === editingStaff.department_id);
     const updated = {
       ...editingStaff,
       department_name: dept?.name || editingStaff.department_name,
-      base_salary: Number(editingStaff.base_salary)
+      base_salary: Number(editingStaff.base_salary),
+      join_date: editingStaff.join_date || '',
+      is_joining_date_set: Boolean(editingStaff.join_date)
     };
 
     const updatedList = employees.map(emp => emp.id === updated.id ? updated : emp);
     saveEmployeesList(updatedList);
     setEditingStaff(null);
-    showNotice(language === 'en' ? 'Employee details & salary updated successfully!' : 'कर्मचारी विवरण र तलब सुरक्षित भयो!');
+    showNotice('Employee details & salary updated successfully!');
   };
 
   const handleDeleteStaff = (id: string, name: string) => {
-    if (confirm(language === 'en' ? `Are you sure you want to remove ${name}?` : `के तपाईं साँच्चै ${name} लाई हटाउन चाहनुहुन्छ?`)) {
+    if (confirm(`Are you sure you want to remove ${name}?`)) {
       const updatedList = employees.filter(e => e.id !== id);
       saveEmployeesList(updatedList);
       setEditingStaff(null);
-      showNotice(language === 'en' ? `${name} has been removed.` : `${name} हटाइयो।`);
+      showNotice(`${name} has been removed.`);
     }
   };
 
@@ -232,6 +561,7 @@ export default function StaffPage() {
       'Designation': e.designation,
       'Base Salary (NPR)': e.base_salary,
       'Join Date': e.join_date,
+      'Date of Birth': e.dob || '',
       'Role': e.role,
       'PAN': e.pan_number,
       'Bank': e.bank_name,
@@ -246,9 +576,6 @@ export default function StaffPage() {
   return (
     <DashboardShell
       title={t.navStaff}
-      subtitle={language === 'en' 
-        ? "Manage, edit salaries, biometric PINs, and automated welcome broadcasts" 
-        : "कर्मचारी विवरण, तलब सम्पादन, बायोमेट्रिक मेसिन पिन, तथा नयाँ कर्मचारी स्वागत इमेल प्रणाली"}
     >
       {/* Toast Notice */}
       {saveSuccessMsg && (
@@ -268,7 +595,7 @@ export default function StaffPage() {
             <div>
               <p className="font-bold text-slate-900">{broadcastResult.subject}</p>
               <p className="text-slate-600 text-[11px] mt-0.5">
-                Sent to {broadcastResult.recipientCount} staff emails. WhatsApp announcement ready.
+                Sent to {broadcastResult.recipientCount} staff emails.
               </p>
             </div>
           </div>
@@ -281,11 +608,128 @@ export default function StaffPage() {
         </div>
       )}
 
+      {/* Enterprise Executive Strip with Official AP1 HD Logo */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-purple-950 p-5 sm:p-6 rounded-2xl text-white shadow-md border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+        <div className="flex items-center gap-4 sm:gap-5">
+          <Link 
+            href="/dashboard"
+            className="p-2.5 sm:p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-2xl border border-white/20 hover:border-white/30 shadow-inner shrink-0 transition-all cursor-pointer group active:scale-95 flex items-center justify-center"
+            title="Go to Dashboard"
+          >
+            <img src="/ap1-logo.png" alt="AP1 HD Logo" className="h-16 sm:h-20 w-auto object-contain drop-shadow-lg group-hover:scale-105 transition-transform" />
+          </Link>
+          <div>
+            <div className="flex items-center gap-2">
+              <Link 
+                href="/dashboard" 
+                className="px-3 py-0.5 rounded-full text-[10px] font-black tracking-widest bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white uppercase shadow-xs transition-colors cursor-pointer"
+                title="Go to Dashboard"
+              >
+                AP1 TELEVISION
+              </Link>
+              <span className="text-xs text-purple-200 font-semibold">• Corporate HRMS by Goinfi</span>
+            </div>
+            <h2 className="text-lg sm:text-xl font-black text-white mt-1.5 tracking-tight">
+              AP1 Tv Staff Directory & Biometric Terminal Management
+            </h2>
+            <p className="text-xs text-slate-300 mt-0.5">
+              Real-time biometric punch synchronization with ZKTeco face & fingerprint hardware
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 self-stretch md:self-auto justify-end flex-wrap">
+          {/* Hardware Status Pill */}
+          <div className="flex items-center gap-2 bg-slate-800/90 border border-slate-700 px-3.5 py-1.5 rounded-xl text-xs">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <span className="font-bold text-emerald-300 text-xs tracking-wide">Online</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 4 Premium Metric Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Metric 1 */}
+        <div className="bg-white p-4.5 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+              Total Workforce
+            </span>
+            <span className="text-2xl font-black text-slate-900 mt-1 block">
+              {employees.length} <span className="text-xs font-semibold text-slate-400">Staff</span>
+            </span>
+            <span className="text-[10px] text-emerald-600 font-semibold mt-0.5 inline-flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> AP1 Registered
+            </span>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shrink-0">
+            <Users className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Metric 2 */}
+        <div className="bg-white p-4.5 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+              Biometric Enrolled
+            </span>
+            <span className="text-2xl font-black text-blue-700 mt-1 block">
+              {employees.filter(e => Boolean(e.biometric_pin)).length} <span className="text-xs font-semibold text-slate-400">PINs</span>
+            </span>
+            <span className="text-[10px] text-blue-600 font-semibold mt-0.5 inline-flex items-center gap-1">
+              <Fingerprint className="w-3 h-3 text-blue-500" /> ZKTeco Ready
+            </span>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-purple-50 border border-purple-200 text-purple-600 flex items-center justify-center shrink-0">
+            <Fingerprint className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Metric 3 */}
+        <div className="bg-white p-4.5 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+              Monthly Payroll
+            </span>
+            <span className="text-xl font-black text-emerald-700 mt-1 block">
+              NPR {employees.reduce((sum, e) => sum + (e.base_salary || 0), 0).toLocaleString('en-IN')}
+            </span>
+            <span className="text-[10px] text-slate-500 font-medium mt-0.5 block">
+              Disbursement active
+            </span>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shrink-0">
+            <CreditCard className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Metric 4 */}
+        <div className="bg-white p-4.5 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+              Admin & HR Ops
+            </span>
+            <span className="text-2xl font-black text-indigo-700 mt-1 block">
+              {employees.filter(e => e.role === 'admin' || e.role === 'hr').length} <span className="text-xs font-semibold text-slate-400">Accounts</span>
+            </span>
+            <span className="text-[10px] text-indigo-600 font-semibold mt-0.5 block">
+              System access control
+            </span>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center shrink-0">
+            <Building className="w-5 h-5" />
+          </div>
+        </div>
+      </div>
+
       {/* Top Action & Control Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3 w-full md:w-auto flex-1">
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4">
+        <div className="flex items-center gap-3 w-full xl:w-auto flex-1 flex-wrap sm:flex-nowrap">
           {/* Search */}
-          <div className="relative flex-1 max-w-xs">
+          <div className="relative flex-1 min-w-[200px] max-w-xs">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -303,14 +747,14 @@ export default function StaffPage() {
             className="py-2 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-medium text-slate-700"
           >
             <option value="ALL">{t.filterDepartment}</option>
-            {initialDepartments.map((d) => (
+            {departments.map((d) => (
               <option key={d.id} value={d.name}>{d.name}</option>
             ))}
           </select>
         </div>
 
-        {/* View Toggle + Add Button */}
-        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+        {/* View Toggle + Add Button (Tablet & Mobile Friendly with flex-wrap) */}
+        <div className="flex items-center flex-wrap gap-2 w-full xl:w-auto justify-start xl:justify-end">
           {/* View Switcher: Cards vs Table */}
           <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200">
             <button
@@ -343,15 +787,37 @@ export default function StaffPage() {
             <span>Excel</span>
           </button>
 
-          {/* Import 263 AP1 Staff Button */}
+          {/* Manage Departments Button */}
           <button
-            onClick={handleImportAp1Backup}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-500/20 transition-all cursor-pointer"
-            title="Load all 263 AP1 staff extracted from biometric backup"
+            onClick={() => setIsDeptModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-2xs transition-all cursor-pointer"
+            title="Manage Corporate Departments & Units"
           >
-            <Fingerprint className="w-4 h-4 text-white" />
-            <span>{language === 'en' ? '⚡ Load 263 AP1 Staff' : '⚡ २६३ AP1 कर्मचारी लोड'}</span>
+            <Building2 className="w-4 h-4 text-indigo-600" />
+            <span>{`🏢 Departments (${departments.length})`}</span>
           </button>
+
+          {/* Send SMS Broadcast Button */}
+          <button
+            onClick={() => handleOpenBulkSms('ALL')}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm shadow-emerald-600/20 transition-all cursor-pointer"
+            title="Send bulk or individual SMS to staff via Goinfi SMS"
+          >
+            <Send className="w-3.5 h-3.5 text-white" />
+            <span>📢 SMS Notice</span>
+          </button>
+
+          {/* Clear All Staff Button */}
+          {employees.length > 0 && (
+            <button
+              onClick={handleClearAllStaff}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer"
+              title="Delete all staff from directory"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear All</span>
+            </button>
+          )}
 
           {/* Big Add Staff Button */}
           <button
@@ -359,10 +825,32 @@ export default function StaffPage() {
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4 text-white" />
-            <span>{language === 'en' ? '+ Add New Staff' : '+ नयाँ कर्मचारी थप्नुहोस्'}</span>
+            <span>+ Add New Staff</span>
           </button>
         </div>
       </div>
+
+      {/* Empty State when directory is empty */}
+      {filteredEmployees.length === 0 && (
+        <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center my-6 shadow-xs">
+          <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
+            <Users className="w-7 h-7" />
+          </div>
+          <h3 className="text-base font-bold text-slate-800">
+            Staff Directory is Empty
+          </h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-5">
+            All old staff records have been cleared. Click below to add staff members manually.
+          </p>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20 cursor-pointer"
+          >
+            <Plus className="w-4 h-4 text-white" />
+            <span>+ Add New Staff</span>
+          </button>
+        </div>
+      )}
 
       {/* VIEW 1: CARD VIEW */}
       {viewMode === 'grid' && (
@@ -410,6 +898,18 @@ export default function StaffPage() {
                     <span>Email:</span>
                     <span className="truncate max-w-[140px] text-slate-700">{emp.email}</span>
                   </div>
+                  {emp.join_date && emp.join_date !== '2023-01-01' && emp.join_date !== '2026-09-19' && emp.join_date !== '2026-09-20' && (
+                    <div className="flex justify-between items-center text-[11px] text-slate-500">
+                      <span>Joined:</span>
+                      <span className="font-semibold text-slate-700">{emp.join_date}</span>
+                    </div>
+                  )}
+                  {emp.dob && (
+                    <div className="flex justify-between items-center text-[11px] text-slate-500">
+                      <span>DOB:</span>
+                      <span className="font-semibold text-slate-700">{emp.dob}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -417,11 +917,18 @@ export default function StaffPage() {
               <div className="pt-2.5 border-t border-slate-100 space-y-2">
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setEditingStaff({ ...emp })}
+                    onClick={() => handleOpenEdit(emp)}
                     className="flex-1 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm shadow-blue-500/20 transition-all cursor-pointer"
                   >
                     <Edit3 className="w-3.5 h-3.5 text-white" />
-                    <span>{language === 'en' ? 'Edit Details' : 'सम्पादन'}</span>
+                    <span>Edit Details</span>
+                  </button>
+                  <button
+                    onClick={() => handleOpenIndividualSms(emp)}
+                    className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors cursor-pointer"
+                    title="Send Direct SMS to this Staff"
+                  >
+                    <MessageSquare className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setIdCardStaff(emp)}
@@ -446,7 +953,7 @@ export default function StaffPage() {
                   title="Send welcome intro email to all 32 staff"
                 >
                   <Send className="w-3 h-3 text-blue-600" />
-                  <span>{language === 'en' ? 'Send Intro Email to All Staff' : 'सबैलाई स्वागत इमेल पठाउनुहोस्'}</span>
+                  <span>Send Intro Email to All Staff</span>
                 </button>
               </div>
             </div>
@@ -465,6 +972,7 @@ export default function StaffPage() {
                   <th className="py-3 px-4">Machine PIN</th>
                   <th className="py-3 px-4">Department</th>
                   <th className="py-3 px-4">Designation</th>
+                  <th className="py-3 px-4">Join Date & DOB</th>
                   <th className="py-3 px-4">Base Salary</th>
                   <th className="py-3 px-4 text-center">Actions</th>
                 </tr>
@@ -498,6 +1006,15 @@ export default function StaffPage() {
                       {emp.designation}
                     </td>
 
+                    <td className="py-3 px-4 text-[11px] text-slate-600">
+                      {emp.join_date && emp.join_date !== '2023-01-01' && emp.join_date !== '2026-09-19' && emp.join_date !== '2026-09-20' ? (
+                        <div><span className="font-semibold text-slate-700">Join:</span> {emp.join_date}</div>
+                      ) : (
+                        <div className="text-slate-400 italic">Not set</div>
+                      )}
+                      {emp.dob && <div><span className="font-semibold text-slate-700">DOB:</span> {emp.dob}</div>}
+                    </td>
+
                     <td className="py-3 px-4 font-bold text-emerald-700 text-sm">
                       NPR {emp.base_salary.toLocaleString('en-IN')}
                     </td>
@@ -505,11 +1022,18 @@ export default function StaffPage() {
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
-                          onClick={() => setEditingStaff({ ...emp })}
+                          onClick={() => handleOpenEdit(emp)}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-lg shadow-xs transition-colors cursor-pointer"
                         >
                           <Edit3 className="w-3.5 h-3.5 text-white" />
                           <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleOpenIndividualSms(emp)}
+                          className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 cursor-pointer"
+                          title="Send Direct SMS"
+                        >
+                          <MessageSquare className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => setIdCardStaff(emp)}
@@ -535,9 +1059,7 @@ export default function StaffPage() {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
                 <Edit3 className="w-5 h-5 text-blue-600" />
-                <span>
-                  {language === 'en' ? `Edit Staff: ${editingStaff.full_name}` : `कर्मचारी सम्पादन: ${editingStaff.full_name}`}
-                </span>
+                <span>Edit Staff: {editingStaff.full_name}</span>
               </h3>
               <button 
                 onClick={() => setEditingStaff(null)}
@@ -548,9 +1070,47 @@ export default function StaffPage() {
             </div>
 
             <form onSubmit={handleUpdateStaff} className="space-y-4 mt-4 text-xs">
+              {/* Photo Upload & Preview */}
+              <div className="flex items-center gap-4 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-slate-200 border border-slate-300 flex items-center justify-center shrink-0 shadow-2xs">
+                  {editingStaff.photo_url ? (
+                    <img src={editingStaff.photo_url} alt={editingStaff.full_name} className="w-full h-full object-cover" />
+                  ) : (
+                    <Camera className="w-6 h-6 text-slate-400" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    Employee Profile Photo
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-100 text-blue-600 border border-blue-200 shadow-2xs cursor-pointer">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{editingStaff.photo_url ? 'Change Photo' : 'Upload Photo'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handlePhotoUpload(e, true)}
+                      />
+                    </label>
+                    {editingStaff.photo_url && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingStaff({ ...editingStaff, photo_url: '' })}
+                        className="text-xs text-rose-600 hover:text-rose-700 font-medium cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">Supports JPG, PNG, WebP (Max 5MB)</p>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Full Name (पूरा नाम) *</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Full Name *</label>
                   <input
                     type="text"
                     required
@@ -560,7 +1120,7 @@ export default function StaffPage() {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Biometric Machine PIN (मेसिन आइडी) *</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Biometric Machine PIN *</label>
                   <input
                     type="text"
                     required
@@ -574,7 +1134,7 @@ export default function StaffPage() {
               {/* Salary Highlight Box */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-blue-50 p-4 rounded-xl border border-blue-200">
                 <div>
-                  <label className="block font-bold text-blue-900 mb-1">Monthly Base Salary (मासिक तलब रु.) *</label>
+                  <label className="block font-bold text-blue-900 mb-1">Monthly Base Salary (NPR) *</label>
                   <input
                     type="number"
                     required
@@ -585,7 +1145,7 @@ export default function StaffPage() {
                   <span className="text-[10px] text-blue-700 mt-1 block font-medium">Used for monthly payslips & OT calculation</span>
                 </div>
                 <div>
-                  <label className="block font-bold text-blue-900 mb-1">Designation / Position (पद) *</label>
+                  <label className="block font-bold text-blue-900 mb-1">Designation / Position *</label>
                   <input
                     type="text"
                     required
@@ -599,14 +1159,41 @@ export default function StaffPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Department (विभाग)</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-700">Department</label>
+                    <button
+                      type="button"
+                      onClick={() => setIsQuickDeptOpen(!isQuickDeptOpen)}
+                      className="text-[11px] font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                    >
+                      {isQuickDeptOpen ? '✕ Close' : '+ New Dept'}
+                    </button>
+                  </div>
+                  {isQuickDeptOpen && (
+                    <div className="mb-2 p-2 bg-blue-50/80 border border-blue-200 rounded-lg flex gap-1.5">
+                      <input
+                        type="text"
+                        value={quickDeptName}
+                        onChange={(e) => setQuickDeptName(e.target.value)}
+                        placeholder="New department name..."
+                        className="flex-1 px-2 py-1 text-xs bg-white border border-blue-300 rounded focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleQuickAddDept(true)}
+                        className="px-2.5 py-1 text-[11px] font-bold bg-blue-600 text-white rounded hover:bg-blue-500 cursor-pointer"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  )}
                   <select
                     value={editingStaff.department_id}
                     onChange={(e) => setEditingStaff({ ...editingStaff, department_id: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-medium"
                   >
-                    {initialDepartments.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
                     ))}
                   </select>
                 </div>
@@ -645,6 +1232,31 @@ export default function StaffPage() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Date of Joining
+                  </label>
+                  <input
+                    type="date"
+                    value={editingStaff.join_date || ''}
+                    onChange={(e) => setEditingStaff({ ...editingStaff, join_date: e.target.value, is_joining_date_set: Boolean(e.target.value) } as any)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-medium text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Date of Birth
+                  </label>
+                  <input
+                    type="date"
+                    value={editingStaff.dob || ''}
+                    onChange={(e) => setEditingStaff({ ...editingStaff, dob: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-medium text-slate-800"
+                  />
+                </div>
+              </div>
+
               {/* ACTION BUTTONS (DELETE & SAVE) */}
               <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
                 <button
@@ -653,7 +1265,7 @@ export default function StaffPage() {
                   className="px-4 py-2.5 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4 text-white" />
-                  <span>{language === 'en' ? 'Delete Staff' : 'कर्मचारी हटाउनुहोस्'}</span>
+                  <span>Delete Staff</span>
                 </button>
 
                 <div className="flex items-center gap-2">
@@ -685,7 +1297,7 @@ export default function StaffPage() {
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
                 <Plus className="w-5 h-5 text-blue-600" />
-                <span>{language === 'en' ? 'Add New Employee' : 'नयाँ कर्मचारी थप्नुहोस्'}</span>
+                <span>Add New Employee</span>
               </h3>
               <button 
                 onClick={() => setIsAddModalOpen(false)}
@@ -696,9 +1308,47 @@ export default function StaffPage() {
             </div>
 
             <form onSubmit={handleCreateStaff} className="space-y-4 mt-4 text-xs">
+              {/* Photo Upload & Preview */}
+              <div className="flex items-center gap-4 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-slate-200 border border-slate-300 flex items-center justify-center shrink-0 shadow-2xs">
+                  {formData.photo_url ? (
+                    <img src={formData.photo_url} alt="Staff Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <Camera className="w-6 h-6 text-slate-400" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    Employee Profile Photo
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-100 text-blue-600 border border-blue-200 shadow-2xs cursor-pointer">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{formData.photo_url ? 'Change Photo' : 'Upload Photo'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handlePhotoUpload(e, false)}
+                      />
+                    </label>
+                    {formData.photo_url && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, photo_url: '' }))}
+                        className="text-xs text-rose-600 hover:text-rose-700 font-medium cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">Supports JPG, PNG, WebP (Max 5MB)</p>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Full Name (पूरा नाम) *</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Full Name *</label>
                   <input
                     type="text"
                     required
@@ -709,7 +1359,7 @@ export default function StaffPage() {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Biometric Machine PIN (मेसिन आइडी) *</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Biometric Machine PIN *</label>
                   <input
                     type="text"
                     required
@@ -746,14 +1396,41 @@ export default function StaffPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Department</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-700">Department *</label>
+                    <button
+                      type="button"
+                      onClick={() => setIsQuickDeptOpen(!isQuickDeptOpen)}
+                      className="text-[11px] font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                    >
+                      {isQuickDeptOpen ? '✕ Close' : '+ New Dept'}
+                    </button>
+                  </div>
+                  {isQuickDeptOpen && (
+                    <div className="mb-2 p-2 bg-blue-50/80 border border-blue-200 rounded-lg flex gap-1.5">
+                      <input
+                        type="text"
+                        value={quickDeptName}
+                        onChange={(e) => setQuickDeptName(e.target.value)}
+                        placeholder="New department name..."
+                        className="flex-1 px-2 py-1 text-xs bg-white border border-blue-300 rounded focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleQuickAddDept(false)}
+                        className="px-2.5 py-1 text-[11px] font-bold bg-blue-600 text-white rounded hover:bg-blue-500 cursor-pointer"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  )}
                   <select
                     value={formData.department_id}
                     onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-medium"
                   >
-                    {initialDepartments.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
                     ))}
                   </select>
                 </div>
@@ -771,7 +1448,7 @@ export default function StaffPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Monthly Base Salary (NPR रु.)</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Monthly Base Salary (NPR)</label>
                   <input
                     type="number"
                     value={formData.base_salary}
@@ -793,9 +1470,34 @@ export default function StaffPage() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Date of Joining
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.join_date || ''}
+                    onChange={(e) => setFormData({ ...formData, join_date: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-medium text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Date of Birth
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.dob || ''}
+                    onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-medium text-slate-800"
+                  />
+                </div>
+              </div>
+
               {/* Short Bio Field */}
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Short Introduction / Bio (छोटो परिचय)</label>
+                <label className="block font-semibold text-slate-700 mb-1">Short Introduction / Bio</label>
                 <textarea
                   rows={2}
                   value={staffBio}
@@ -814,10 +1516,10 @@ export default function StaffPage() {
                     onChange={(e) => setBroadcastEmail(e.target.checked)}
                     className="rounded text-blue-600 w-4 h-4"
                   />
-                  <span>🎉 Broadcast Welcome Email to All Staff (सबै कर्मचारीलाई इमेल पठाउने)</span>
+                  <span>🎉 Broadcast Welcome Email to All Staff</span>
                 </label>
                 <p className="text-[11px] text-blue-700 pl-6.5">
-                  Automatically introduces {formData.full_name || 'this new staff member'} to all 32 team members' emails with photo and designation.
+                  Automatically introduces {formData.full_name || 'this new staff member'} to all team members via email with photo and designation.
                 </p>
               </div>
 
@@ -858,41 +1560,39 @@ export default function StaffPage() {
               {/* Lanyard punch hole simulation */}
               <div className="w-12 h-2 bg-slate-800 rounded-full mx-auto mb-4 border border-slate-700"></div>
 
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white">
-                  <Fingerprint className="w-4 h-4" />
-                </div>
-                <h3 className="font-bold text-sm tracking-tight text-white">GOINFI TECHNOLOGIES</h3>
+              <div className="flex items-center justify-center gap-2 mb-3 bg-white/5 py-1.5 px-3 rounded-xl border border-white/10">
+                <img src="/ap1-logo.png" alt="AP1 HD" className="h-6 w-auto object-contain drop-shadow" />
+                <h3 className="font-black text-[11px] tracking-wider text-white uppercase">AP1 TELEVISION HD</h3>
               </div>
 
               <img
                 src={idCardStaff.photo_url || "https://images.unsplash.com/photo-1534528741775?w=150"}
                 alt={idCardStaff.full_name}
-                className="w-20 h-20 rounded-full object-cover border-2 border-blue-500 mx-auto shadow-md mb-3"
+                className="w-20 h-20 rounded-full object-cover border-2 border-red-500 mx-auto shadow-lg mb-2"
               />
 
               <h4 className="font-bold text-base text-white">{idCardStaff.full_name}</h4>
-              <p className="text-xs font-semibold text-blue-400 mt-0.5">{idCardStaff.designation}</p>
-              <span className="text-[11px] text-slate-400">{idCardStaff.department_name}</span>
+              <p className="text-xs font-semibold text-red-400 mt-0.5">{idCardStaff.designation}</p>
+              <span className="text-[11px] text-slate-300 font-medium">{idCardStaff.department_name}</span>
 
-              <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-left text-[11px]">
-                <div>
-                  <span className="text-slate-500 block text-[9px] uppercase font-bold">Biometric PIN</span>
-                  <span className="font-mono font-bold text-white">#{idCardStaff.biometric_pin}</span>
+              <div className="mt-3.5 pt-3 border-t border-slate-800 grid grid-cols-3 gap-1 text-left text-[11px]">
+                <div className="bg-slate-800/80 p-1.5 rounded-lg text-center">
+                  <span className="text-slate-400 block text-[8px] uppercase font-bold">Biometric PIN</span>
+                  <span className="font-mono font-black text-emerald-400 text-xs">#{idCardStaff.biometric_pin}</span>
                 </div>
-                <div>
-                  <span className="text-slate-500 block text-[9px] uppercase font-bold">Join Date</span>
-                  <span className="text-white font-medium">{idCardStaff.join_date}</span>
+                <div className="bg-slate-800/80 p-1.5 rounded-lg text-center">
+                  <span className="text-slate-400 block text-[8px] uppercase font-bold">Role</span>
+                  <span className="text-white font-bold text-[10px] uppercase">{idCardStaff.role}</span>
                 </div>
-                <div>
-                  <span className="text-slate-500 block text-[9px] uppercase font-bold">PAN</span>
-                  <span className="font-mono text-white text-[10px]">{idCardStaff.pan_number || 'PAN60129381'}</span>
+                <div className="bg-slate-800/80 p-1.5 rounded-lg text-center">
+                  <span className="text-slate-400 block text-[8px] uppercase font-bold">Status</span>
+                  <span className="text-emerald-400 font-bold text-[10px]">ACTIVE</span>
                 </div>
               </div>
 
-              <div className="mt-3 pt-2 bg-slate-950/60 rounded-xl p-2 flex items-center justify-center gap-2 text-[10px] text-slate-400">
-                <QrCode className="w-4 h-4 text-blue-400" />
-                <span>Verified Biometric Profile</span>
+              <div className="mt-3 pt-2 bg-slate-950/80 rounded-xl p-2 flex items-center justify-center gap-2 text-[10px] text-slate-400 border border-slate-800">
+                <QrCode className="w-4 h-4 text-red-400" />
+                <span className="font-medium">Verified by Goinfi Biometric HRMS</span>
               </div>
             </div>
 
@@ -912,6 +1612,504 @@ export default function StaffPage() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MANAGE DEPARTMENTS MODAL */}
+      {isDeptModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center shadow-xs">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-lg">
+                    Manage Departments & Units
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Create, organize, and manage corporate divisions
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsDeptModalOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* ADD NEW DEPARTMENT FORM */}
+            <form onSubmit={handleAddDepartment} className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Plus className="w-4 h-4 text-indigo-600" />
+                  <span>Add New Department</span>
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">Auto-syncs across system</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Department Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newDeptName}
+                    onChange={(e) => setNewDeptName(e.target.value)}
+                    placeholder="e.g. News & Current Affairs"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Code
+                  </label>
+                  <input
+                    type="text"
+                    value={newDeptCode}
+                    onChange={(e) => setNewDeptCode(e.target.value.toUpperCase())}
+                    placeholder="e.g. NEWS"
+                    maxLength={6}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Description / Responsibilities
+                </label>
+                <input
+                  type="text"
+                  value={newDeptDesc}
+                  onChange={(e) => setNewDeptDesc(e.target.value)}
+                  placeholder="e.g. Newsroom reporting, bulletin desk, and live coverage"
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <button
+                  type="submit"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm shadow-indigo-600/20 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Department</span>
+                </button>
+              </div>
+            </form>
+
+            {/* LIST OF ACTIVE DEPARTMENTS */}
+            <div className="mt-5">
+              <div className="flex items-center justify-between mb-3 px-1">
+                <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                  Active Departments ({departments.length})
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  {employees.length} staff registered
+                </span>
+              </div>
+
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {departments.map((dept) => {
+                  const staffCount = employees.filter(e => e.department_id === dept.id || e.department_name === dept.name).length;
+                  return (
+                    <div
+                      key={dept.id}
+                      className="p-3 bg-white border border-slate-200 hover:border-slate-300 rounded-xl flex items-center justify-between transition-colors shadow-2xs"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-700 font-mono font-bold text-[11px] flex items-center justify-center border border-indigo-100 shrink-0">
+                          {dept.code}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 text-xs">{dept.name}</span>
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                              {staffCount} staff
+                            </span>
+                          </div>
+                          {dept.description && (
+                            <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{dept.description}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteDepartment(dept.id, dept.name)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                        title="Delete Department"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* MODAL FOOTER */}
+            <div className="mt-5 pt-4 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsDeptModalOpen(false)}
+                className="px-5 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GOINFI SMS BROADCAST & NOTICE CENTER MODAL */}
+      {isSmsModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto space-y-4">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/20">
+                  <Radio className="w-6 h-6 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base sm:text-lg flex items-center gap-2">
+                    <span>SMS Broadcast & Notice Center</span>
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      Goinfi SMS
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Send instant SMS notices in bulk to all staff or directly to individual employees
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsSmsModalOpen(false);
+                  setSmsStatusMsg(null);
+                }}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setSmsTab('bulk');
+                  setSmsStatusMsg(null);
+                }}
+                className={`flex-1 py-2 px-2.5 rounded-lg font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                  smsTab === 'bulk' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>📢 Bulk SMS</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSmsTab('individual');
+                  setSmsStatusMsg(null);
+                }}
+                className={`flex-1 py-2 px-2.5 rounded-lg font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                  smsTab === 'individual' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>👤 Individual SMS</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSmsTab('logs');
+                  setSmsStatusMsg(null);
+                }}
+                className={`py-2 px-2.5 rounded-lg font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                  smsTab === 'logs' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <History className="w-3.5 h-3.5" />
+                <span>Sent History ({smsLogs.length})</span>
+              </button>
+            </div>
+
+            {/* Status Alert */}
+            {smsStatusMsg && (
+              <div className={`p-3 rounded-xl text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 border ${
+                smsStatusMsg.type === 'success' 
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                  : 'bg-red-50 text-red-800 border-red-200'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {smsStatusMsg.type === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <X className="w-4 h-4 text-red-600 shrink-0" />
+                  )}
+                  <span className="font-semibold">{smsStatusMsg.text}</span>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 1 & TAB 2: SMS COMPOSER FORM */}
+            {(smsTab === 'bulk' || smsTab === 'individual') && (
+              <form onSubmit={handleSendSmsBroadcast} className="space-y-4 text-xs">
+                {/* RECIPIENT SELECTOR */}
+                {smsTab === 'bulk' ? (
+                  <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-emerald-950 uppercase tracking-wider text-[11px]">
+                        🎯 Target Audience
+                      </label>
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-200/80 text-emerald-900">
+                        {smsTargetDept === 'ALL' 
+                          ? `All Staff (${employees.length})` 
+                          : `${employees.filter(e => e.department_name === smsTargetDept || e.department_id === smsTargetDept).length} Staff`}
+                      </span>
+                    </div>
+
+                    <select
+                      value={smsTargetDept}
+                      onChange={e => setSmsTargetDept(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="ALL">🌐 All Staff ({employees.length})</option>
+                      {departments.map(d => {
+                        const count = employees.filter(e => e.department_id === d.id || e.department_name === d.name).length;
+                        return (
+                          <option key={d.id} value={d.name}>
+                            🏢 {d.name} ({count} Staff)
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-2.5">
+                    <label className="font-bold text-blue-950 uppercase tracking-wider text-[11px] block">
+                      👤 Select Employee
+                    </label>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <select
+                          value={smsSelectedStaffId}
+                          onChange={e => {
+                            setSmsSelectedStaffId(e.target.value);
+                            const chosen = employees.find(emp => emp.id === e.target.value || emp.biometric_pin === e.target.value);
+                            if (chosen) {
+                              const digits = (chosen.phone || '').replace(/[^0-9]/g, '');
+                              const clean = digits.startsWith('977') && digits.length === 13 ? digits.substring(3) : digits;
+                              setSmsCustomPhone(clean);
+                            }
+                          }}
+                          className="w-full px-3 py-2 bg-white border border-blue-300 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">-- Select Employee ({employees.length}) --</option>
+                          {employees.map(emp => (
+                            <option key={emp.id} value={emp.id}>
+                              PIN #{emp.biometric_pin} - {emp.full_name} ({emp.designation})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <div className="flex rounded-xl overflow-hidden border border-blue-300 focus-within:ring-2 focus-within:ring-blue-500">
+                          <span className="bg-blue-100/80 px-2.5 py-2 text-slate-600 font-mono font-bold text-xs border-r border-blue-200">
+                            +977
+                          </span>
+                          <input
+                            type="tel"
+                            maxLength={10}
+                            placeholder="98xxxxxxxx (Mobile Number)"
+                            value={smsCustomPhone}
+                            onChange={e => setSmsCustomPhone(e.target.value.replace(/[^0-9]/g, ''))}
+                            className="flex-1 px-3 py-2 bg-white text-xs font-mono font-semibold text-slate-900 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* PRESET NOTICE TEMPLATES */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-bold text-slate-700 text-[11px] uppercase tracking-wider flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Quick Preset Templates</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400">1-click insert</span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setSmsMessage('Dear {name}, there will be an important staff meeting today at 2:00 PM in the hall. Please ensure your punctual attendance. - AP1 TV')}
+                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer border border-slate-200"
+                    >
+                      🚨 Urgent Meeting
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSmsMessage('Dear {name}, please be informed that tomorrow is an official public holiday. Office remains closed except for live broadcast staff. - AP1 TV')}
+                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer border border-slate-200"
+                    >
+                      🗓️ Public Holiday
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSmsMessage('Dear {name}, your monthly salary has been disbursed to your bank account. Check your Staff Portal for payslip details. - AP1 TV')}
+                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer border border-slate-200"
+                    >
+                      💰 Salary Disbursed
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSmsMessage('Dear {name}, please make sure to record your daily biometric punch when arriving and leaving the office. - AP1 TV HR')}
+                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer border border-slate-200"
+                    >
+                      ⏰ Attendance Compliance
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSmsMessage('')}
+                      className="px-2 py-1 text-slate-400 hover:text-slate-600 rounded-lg text-[10px] font-medium cursor-pointer"
+                    >
+                      ✕ Clear
+                    </button>
+                  </div>
+                </div>
+
+                {/* MESSAGE TEXTAREA */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">
+                      SMS Message Text *
+                    </label>
+                    <div className="text-[11px] font-mono">
+                      <span className="text-slate-600">{smsMessage.length} characters</span>
+                      <span className="text-slate-400 mx-1">•</span>
+                      <span className="font-bold text-emerald-700">
+                        {Math.ceil(smsMessage.length / 160) || 1} SMS per staff
+                      </span>
+                    </div>
+                  </div>
+
+                  <textarea
+                    required
+                    rows={4}
+                    value={smsMessage}
+                    onChange={e => setSmsMessage(e.target.value)}
+                    placeholder="Type your message here... (use {name} to personalize each message with employee name)"
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-800 focus:outline-none focus:border-emerald-500 focus:bg-white transition-all font-sans leading-relaxed"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    💡 Tip: Include <code className="bg-slate-100 px-1 py-0.5 rounded text-emerald-700 font-bold">&#123;name&#125;</code> in your message to automatically personalize it with each employee's name.
+                  </p>
+                </div>
+
+                {/* DISPATCH ACTION BUTTONS */}
+                <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                  <span className="text-[11px] text-slate-500">
+                    ⚡ SMS notices will be delivered directly to employee mobile numbers via Goinfi SMS Gateway.
+                  </span>
+
+                  {smsTab === 'individual' ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="submit"
+                        disabled={smsSending || !smsMessage.trim()}
+                        className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-transform active:scale-95 cursor-pointer flex items-center gap-1.5"
+                      >
+                        {smsSending ? <Radio className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                        <span>{smsSending ? 'Sending SMS...' : 'Send SMS'}</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="submit"
+                        disabled={smsSending || !smsMessage.trim()}
+                        className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-600/20 transition-transform active:scale-95 cursor-pointer flex items-center gap-1.5"
+                      >
+                        {smsSending ? <Radio className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                        <span>
+                          {smsSending 
+                            ? 'Sending SMS...' 
+                            : `Send Bulk SMS (${smsTargetDept === 'ALL' ? employees.length : employees.filter(e => e.department_name === smsTargetDept || e.department_id === smsTargetDept).length} Staff)`}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </form>
+            )}
+
+            {/* TAB 3: SMS SENT HISTORY / LOGS */}
+            {smsTab === 'logs' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Recent Sent Notices ({smsLogs.length})
+                  </span>
+                  {smsLogs.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSmsLogs([]);
+                        if (typeof window !== 'undefined') localStorage.removeItem('goinfi_sms_logs');
+                      }}
+                      className="text-[11px] text-rose-600 hover:text-rose-700 font-semibold cursor-pointer"
+                    >
+                      Clear History
+                    </button>
+                  )}
+                </div>
+
+                {smsLogs.length === 0 ? (
+                  <div className="py-10 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    <History className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-xs font-medium">No SMS broadcast records found.</p>
+                    <p className="text-[11px] mt-0.5">All sent SMS broadcasts will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                    {smsLogs.map((log: any) => (
+                      <div key={log.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900">{log.target}</span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              {log.recipientCount} Delivered
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {new Date(log.sentAt).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-slate-700 bg-white p-2 rounded-lg border border-slate-200 text-[11px] leading-relaxed">
+                          {log.message}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

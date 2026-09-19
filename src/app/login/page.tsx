@@ -45,28 +45,15 @@ export default function LoginPage() {
       <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-emerald-600/20 rounded-full blur-3xl pointer-events-none"></div>
 
-      {/* Language Switcher in top corner */}
-      <div className="absolute top-6 right-6">
-        <button
-          onClick={toggleLanguage}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-xs text-slate-200 border border-slate-700 transition-colors"
-        >
-          <Languages className="w-3.5 h-3.5 text-blue-400" />
-          <span>{language === 'en' ? 'नेपाली' : 'English'}</span>
-        </button>
-      </div>
-
       <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl relative z-10">
         {/* Header Branding */}
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-xl shadow-blue-500/30 mb-4">
-            <Fingerprint className="w-8 h-8" />
+          <div className="px-5 py-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 flex items-center justify-center shadow-xl mb-4">
+            <img src="/ap1-logo.png" alt="AP1 HD" className="h-12 w-auto object-contain drop-shadow" />
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">{t.appName}</h1>
+          <h1 className="text-2xl font-black text-white tracking-tight">AP1 Television Network</h1>
           <p className="text-xs text-slate-400 mt-1">
-            {language === 'en' 
-              ? 'Secure HR & Biometric Attendance Portal' 
-              : 'सुरक्षित मानव संसाधन तथा बायोमेट्रिक हाजिरी पोर्टल'}
+            Corporate HRMS & Biometric Attendance Portal
           </p>
         </div>
 
@@ -79,7 +66,7 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-              {language === 'en' ? 'Email or Biometric PIN' : 'इमेल वा बायोमेट्रिक पिन'}
+              Email or Biometric PIN
             </label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -95,7 +82,7 @@ export default function LoginPage() {
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-              {language === 'en' ? 'Password' : 'पासवर्ड'}
+              Password
             </label>
             <div className="relative">
               <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -113,7 +100,7 @@ export default function LoginPage() {
             type="submit"
             className="w-full mt-2 bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-xl text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20"
           >
-            <span>{language === 'en' ? 'Sign In to Portal' : 'पोर्टलमा प्रवेश गर्नुहोस्'}</span>
+            <span>Sign In to Portal</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
@@ -121,7 +108,7 @@ export default function LoginPage() {
         {/* Quick Demo Access Bar */}
         <div className="mt-8 pt-6 border-t border-slate-800/80">
           <p className="text-[11px] text-center font-medium text-slate-400 mb-3">
-            {language === 'en' ? 'Quick Demo Access (One-Click):' : 'द्रुत परीक्षण पहुँच:'}
+            Quick Demo Access (One-Click):
           </p>
           <div className="grid grid-cols-3 gap-2">
             <button

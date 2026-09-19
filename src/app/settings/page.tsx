@@ -47,9 +47,7 @@ export default function SettingsPage() {
   return (
     <DashboardShell
       title={t.navSettings}
-      subtitle={language === 'en' 
-        ? "Hardware integration, ZKTeco IP configuration, Meta Cloud WhatsApp API, and company profile" 
-        : "बायोमेट्रिक मेसिन LAN आइपी, ह्वाट्सएप क्लाउड नोटिफिकेसन तथा कम्पनी विवरण"}
+      subtitle="Hardware integration, ZKTeco IP configuration, Meta Cloud WhatsApp API, and company profile"
     >
       <form onSubmit={handleSave} className="space-y-6">
         {/* Section 1: ZKTeco Biometric Machine LAN Configuration */}
@@ -62,9 +60,7 @@ export default function SettingsPage() {
               <div>
                 <h4 className="font-bold text-slate-900 text-base">{t.hardwareSettings}</h4>
                 <p className="text-xs text-slate-500">
-                  {language === 'en'
-                    ? "Connects directly to your office ZKTeco device over LAN via pyzk TCP/IP (Port 4370)"
-                    : "कार्यालयको ZKTeco बायोमेट्रिक मेसिनसँग LAN/TCP पोर्ट ४३७० मार्फत प्रत्यक्ष सम्बन्ध"}
+                  Connects directly to your office ZKTeco device over LAN via pyzk TCP/IP (Port 4370)
                 </p>
               </div>
             </div>

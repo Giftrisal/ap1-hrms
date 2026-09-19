@@ -20,6 +20,7 @@ import {
   Filter,
   Calendar,
   Building,
+  Building2,
   UserCheck
 } from 'lucide-react';
 
@@ -150,7 +151,7 @@ export default function FieldDutyPage() {
 
   return (
     <DashboardShell
-      title="Field Duty & Work From Home (फिल्ड ड्युटी / WFH)"
+      title="Field Duty & Work From Home"
       subtitle="Track on-site client visits, remote days, and grant automatic biometric attendance credits"
     >
       <div className="space-y-6">
@@ -163,7 +164,7 @@ export default function FieldDutyPage() {
               <p className="text-[11px] text-slate-500 mt-0.5">Total official applications</p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <MapPin className="w-6 h-6" />
+              <Building2 className="w-6 h-6" />
             </div>
           </div>
 
@@ -173,7 +174,7 @@ export default function FieldDutyPage() {
               <h3 className="text-2xl font-bold text-emerald-600 mt-1">
                 {requests.filter(r => r.status === 'approved').length}
               </h3>
-              <p className="text-[11px] text-slate-500 mt-0.5">Attendance auto-credited</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">Attendance credited</p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <CheckCircle className="w-6 h-6" />
@@ -186,7 +187,7 @@ export default function FieldDutyPage() {
               <h3 className="text-2xl font-bold text-amber-600 mt-1">
                 {requests.filter(r => r.status === 'pending').length}
               </h3>
-              <p className="text-[11px] text-slate-500 mt-0.5">Awaiting Manager Review</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">Requires manager action</p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
               <Clock className="w-6 h-6" />
@@ -195,52 +196,39 @@ export default function FieldDutyPage() {
 
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Remote / WFH</p>
-              <h3 className="text-2xl font-bold text-purple-600 mt-1">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">WFH / Remote</p>
+              <h3 className="text-2xl font-bold text-indigo-600 mt-1">
                 {requests.filter(r => r.type === 'WORK_FROM_HOME').length}
               </h3>
-              <p className="text-[11px] text-slate-500 mt-0.5">Off-premise working days</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">Working from home</p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
               <Home className="w-6 h-6" />
             </div>
           </div>
         </div>
 
-        {/* Action Header & Filters */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="flex flex-1 items-center gap-3 w-full md:w-auto">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Search staff, location, purpose..."
-                className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* Type Filter */}
+        {/* Action & Filter Controls */}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+          <div className="flex items-center gap-3 w-full md:w-auto">
             <select
               value={filterType}
               onChange={e => setFilterType(e.target.value)}
-              className="px-3 py-2 border border-slate-200 rounded-lg text-xs sm:text-sm focus:outline-hidden text-slate-700 bg-white"
+              className="px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500 bg-white"
             >
-              <option value="ALL">All Types</option>
-              <option value="FIELD_VISIT">Field Visit</option>
-              <option value="WORK_FROM_HOME">Work From Home</option>
-              <option value="CLIENT_MEETING">Client Meeting</option>
-              <option value="OFFICIAL_TOUR">Official Tour</option>
+              <option value="ALL">All Duty Types</option>
+              <option value="FIELD_VISIT">Field Visits Only</option>
+              <option value="CLIENT_MEETING">Client Meetings Only</option>
+              <option value="WORK_FROM_HOME">Work From Home (WFH)</option>
+              <option value="OFFICIAL_TOUR">Official Tours</option>
             </select>
 
-            {/* Status Filter */}
             <select
               value={filterStatus}
               onChange={e => setFilterStatus(e.target.value)}
-              className="px-3 py-2 border border-slate-200 rounded-lg text-xs sm:text-sm focus:outline-hidden text-slate-700 bg-white"
+              className="px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500 bg-white"
             >
-              <option value="ALL">All Status</option>
+              <option value="ALL">All Statuses</option>
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="rejected">Rejected</option>
@@ -252,7 +240,7 @@ export default function FieldDutyPage() {
             className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs sm:text-sm font-semibold transition-colors shadow-xs cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Apply Field Duty / WFH (निवेदन)</span>
+            <span>Apply Field Duty / WFH</span>
           </button>
         </div>
 
@@ -264,7 +252,7 @@ export default function FieldDutyPage() {
                 <tr>
                   <th className="px-5 py-3.5">Staff Member</th>
                   <th className="px-5 py-3.5">Type & Location</th>
-                  <th className="px-5 py-3.5">Dates (वि.सं. / AD)</th>
+                  <th className="px-5 py-3.5">Dates (BS / AD)</th>
                   <th className="px-5 py-3.5">Purpose</th>
                   <th className="px-5 py-3.5">Status</th>
                   <th className="px-5 py-3.5 text-right">Actions</th>
@@ -326,13 +314,13 @@ export default function FieldDutyPage() {
                               onClick={() => handleUpdateStatus(req.id, 'approved')}
                               className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
                             >
-                              <CheckCircle className="w-3.5 h-3.5" /> Approve (स्वीकृत)
+                              <CheckCircle className="w-3.5 h-3.5" /> Approve
                             </button>
                             <button
                               onClick={() => handleUpdateStatus(req.id, 'rejected')}
                               className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
                             >
-                              <XCircle className="w-3.5 h-3.5" /> Reject (अस्वीकृत)
+                              <XCircle className="w-3.5 h-3.5" /> Reject
                             </button>
                           </div>
                         )
@@ -360,7 +348,7 @@ export default function FieldDutyPage() {
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-slate-900">New Field Duty / WFH Request</h3>
-                    <p className="text-xs text-slate-500">फिल्ड भ्रमण वा घरबाट काम गर्ने निवेदन</p>
+                    <p className="text-xs text-slate-500">Apply for field visit, client meeting, or work from home</p>
                   </div>
                 </div>
                 <button
@@ -374,7 +362,7 @@ export default function FieldDutyPage() {
               <form onSubmit={handleCreateRequest} className="space-y-3.5">
                 {/* Staff Selection */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Select Employee (कर्मचारी)</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Select Employee</label>
                   <select
                     value={formData.employee_id}
                     onChange={e => setFormData({ ...formData, employee_id: e.target.value })}
@@ -390,23 +378,23 @@ export default function FieldDutyPage() {
 
                 {/* Duty Type */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Duty Type (प्रकार)</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Duty Type</label>
                   <select
                     value={formData.type}
                     onChange={e => setFormData({ ...formData, type: e.target.value as FieldDutyType })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500 bg-white"
                   >
-                    <option value="FIELD_VISIT">Field Visit (फिल्ड भ्रमण / सर्भे)</option>
-                    <option value="CLIENT_MEETING">Client Meeting (ग्राहक भेटघाट / प्रस्तुतीकरण)</option>
-                    <option value="WORK_FROM_HOME">Work From Home (घरबाट काम - WFH)</option>
-                    <option value="OFFICIAL_TOUR">Official Tour (उपत्यकाबाहिर भ्रमण / इभेन्ट)</option>
+                    <option value="FIELD_VISIT">Field Visit (Client Site / Survey)</option>
+                    <option value="CLIENT_MEETING">Client Meeting / Presentation</option>
+                    <option value="WORK_FROM_HOME">Work From Home (WFH)</option>
+                    <option value="OFFICIAL_TOUR">Official Tour (Outstation / Event)</option>
                   </select>
                 </div>
 
                 {/* Dates */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Start Date (सुरु मिति)</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Start Date</label>
                     <input
                       type="date"
                       required
@@ -416,7 +404,7 @@ export default function FieldDutyPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">End Date (अन्तिम मिति)</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">End Date</label>
                     <input
                       type="date"
                       required
@@ -429,7 +417,7 @@ export default function FieldDutyPage() {
 
                 {/* Location */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Location / Client Site (स्थान)</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Location / Client Site</label>
                   <input
                     type="text"
                     required
@@ -442,7 +430,7 @@ export default function FieldDutyPage() {
 
                 {/* Purpose */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Official Purpose (उद्देश्य / कामको विवरण)</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Official Purpose</label>
                   <textarea
                     required
                     rows={3}
@@ -465,7 +453,7 @@ export default function FieldDutyPage() {
                     type="submit"
                     className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
                   >
-                    Submit Request (दर्ता गर्नुहोस्)
+                    Submit Request
                   </button>
                 </div>
               </form>

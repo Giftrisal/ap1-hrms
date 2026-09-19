@@ -72,19 +72,24 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       >
         {/* Brand Header & Mobile Close Button */}
         <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
-              <Fingerprint className="w-6 h-6 text-white" />
+          <Link 
+            href="/dashboard"
+            onClick={handleNavClick}
+            className="flex items-center gap-3 group cursor-pointer transition-transform active:scale-95"
+            title="Go to Dashboard"
+          >
+            <div className="h-11 px-2.5 py-1 rounded-xl bg-white/10 group-hover:bg-white/15 backdrop-blur-md border border-white/15 group-hover:border-white/25 flex items-center justify-center shrink-0 shadow-sm transition-all">
+              <img src="/ap1-logo.png" alt="AP1 HD" className="h-8 w-auto object-contain drop-shadow group-hover:scale-105 transition-transform" />
             </div>
             <div>
-              <h1 className="font-bold text-white text-lg tracking-tight leading-none">
-                {t.appName}
+              <h1 className="font-bold text-white text-base tracking-tight leading-none group-hover:text-blue-300 transition-colors">
+                AP1 Television
               </h1>
               <p className="text-[11px] text-slate-400 font-medium mt-1">
-                {t.appSubTitle}
+                Corporate HRMS & Biometric
               </p>
             </div>
-          </div>
+          </Link>
 
           {/* Close button on mobile */}
           <button 
@@ -167,22 +172,8 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           </div>
         </div>
 
-        {/* Bottom Profile & Language Bar */}
+        {/* Bottom Profile Bar */}
         <div className="p-3 border-t border-slate-800 bg-slate-950/70 space-y-2">
-          {/* Language Switcher */}
-          <button
-            onClick={toggleLanguage}
-            className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-xs text-slate-200 transition-colors border border-slate-700/60 cursor-pointer"
-          >
-            <div className="flex items-center gap-2">
-              <Languages className="w-3.5 h-3.5 text-blue-400" />
-              <span>{language === 'en' ? 'English (EN)' : 'नेपाली (NE)'}</span>
-            </div>
-            <span className="text-[10px] uppercase font-bold text-blue-400 bg-blue-950/80 px-1.5 py-0.5 rounded border border-blue-800/40">
-              {language === 'en' ? 'Switch' : 'फेर्नुहोस्'}
-            </span>
-          </button>
-
           {/* User Card */}
           {currentUser && (
             <div className="flex items-center justify-between pt-1">

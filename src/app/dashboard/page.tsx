@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import DashboardShell from '@/components/layout/DashboardShell';
 import { useLanguage } from '@/lib/i18n/context';
 import { initialEmployees, generateTodayAttendance, initialDepartments } from '@/lib/mock-data';
+import { Employee } from '@/lib/types';
 import { 
   Users, 
   UserCheck, 
@@ -18,10 +19,6 @@ import {
   Search,
   CheckCircle2,
   AlertCircle,
-  Cake,
-  Gift,
-  PartyPopper,
-  Sparkles,
   Send,
   MapPin,
   PackageCheck,
@@ -37,30 +34,128 @@ export default function DashboardPage() {
   const [attendanceList, setAttendanceList] = useState(generateTodayAttendance());
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('ALL');
-  const [greetingModal, setGreetingModal] = useState<{
-    isOpen: boolean;
-    name: string;
-    type: 'birthday' | 'anniversary';
-    detail: string;
-    phone?: string;
-  }>({
-    isOpen: false,
-    name: '',
-    type: 'birthday',
-    detail: ''
-  });
-  const [greetingSuccess, setGreetingSuccess] = useState(false);
+  const [livePunches, setLivePunches] = useState<any[]>([]);
 
-  // Key metrics
-  const totalStaff = initialEmployees.length;
-  const presentCount = attendanceList.filter(a => a.status === 'PRESENT' || a.status === 'LATE' || a.status === 'HALF_DAY').length;
-  const lateCount = attendanceList.filter(a => a.status === 'LATE').length;
-  const absentCount = attendanceList.filter(a => a.status === 'ABSENT').length;
-  const leaveCount = attendanceList.filter(a => a.status === 'ON_LEAVE').length;
-  const attendanceRate = Math.round((presentCount / totalStaff) * 100);
+  // Load employees from storage with purge of old bulk staff
+  const [employees] = useState<Employee[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('goinfi_staff_list');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          const isOldBulk = Array.isArray(parsed) && (
+            parsed.length > 200 ||
+            parsed.some((e: any) => (typeof e.id === 'string' && e.id.startsWith('ap1-')) || e.full_name === 'Yeshoda')
+          );
+          if (isOldBulk) {
+            localStorage.removeItem('goinfi_staff_list');
+            return [];
+          }
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch (e) {}
+      }
+    }
+    return [];
+  });
+
+  // Poll /api/biometric/sync for real-time punches from hardware device
+  React.useEffect(() => {
+    const fetchLivePunches = async () => {
+      try {
+        const res = await fetch('/api/biometric/sync');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.recent_logs && Array.isArray(data.recent_logs) && data.recent_logs.length > 0) {
+          setLivePunches(data.recent_logs);
+          
+          setAttendanceList((prev) => {
+            let updated = [...prev];
+            for (const log of data.recent_logs) {
+              const pin = String(log.user_id || log.biometric_pin || '');
+              if (!pin) continue;
+
+              const matchedEmp = employees.find(
+                e => String(e.biometric_pin) === pin || String(e.id) === pin || String(e.id) === `emp-${pin}`
+              );
+
+              const empName = matchedEmp?.full_name || log.employee_name || `Staff ${pin}`;
+              const deptName = matchedEmp?.department_name || 'AP1 Media / Operations';
+              const designation = matchedEmp?.designation || 'Staff Member';
+
+              const idx = updated.findIndex((a) => a.employee_pin === pin);
+              if (idx !== -1) {
+                updated[idx] = {
+                  ...updated[idx],
+                  employee_name: empName,
+                  department_name: deptName,
+                  designation: designation,
+                  status: log.is_late ? 'LATE' : 'PRESENT',
+                  in_time: log.punch_time,
+                  late_minutes: log.late_minutes || 0,
+                  remarks: 'Live Biometric Machine Punch'
+                };
+              } else {
+                updated.unshift({
+                  id: `live-${pin}-${Date.now()}`,
+                  employee_id: matchedEmp?.id || `emp-${pin}`,
+                  employee_name: empName,
+                  employee_pin: pin,
+                  department_name: deptName,
+                  designation: designation,
+                  date: new Date().toISOString().split('T')[0],
+                  in_time: log.punch_time,
+                  out_time: undefined,
+                  status: log.is_late ? 'LATE' : 'PRESENT',
+                  late_minutes: log.late_minutes || 0,
+                  early_exit_minutes: 0,
+                  overtime_minutes: 0,
+                  worked_hours: 8,
+                  source: 'biometric',
+                  remarks: 'Live Biometric Machine Punch'
+                });
+              }
+            }
+            return updated;
+          });
+        }
+      } catch (e) {
+        // silent
+      }
+    };
+
+    fetchLivePunches();
+    const interval = setInterval(fetchLivePunches, 3000);
+    return () => clearInterval(interval);
+  }, [employees]);
+
+  // Key metrics - mathematically bounded to registered workforce and active punches
+  const uniquePunchedPins = new Set(attendanceList.map(a => String(a.employee_pin || a.employee_id)));
+  const registeredPins = new Set(employees.map(e => String(e.biometric_pin || e.id)));
+  const allKnownPins = new Set([...Array.from(registeredPins), ...Array.from(uniquePunchedPins)]);
+  
+  const totalStaff = Math.max(employees.length, allKnownPins.size);
+  const validAttendance = attendanceList;
+
+  const presentCount = validAttendance.filter(
+    a => a.status === 'PRESENT' || a.status === 'LATE' || a.status === 'HALF_DAY'
+  ).length;
+
+  const lateCount = validAttendance.filter(a => a.status === 'LATE').length;
+
+  const leaveCount = totalStaff > 0 
+    ? validAttendance.filter(a => a.status === 'ON_LEAVE').length
+    : 0;
+
+  const absentCount = totalStaff > 0 
+    ? Math.max(0, totalStaff - presentCount - leaveCount)
+    : 0;
+
+  const attendanceRate = totalStaff > 0 
+    ? Math.min(100, Math.round((presentCount / totalStaff) * 100))
+    : 0;
 
   // Filter list for live attendance
-  const filteredList = attendanceList.filter(att => {
+  const filteredList = (totalStaff > 0 ? validAttendance : []).filter(att => {
     const matchesSearch = 
       (att.employee_name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
       (att.employee_pin?.includes(searchQuery) ?? false);
@@ -128,9 +223,7 @@ export default function DashboardPage() {
   return (
     <DashboardShell
       title={t.navDashboard}
-      subtitle={language === 'en' 
-        ? "Live real-time staff attendance, biometric sync feed, and key metrics" 
-        : "प्रत्यक्ष कर्मचारी हाजिरी, बायोमेट्रिक सिङ्क तथा मुख्य तथ्याङ्कहरू"}
+      subtitle="Live real-time staff attendance, biometric sync feed, and key metrics"
       onSyncTriggered={() => setAttendanceList(generateTodayAttendance())}
     >
       {/* 5 Key Metric Cards */}
@@ -140,7 +233,9 @@ export default function DashboardPage() {
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t.totalEmployees}</p>
             <h3 className="text-2xl font-bold text-slate-900 mt-1">{totalStaff}</h3>
-            <span className="text-[11px] text-slate-400 font-medium mt-0.5 block">Across 7 Departments</span>
+            <span className="text-[11px] text-slate-400 font-medium mt-0.5 block">
+              {totalStaff > 0 ? 'Across Active Departments' : 'Ready for Registration'}
+            </span>
           </div>
           <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
             <Users className="w-6 h-6" />
@@ -157,7 +252,9 @@ export default function DashboardPage() {
                 {attendanceRate}%
               </span>
             </div>
-            <span className="text-[11px] text-slate-400 font-medium mt-0.5 block">Punched in via ZKTeco</span>
+            <span className="text-[11px] text-slate-400 font-medium mt-0.5 block">
+              {totalStaff > 0 ? 'Punched in via ZKTeco' : 'No staff registered'}
+            </span>
           </div>
           <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
             <UserCheck className="w-6 h-6" />
@@ -169,7 +266,9 @@ export default function DashboardPage() {
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t.lateToday}</p>
             <h3 className="text-2xl font-bold text-amber-600 mt-1">{lateCount}</h3>
-            <span className="text-[11px] text-amber-600 font-medium mt-0.5 block">After 9:15 AM Grace</span>
+            <span className="text-[11px] text-amber-600 font-medium mt-0.5 block">
+              {lateCount > 0 ? 'After 9:15 AM Grace' : 'On-time attendance'}
+            </span>
           </div>
           <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
             <Clock className="w-6 h-6" />
@@ -181,7 +280,9 @@ export default function DashboardPage() {
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t.absentToday}</p>
             <h3 className="text-2xl font-bold text-red-600 mt-1">{absentCount}</h3>
-            <span className="text-[11px] text-red-500 font-medium mt-0.5 block">Auto-alerted via WA</span>
+            <span className="text-[11px] text-red-500 font-medium mt-0.5 block">
+              {absentCount > 0 ? 'Auto-alerted via WA' : 'No absent staff'}
+            </span>
           </div>
           <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center text-red-600">
             <UserX className="w-6 h-6" />
@@ -201,158 +302,68 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Celebrations, Milestones & Quick Shortcuts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Birthday & Anniversary Celebrations Widget */}
-        <div className="lg:col-span-2 bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-purple-500/10 border border-amber-200/80 rounded-2xl p-5 shadow-xs relative overflow-hidden">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200/60 pb-3 mb-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20">
-                <PartyPopper className="w-5 h-5 animate-bounce" />
-              </div>
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-1.5">
-                  <span>🎉 Celebrations & Milestones (आजका जन्मोत्सव तथा वार्षिकोत्सव)</span>
-                </h4>
-                <p className="text-xs text-slate-600">
-                  Daily staff recognition, work anniversaries, and automated team wishes
-                </p>
-              </div>
-            </div>
-            <span className="self-start sm:self-auto px-2.5 py-1 bg-amber-100/80 text-amber-800 text-[11px] font-bold rounded-full border border-amber-300">
-              {getNepaliDate().formattedNp}
+      {/* Quick Portals & Shortcuts Banner */}
+      <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-xs space-y-3">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+          <div className="flex items-center gap-2">
+            <Smartphone className="w-4 h-4 text-red-500" />
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+              Quick Portals & Mobile Access
             </span>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Today's Birthday */}
-            <div className="bg-white/90 backdrop-blur-xs p-3.5 rounded-xl border border-amber-200 shadow-2xs flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <img
-                    src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150"
-                    alt="Samikshya Gautam"
-                    className="w-11 h-11 rounded-full object-cover border-2 border-amber-400"
-                  />
-                  <span className="absolute -bottom-1 -right-1 text-sm">🎂</span>
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <p className="font-bold text-slate-900 text-xs sm:text-sm">Samikshya Gautam</p>
-                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-pink-100 text-pink-700">Today</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500">Sr. Full Stack Engineer</p>
-                  <p className="text-[11px] text-amber-700 font-semibold mt-0.5">Birthday Today! 🎂</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setGreetingModal({
-                  isOpen: true,
-                  name: 'Samikshya Gautam',
-                  type: 'birthday',
-                  detail: 'Wishing you a very Happy Birthday from all of us at Goinfi! May this year bring tremendous joy and success!',
-                  phone: '+977-9841100104'
-                })}
-                className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
-              >
-                <Gift className="w-3.5 h-3.5" /> Wish
-              </button>
-            </div>
-
-            {/* Today's Work Anniversary */}
-            <div className="bg-white/90 backdrop-blur-xs p-3.5 rounded-xl border border-purple-200 shadow-2xs flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <img
-                    src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150"
-                    alt="Pooja Thapa"
-                    className="w-11 h-11 rounded-full object-cover border-2 border-purple-400"
-                  />
-                  <span className="absolute -bottom-1 -right-1 text-sm">🎖️</span>
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <p className="font-bold text-slate-900 text-xs sm:text-sm">Pooja Thapa</p>
-                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-100 text-purple-700">3rd Year</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500">HR Manager</p>
-                  <p className="text-[11px] text-purple-700 font-semibold mt-0.5">3 Years at Goinfi! 🌟</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setGreetingModal({
-                  isOpen: true,
-                  name: 'Pooja Thapa',
-                  type: 'anniversary',
-                  detail: 'Congratulations on completing 3 wonderful years at Goinfi! Thank you for your leadership and dedication!',
-                  phone: '+977-9841100102'
-                })}
-                className="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
-              >
-                <Sparkles className="w-3.5 h-3.5" /> Greet
-              </button>
-            </div>
-          </div>
+          <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+            Active System
+          </span>
         </div>
 
-        {/* Quick Feature Shortcuts Card */}
-        <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-xs flex flex-col justify-between space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Quick Portals & Tools</span>
-            <span className="text-[10px] font-semibold bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded border border-blue-500/30">
-              Active
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 gap-2 text-xs">
-            <Link
-              href="/field-duty"
-              className="flex items-center justify-between p-2.5 bg-slate-800 hover:bg-slate-700/80 rounded-xl transition-colors border border-slate-700/60"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center">
-                  <MapPin className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="font-semibold text-white">Field Duty & WFH</p>
-                  <p className="text-[10px] text-slate-400">Client visits & remote approvals</p>
-                </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <Link
+            href="/portal"
+            className="flex items-center justify-between p-3.5 bg-slate-800 hover:bg-slate-750 rounded-xl transition-all border border-slate-700/80 hover:border-red-500/50 group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-red-600/20 text-red-400 flex items-center justify-center group-hover:bg-red-600 group-hover:text-white transition-colors">
+                <Smartphone className="w-5 h-5" />
               </div>
-              <span className="text-[11px] text-blue-400 font-semibold">Open →</span>
-            </Link>
-
-            <Link
-              href="/assets"
-              className="flex items-center justify-between p-2.5 bg-slate-800 hover:bg-slate-700/80 rounded-xl transition-colors border border-slate-700/60"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                  <PackageCheck className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="font-semibold text-white">Asset Inventory</p>
-                  <p className="text-[10px] text-slate-400">Laptops, SIMs, Vehicles handover</p>
-                </div>
+              <div>
+                <p className="font-bold text-white text-sm">Staff Mobile App</p>
+                <p className="text-[11px] text-slate-400">Employee PIN & Password self-service</p>
               </div>
-              <span className="text-[11px] text-emerald-400 font-semibold">Open →</span>
-            </Link>
+            </div>
+            <span className="text-xs text-red-400 font-semibold group-hover:translate-x-0.5 transition-transform">Open →</span>
+          </Link>
 
-            <Link
-              href="/portal"
-              className="flex items-center justify-between p-2.5 bg-slate-800 hover:bg-slate-700/80 rounded-xl transition-colors border border-slate-700/60"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center">
-                  <Smartphone className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="font-semibold text-white">Staff Self-Service</p>
-                  <p className="text-[10px] text-slate-400">Employee punch & payslip portal</p>
-                </div>
+          <Link
+            href="/field-duty"
+            className="flex items-center justify-between p-3.5 bg-slate-800 hover:bg-slate-750 rounded-xl transition-all border border-slate-700/80 hover:border-blue-500/50 group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                <MapPin className="w-5 h-5" />
               </div>
-              <span className="text-[11px] text-purple-400 font-semibold">Open →</span>
-            </Link>
-          </div>
+              <div>
+                <p className="font-bold text-white text-sm">Field Duty & WFH</p>
+                <p className="text-[11px] text-slate-400">Client visits & outside punch approvals</p>
+              </div>
+            </div>
+            <span className="text-xs text-blue-400 font-semibold group-hover:translate-x-0.5 transition-transform">Open →</span>
+          </Link>
+
+          <Link
+            href="/assets"
+            className="flex items-center justify-between p-3.5 bg-slate-800 hover:bg-slate-750 rounded-xl transition-all border border-slate-700/80 hover:border-emerald-500/50 group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                <PackageCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="font-bold text-white text-sm">Asset Inventory</p>
+                <p className="text-[11px] text-slate-400">Cameras, SD Cards, Laptops handover</p>
+              </div>
+            </div>
+            <span className="text-xs text-emerald-400 font-semibold group-hover:translate-x-0.5 transition-transform">Open →</span>
+          </Link>
         </div>
       </div>
 
@@ -364,7 +375,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2">
               <Building2 className="w-5 h-5 text-slate-700" />
               <h4 className="font-bold text-slate-900 text-sm">
-                {language === 'en' ? 'Department Attendance Breakdown' : 'विभाग अनुसार हाजिरी अवस्था'}
+                Department Attendance Breakdown
               </h4>
             </div>
             <span className="text-xs text-slate-500 font-medium">Today's Ratio</span>
@@ -372,10 +383,15 @@ export default function DashboardPage() {
 
           <div className="space-y-3">
             {initialDepartments.map((dept, i) => {
-              const deptStaff = attendanceList.filter(a => a.department_name === dept.name);
-              const deptPresent = deptStaff.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length;
-              const deptTotal = deptStaff.length || 1;
-              const pct = Math.round((deptPresent / deptTotal) * 100);
+              const deptEmployees = employees.filter(e => e.department_name === dept.name || e.department_id === dept.id);
+              const deptTotal = deptEmployees.length;
+              const deptPresent = deptTotal > 0
+                ? validAttendance.filter(a => 
+                    (a.department_name === dept.name || deptEmployees.some(e => e.biometric_pin === a.employee_pin)) && 
+                    (a.status === 'PRESENT' || a.status === 'LATE')
+                  ).length
+                : 0;
+              const pct = deptTotal > 0 ? Math.min(100, Math.round((deptPresent / deptTotal) * 100)) : 0;
 
               return (
                 <div key={dept.id} className="space-y-1">
@@ -403,7 +419,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2 mb-3">
               <Fingerprint className="w-5 h-5 text-blue-600" />
               <h4 className="font-bold text-slate-900 text-sm">
-                {language === 'en' ? 'Machine Integration Status' : 'बायोमेट्रिक मेसिन अवस्था'}
+                Machine Integration Status
               </h4>
             </div>
             <p className="text-xs text-slate-500 mb-4">
@@ -435,12 +451,35 @@ export default function DashboardPage() {
               href="/settings"
               className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center justify-between"
             >
-              <span>{language === 'en' ? 'Manage Hardware Settings' : 'उपकरण सेटिङ्स मिलाउनुहोस्'}</span>
+              <span>Manage Hardware Settings</span>
               <ArrowUpRight className="w-4 h-4" />
             </a>
           </div>
         </div>
       </div>
+
+      {/* Live Hardware Punch Banner */}
+      {livePunches.length > 0 && (
+        <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-xs">
+          <div className="flex items-center gap-2.5 text-xs text-emerald-950 font-medium">
+            <span className="relative flex h-3 w-3 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+            </span>
+            <span className="font-bold text-emerald-800 uppercase tracking-wide">
+              Live Biometric Punch:
+            </span>
+            <span>
+              <strong>{livePunches[0].employee_name || `PIN ${livePunches[0].user_id}`}</strong> (PIN:{' '}
+              {livePunches[0].user_id || livePunches[0].biometric_pin}) —{' '}
+              {new Date(livePunches[0].punch_time).toLocaleTimeString()} ({livePunches[0].punch_type || 'Check-In'})
+            </span>
+          </div>
+          <span className="text-[11px] font-mono bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-md font-bold self-end sm:self-auto border border-emerald-300">
+            ZKTeco 192.168.1.201:4370 ⚡ Live
+          </span>
+        </div>
+      )}
 
       {/* Live Attendance Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
@@ -586,104 +625,10 @@ export default function DashboardPage() {
             href="/attendance"
             className="text-xs font-semibold text-blue-600 hover:text-blue-700"
           >
-            {language === 'en' 
-              ? `View all ${attendanceList.length} staff attendance records & history →` 
-              : `सबै ${attendanceList.length} जना कर्मचारीको हाजिरी इतिहास हेर्नुहोस् →`}
+            View all {attendanceList.length} staff attendance records & history →
           </a>
         </div>
       </div>
-
-      {/* Greeting Modal */}
-      {greetingModal.isOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white ${
-                  greetingModal.type === 'birthday' ? 'bg-amber-500' : 'bg-purple-600'
-                }`}>
-                  {greetingModal.type === 'birthday' ? <Cake className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">
-                    {greetingModal.type === 'birthday' ? '🎂 Birthday Wishes' : '🎖️ Work Anniversary Greeting'}
-                  </h3>
-                  <p className="text-xs text-slate-500">{greetingModal.name}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setGreetingModal({ ...greetingModal, isOpen: false });
-                  setGreetingSuccess(false);
-                }}
-                className="text-slate-400 hover:text-slate-600 font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            {greetingSuccess ? (
-              <div className="py-6 text-center space-y-2">
-                <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto animate-bounce" />
-                <h4 className="font-bold text-slate-900 text-base">Wishes Sent Successfully!</h4>
-                <p className="text-xs text-slate-600">
-                  {greetingModal.name} लाई शुभकामना सन्देश पठाइयो! 🎉
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Greeting Message (शुभकामना सन्देश)
-                  </label>
-                  <textarea
-                    rows={4}
-                    defaultValue={greetingModal.detail}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500 text-slate-800"
-                  />
-                </div>
-
-                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1">
-                  <p className="font-bold">✨ Delivery Channels:</p>
-                  <p>• Official Company Slack / Email Broadcast to all 32+ staff</p>
-                  <p>• Personal WhatsApp greeting to {greetingModal.phone}</p>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                  <button
-                    onClick={() => {
-                      if (greetingModal.phone) {
-                        const msg = encodeURIComponent(`🎉 Dear ${greetingModal.name}, ${greetingModal.detail} Warm wishes from Goinfi Team!`);
-                        window.open(`https://wa.me/${greetingModal.phone.replace(/[^0-9]/g, '')}?text=${msg}`, '_blank');
-                      }
-                      setGreetingSuccess(true);
-                      setTimeout(() => {
-                        setGreetingSuccess(false);
-                        setGreetingModal({ ...greetingModal, isOpen: false });
-                      }, 2000);
-                    }}
-                    className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Send className="w-3.5 h-3.5" /> Send via WhatsApp
-                  </button>
-                  <button
-                    onClick={() => {
-                      setGreetingSuccess(true);
-                      setTimeout(() => {
-                        setGreetingSuccess(false);
-                        setGreetingModal({ ...greetingModal, isOpen: false });
-                      }, 2000);
-                    }}
-                    className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" /> Broadcast Email
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </DashboardShell>
   );
 }

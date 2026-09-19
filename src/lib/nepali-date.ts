@@ -124,18 +124,14 @@ export function getNepaliDate(adDateInput: Date | string = new Date()): BSDate {
   };
 }
 
-// Get dual formatted string e.g. "२०८३ असोज ३१ | 16 Sep 2026"
-export function formatDualDate(adDateInput: Date | string = new Date(), lang: 'ne' | 'en' = 'ne'): string {
+export function formatDualDate(adDateInput: Date | string = new Date(), lang: 'ne' | 'en' = 'en'): string {
   const ad = typeof adDateInput === 'string' ? new Date(adDateInput) : adDateInput;
   const bs = getNepaliDate(ad);
-  const adFormatted = ad.toLocaleDateString(lang === 'ne' ? 'ne-NP' : 'en-US', {
+  const adFormatted = ad.toLocaleDateString('en-US', {
     day: 'numeric',
     month: 'short',
     year: 'numeric'
   });
 
-  if (lang === 'ne') {
-    return `${bs.formattedNp} (वि.सं.)`;
-  }
   return `${bs.formattedEn} (${adFormatted})`;
 }

@@ -105,11 +105,13 @@ export interface LeaveRequest {
   id: string;
   employee_id: string;
   employee_name?: string;
+  department_name?: string;
   leave_type_id: string;
   leave_type_name?: string;
   start_date: string;
   end_date: string;
   total_days: number;
+  days_count?: number;
   reason: string;
   status: 'pending' | 'approved' | 'rejected' | 'cancelled';
   approved_by?: string;
@@ -211,7 +213,17 @@ export interface FieldDutyRequest {
   remarks?: string;
 }
 
-export type AssetCategory = 'Laptop' | 'Desktop' | 'Mobile / SIM' | 'Vehicle' | 'Office Access / Key' | 'Equipment';
+export type AssetCategory = 
+  | 'Laptop' 
+  | 'Desktop' 
+  | 'Mobile / SIM' 
+  | 'Vehicle' 
+  | 'Office Access / Key' 
+  | 'Equipment' 
+  | 'Camera' 
+  | 'Memory Card' 
+  | 'SSD / HDD' 
+  | string;
 
 export interface CompanyAsset {
   id: string;

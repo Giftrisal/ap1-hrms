@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { 
   RefreshCw, 
   Wifi, 
@@ -32,6 +33,21 @@ export default function Header({
   const [syncSuccess, setSyncSuccess] = useState(false);
   const [currentTime, setCurrentTime] = useState('');
   const [lastSyncText, setLastSyncText] = useState('Just now');
+  const [isWhatsAppDigestOn, setIsWhatsAppDigestOn] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('goinfi_whatsapp_digest_enabled');
+      if (saved !== null) return saved === 'true';
+    }
+    return true;
+  });
+
+  const handleToggleWhatsAppDigest = () => {
+    const nextState = !isWhatsAppDigestOn;
+    setIsWhatsAppDigestOn(nextState);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('goinfi_whatsapp_digest_enabled', String(nextState));
+    }
+  };
 
   useEffect(() => {
     const updateTime = () => {
@@ -116,6 +132,11 @@ export default function Header({
             <Menu className="w-5 h-5" />
           </button>
 
+          {/* Mobile AP1 Logo */}
+          <Link href="/dashboard" className="lg:hidden shrink-0 cursor-pointer active:scale-95 transition-transform" title="Go to Dashboard">
+            <img src="/ap1-logo.png" alt="AP1 HD" className="h-7 w-auto object-contain drop-shadow" />
+          </Link>
+
           <div>
             <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-tight">{title}</h2>
             {subtitle && <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-1">{subtitle}</p>}
@@ -142,7 +163,7 @@ export default function Header({
         {/* Bikram Sambat Dual Date */}
         <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50/80 rounded-lg border border-blue-200/80 text-xs font-semibold text-blue-900 shadow-2xs">
           <Calendar className="w-3.5 h-3.5 text-blue-600" />
-          <span>{getNepaliDate().formattedNp}</span>
+          <span>{getNepaliDate().formattedEn}</span>
           <span className="text-blue-400">|</span>
           <span className="text-[11px] text-blue-700 font-normal">
             {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -155,18 +176,15 @@ export default function Header({
           <span>{currentTime || '09:00:00 AM'} (NPT)</span>
         </div>
 
-        {/* ZKTeco Machine Status Card */}
-        <div className="flex items-center gap-2 px-2.5 py-1.5 bg-emerald-50/70 border border-emerald-200 rounded-lg text-xs">
-          <Wifi className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
-          <div>
-            <div className="flex items-center gap-1">
-              <span className="font-semibold text-emerald-900 text-[11px]">ZKTeco LAN</span>
-              <span className="inline-block w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-            </div>
-            <span className="text-[10px] text-emerald-700 font-medium">
-              {t.lastSynced}: {lastSyncText}
-            </span>
-          </div>
+        {/* Machine Status Card */}
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50/80 border border-emerald-200 rounded-lg text-xs">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span className="text-xs text-emerald-900 font-semibold">
+            Last Synced: {lastSyncText}
+          </span>
         </div>
 
         {/* Sync Now Button */}
@@ -192,15 +210,38 @@ export default function Header({
           )}
         </button>
 
-        {/* WhatsApp Digest Action */}
-        <button
-          onClick={handleSendTestWhatsApp}
-          title="Send Daily 10 AM WhatsApp Digest to Admin"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-700 border border-emerald-200 transition-colors cursor-pointer"
-        >
-          <Send className="w-3.5 h-3.5" />
-          <span>WhatsApp Digest</span>
-        </button>
+        {/* WhatsApp Digest ON/OFF Toggle Switch */}
+        <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg p-1">
+          <button
+            type="button"
+            onClick={handleToggleWhatsAppDigest}
+            title={`Click to turn automated WhatsApp Digest ${isWhatsAppDigestOn ? 'OFF' : 'ON'}`}
+            className={`flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+              isWhatsAppDigestOn
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                : 'bg-slate-100 text-slate-500 border border-slate-200'
+            }`}
+          >
+            <div className={`w-2 h-2 rounded-full ${isWhatsAppDigestOn ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+            <span>WhatsApp Digest:</span>
+            <span className={`font-bold uppercase tracking-wider text-[10px] px-1.5 py-0.5 rounded ${
+              isWhatsAppDigestOn ? 'bg-emerald-600 text-white' : 'bg-slate-300 text-slate-700'
+            }`}>
+              {isWhatsAppDigestOn ? 'ON' : 'OFF'}
+            </span>
+          </button>
+
+          {isWhatsAppDigestOn && (
+            <button
+              type="button"
+              onClick={handleSendTestWhatsApp}
+              title="Send WhatsApp Digest Test to Admin"
+              className="p-1.5 text-emerald-700 hover:bg-emerald-100/70 rounded-md transition-colors cursor-pointer"
+            >
+              <Send className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
     </header>
   );

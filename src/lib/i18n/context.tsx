@@ -16,26 +16,26 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>('en');
 
   useEffect(() => {
-    const saved = localStorage.getItem('goinfi_hr_lang') as Language;
-    if (saved === 'en' || saved === 'ne') {
-      setLanguageState(saved);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('goinfi_hr_lang', 'en');
     }
   }, []);
 
-  const setLanguage = (lang: Language) => {
-    setLanguageState(lang);
-    localStorage.setItem('goinfi_hr_lang', lang);
+  const setLanguage = (_lang: Language) => {
+    setLanguageState('en');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('goinfi_hr_lang', 'en');
+    }
   };
 
   const toggleLanguage = () => {
-    const next = language === 'en' ? 'ne' : 'en';
-    setLanguage(next);
+    setLanguageState('en');
   };
 
-  const t = translations[language];
+  const t = translations.en;
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t, toggleLanguage }}>
+    <LanguageContext.Provider value={{ language: 'en', setLanguage, t, toggleLanguage }}>
       {children}
     </LanguageContext.Provider>
   );

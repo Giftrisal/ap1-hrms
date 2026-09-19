@@ -121,6 +121,15 @@ def pull_and_sync_attendance(ip, port, api_url, api_secret):
         conn.disable_device() # Temporarily disable to prevent state change during sync
 
         try:
+            # Auto-sync machine clock with computer clock
+            try:
+                conn.set_time(datetime.now())
+            except Exception as time_err:
+                pass
+
+            users = conn.get_users()
+            user_names = {str(u.user_id): (u.name or f"Staff {u.user_id}") for u in users}
+
             attendance_records = conn.get_attendance()
             logger.info(f"Retrieved {len(attendance_records)} total records from machine.")
             
@@ -131,10 +140,13 @@ def pull_and_sync_attendance(ip, port, api_url, api_secret):
             # Prepare payload for Next.js API
             payload = []
             for record in attendance_records:
+                uid = str(record.user_id)
                 payload.append({
-                    "biometric_pin": str(record.user_id),
+                    "user_id": uid,
+                    "biometric_pin": uid,
+                    "employee_name": user_names.get(uid, f"Staff {uid}"),
                     "punch_time": record.timestamp.isoformat(),
-                    "punch_type": record.punch, # 0=CheckIn, 1=CheckOut
+                    "punch_type": "Check-In" if record.punch in (0, 255) else "Check-Out",
                     "verify_type": record.status,
                     "device_ip": ip
                 })

@@ -157,9 +157,7 @@ export default function PayrollPage() {
   return (
     <DashboardShell
       title={t.navPayroll}
-      subtitle={language === 'en' 
-        ? "Monthly salary processing, automated deductions, overtime, and PDF payslips" 
-        : "मासिक तलब गणना, ढिलो तथा अनुपस्थित कट्टी, ओभरटाइम तथा डिजिटल पेस्लिप"}
+      subtitle="Monthly salary processing, automated deductions, overtime, and PDF payslips"
     >
       {/* 3 Executive Financial Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -223,9 +221,9 @@ export default function PayrollPage() {
               onChange={(e) => setSelectedMonth(e.target.value)}
               className="py-2 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg font-medium text-slate-700"
             >
-              <option value="9">September 2026 (असोज २०८३)</option>
-              <option value="8">August 2026 (भाद्र २०८३)</option>
-              <option value="7">July 2026 (श्रावण २०८३)</option>
+              <option value="9">September 2026 (Ashwin 2083)</option>
+              <option value="8">August 2026 (Bhadra 2083)</option>
+              <option value="7">July 2026 (Shrawan 2083)</option>
             </select>
           </div>
         </div>

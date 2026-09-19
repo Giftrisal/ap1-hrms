@@ -17,7 +17,8 @@ import {
   AlertCircle, 
   X, 
   PlusCircle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Trash2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -26,11 +27,163 @@ import autoTable from 'jspdf-autotable';
 export default function AttendancePage() {
   const { t, language } = useLanguage();
   const { role } = useAuth();
-  const [records, setRecords] = useState<DailyAttendance[]>(generateTodayAttendance());
+  const [records, setRecords] = useState<DailyAttendance[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('goinfi_attendance_records');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            return parsed;
+          }
+        } catch (e) {}
+      }
+    }
+    return [];
+  });
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [editRecord, setEditRecord] = useState<DailyAttendance | null>(null);
+
+  const saveRecordsList = (newList: DailyAttendance[]) => {
+    setRecords(newList);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('goinfi_attendance_records', JSON.stringify(newList));
+    }
+  };
+
+  const handleDeleteRecord = (id: string, name: string) => {
+    if (confirm(`Delete attendance record for ${name}?`)) {
+      const updated = records.filter(r => r.id !== id);
+      saveRecordsList(updated);
+    }
+  };
+
+  const handleClearAllRecords = () => {
+    if (confirm('Delete all attendance records?')) {
+      saveRecordsList([]);
+    }
+  };
+
+  // Poll /api/biometric/sync for live hardware punches from ZKTeco
+  React.useEffect(() => {
+    const syncBiometricPunches = async () => {
+      try {
+        const res = await fetch('/api/biometric/sync');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.recent_logs && Array.isArray(data.recent_logs) && data.recent_logs.length > 0) {
+          // Load staff list for enrichment if available
+          let staffList: any[] = [];
+          if (typeof window !== 'undefined') {
+            try {
+              const savedStaff = localStorage.getItem('goinfi_staff_list');
+              if (savedStaff) staffList = JSON.parse(savedStaff);
+            } catch (e) {}
+          }
+
+          setRecords((prev) => {
+            let updated = [...prev];
+            let hasChanges = false;
+
+            for (const log of data.recent_logs) {
+              const pin = String(log.user_id || log.biometric_pin || '');
+              if (!pin) continue;
+
+              const matchedEmp = staffList.find(
+                (s: any) => String(s.biometric_pin) === pin || String(s.id) === pin || String(s.id) === `emp-${pin}`
+              );
+
+              const empName = matchedEmp?.full_name || log.employee_name || `Staff ${pin}`;
+              const deptName = matchedEmp?.department_name || 'AP1 Media / Operations';
+              const designation = matchedEmp?.designation || 'Staff Member';
+              const photo = matchedEmp?.photo_url;
+              const punchDate = (log.punch_time || new Date().toISOString()).split('T')[0];
+
+              const existingIdx = updated.findIndex(
+                (r) => String(r.employee_pin) === pin && r.date === punchDate
+              );
+
+              if (existingIdx !== -1) {
+                const existing = updated[existingIdx];
+                const punchTime = log.punch_time;
+                let newOut = existing.out_time;
+                let newIn = existing.in_time;
+
+                if (log.punch_type === 'Check-Out' || (newIn && punchTime > newIn)) {
+                  newOut = punchTime;
+                }
+                if (!newIn || punchTime < newIn) {
+                  newIn = punchTime;
+                }
+
+                // Calculate worked hours if in and out exist
+                let workedHours = existing.worked_hours || 8;
+                if (newIn && newOut && newIn !== newOut) {
+                  const diffMs = new Date(newOut).getTime() - new Date(newIn).getTime();
+                  if (diffMs > 0) {
+                    workedHours = Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10;
+                  }
+                }
+
+                if (existing.in_time !== newIn || existing.out_time !== newOut || existing.employee_name !== empName) {
+                  updated[existingIdx] = {
+                    ...existing,
+                    employee_name: empName,
+                    department_name: deptName,
+                    designation: designation,
+                    employee_photo: photo || existing.employee_photo,
+                    in_time: newIn,
+                    out_time: newOut,
+                    status: log.is_late ? 'LATE' : existing.status || 'PRESENT',
+                    late_minutes: log.late_minutes || existing.late_minutes || 0,
+                    worked_hours: workedHours,
+                    remarks: 'ZKTeco Live Machine Punch'
+                  };
+                  hasChanges = true;
+                }
+              } else {
+                // Insert new daily record from live biometric machine
+                const newRec: DailyAttendance = {
+                  id: `zk-${pin}-${punchDate}-${Date.now()}`,
+                  employee_id: matchedEmp?.id || `emp-${pin}`,
+                  employee_name: empName,
+                  employee_pin: pin,
+                  department_name: deptName,
+                  designation: designation,
+                  employee_photo: photo,
+                  date: punchDate,
+                  in_time: log.punch_time,
+                  out_time: log.punch_type === 'Check-Out' ? log.punch_time : undefined,
+                  status: log.is_late ? 'LATE' : 'PRESENT',
+                  late_minutes: log.late_minutes || 0,
+                  early_exit_minutes: 0,
+                  overtime_minutes: 0,
+                  worked_hours: 8,
+                  source: 'biometric',
+                  remarks: 'ZKTeco Live Machine Punch'
+                };
+                updated.unshift(newRec);
+                hasChanges = true;
+              }
+            }
+
+            if (hasChanges && typeof window !== 'undefined') {
+              localStorage.setItem('goinfi_attendance_records', JSON.stringify(updated));
+            }
+            return updated;
+          });
+        }
+      } catch (err) {
+        // silent
+      }
+    };
+
+    syncBiometricPunches();
+    const interval = setInterval(syncBiometricPunches, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   const filteredRecords = records.filter(r => {
     const matchesSearch = 
@@ -43,7 +196,8 @@ export default function AttendancePage() {
   const handleUpdateRecord = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editRecord) return;
-    setRecords(records.map(r => r.id === editRecord.id ? editRecord : r));
+    const updated = records.map(r => r.id === editRecord.id ? editRecord : r);
+    saveRecordsList(updated);
     setEditRecord(null);
     alert('Attendance entry successfully updated!');
   };
@@ -98,9 +252,7 @@ export default function AttendancePage() {
   return (
     <DashboardShell
       title={t.navAttendance}
-      subtitle={language === 'en' 
-        ? "Daily punch logs, shift analysis, and manual adjustments" 
-        : "दैनिक पञ्च विवरण, सिफ्ट विश्लेषण तथा म्यानुअल हाजिरी संशोधन"}
+      subtitle="Daily punch logs, shift analysis, and manual adjustments"
     >
       {/* Top Filter Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
@@ -143,22 +295,32 @@ export default function AttendancePage() {
           </select>
         </div>
 
-        {/* Export Buttons */}
+        {/* Export Buttons & Clear All */}
         <div className="flex items-center gap-2 w-full md:w-auto justify-end">
           <button
             onClick={exportExcel}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
             <span>{t.exportExcel}</span>
           </button>
           <button
             onClick={exportPdf}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-red-600" />
             <span>{t.exportPdf}</span>
           </button>
+          {records.length > 0 && (
+            <button
+              onClick={handleClearAllRecords}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer"
+              title="Delete all attendance logs"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear All</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -256,17 +418,42 @@ export default function AttendancePage() {
 
                   <td className="py-3 px-4 text-right">
                     {(role === 'admin' || role === 'hr') && (
-                      <button
-                        onClick={() => setEditRecord(r)}
-                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-md transition-colors"
-                        title="Manual Correction"
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => setEditRecord(r)}
+                          className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
+                          title="Manual Correction"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRecord(r.id, r.employee_name || 'Staff')}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
+                          title="Delete Attendance Record"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
               ))}
+
+              {filteredRecords.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="py-14 text-center">
+                    <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                      <Clock className="w-6 h-6" />
+                    </div>
+                    <p className="font-bold text-slate-800 text-sm">
+                      No Attendance Records Found
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                      Real-time punches will appear here automatically when employees punch on the ZKTeco biometric machine.
+                    </p>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
