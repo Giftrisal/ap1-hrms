@@ -154,6 +154,10 @@ export interface PayrollRecord {
   month: number;
   base_salary: number;
   working_days: number;
+  target_monthly_hours?: number;
+  actual_worked_hours?: number;
+  shortfall_hours?: number;
+  hourly_rate?: number;
   present_days: number;
   absent_days: number;
   late_days: number;
@@ -190,7 +194,7 @@ export interface SystemSettings {
   whatsapp_auto_10am_alert: boolean;
   whatsapp_late_alert_threshold: number;
   nepali_fiscal_year: string;
-  late_penalty_rule: 'three_late_half_day' | 'per_minute' | 'fixed_amount';
+  late_penalty_rule: 'three_late_half_day' | 'per_minute' | 'fixed_amount' | 'monthly_hours_shortfall';
   late_penalty_amount: number;
 }
 

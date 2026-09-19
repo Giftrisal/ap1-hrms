@@ -115,10 +115,10 @@ export const initialHolidays: PublicHoliday[] = [];
 
 export const initialSettings: SystemSettings = {
   id: 'sys-1',
-  company_name: 'Goinfi Technologies Pvt. Ltd.',
-  company_address: 'Baneshwor, Kathmandu, Nepal',
+  company_name: 'AP1 Television',
+  company_address: 'Kathmandu, Nepal',
   company_phone: '+977-1-4498765',
-  company_email: 'contact@goinfi.com',
+  company_email: 'contact@ap1.tv',
   biometric_device_ip: '192.168.1.201',
   biometric_device_port: 4370,
   biometric_last_sync: new Date().toISOString(),
@@ -129,7 +129,7 @@ export const initialSettings: SystemSettings = {
   whatsapp_auto_10am_alert: true,
   whatsapp_late_alert_threshold: 30,
   nepali_fiscal_year: '2082/2083',
-  late_penalty_rule: 'three_late_half_day',
+  late_penalty_rule: 'monthly_hours_shortfall',
   late_penalty_amount: 500
 };
 

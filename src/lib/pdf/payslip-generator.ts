@@ -2,7 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { PayrollRecord } from '../types';
 
-export function generatePayslipPdf(payroll: PayrollRecord, companyName = 'Goinfi Technologies Pvt. Ltd.') {
+export function generatePayslipPdf(payroll: PayrollRecord, companyName = 'AP1 Television') {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -27,7 +27,7 @@ export function generatePayslipPdf(payroll: PayrollRecord, companyName = 'Goinfi
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(203, 213, 225);
-  doc.text('Baneshwor, Kathmandu, Nepal | Phone: +977-1-4498765 | hr@goinfi.com', 14, 23);
+  doc.text('Kathmandu, Nepal | Phone: +977-1-4498765 | info@ap1.tv | ap1.tv', 14, 23);
 
   // Payslip Title Badge
   doc.setTextColor(15, 23, 42);
@@ -40,23 +40,27 @@ export function generatePayslipPdf(payroll: PayrollRecord, companyName = 'Goinfi
   doc.setTextColor(100, 116, 139);
   doc.text(`Generated on: ${new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}`, 140, 42);
 
+  const targetHours = payroll.target_monthly_hours || (payroll.working_days * 8);
+  const actualHours = payroll.actual_worked_hours ?? (targetHours - (payroll.shortfall_hours || 0));
+  const shortfallHours = payroll.shortfall_hours ?? Math.max(0, targetHours - actualHours);
+
   // Employee Information Box
   autoTable(doc, {
     startY: 48,
     theme: 'plain',
     styles: { fontSize: 8.5, cellPadding: 2 },
     columnStyles: {
-      0: { fontStyle: 'bold', textColor: [71, 85, 105], cellWidth: 35 },
-      1: { textColor: [15, 23, 42], cellWidth: 65 },
-      2: { fontStyle: 'bold', textColor: [71, 85, 105], cellWidth: 35 },
-      3: { textColor: [15, 23, 42], cellWidth: 65 }
+      0: { fontStyle: 'bold', textColor: [71, 85, 105], cellWidth: 38 },
+      1: { textColor: [15, 23, 42], cellWidth: 62 },
+      2: { fontStyle: 'bold', textColor: [71, 85, 105], cellWidth: 38 },
+      3: { textColor: [15, 23, 42], cellWidth: 62 }
     },
     body: [
       ['Employee Name:', payroll.employee_name || 'N/A', 'PAN Number:', payroll.pan_number || 'PAN60129381'],
       ['Designation:', payroll.employee_designation || 'N/A', 'Bank Name:', payroll.bank_name || 'NIC Asia Bank'],
-      ['Department:', payroll.department_name || 'Engineering', 'Account Number:', payroll.bank_account_number || '10928374829101'],
-      ['Working Days:', `${payroll.working_days} Days`, 'Payment Method:', payroll.payment_method || 'Bank Transfer'],
-      ['Present Days:', `${payroll.present_days} Days`, 'Late / Absent Days:', `${payroll.late_days} Lates / ${payroll.absent_days} Absents`],
+      ['Department:', payroll.department_name || 'Broadcasting', 'Account Number:', payroll.bank_account_number || '10928374829101'],
+      ['Working Days / Target:', `${payroll.working_days} Days / ${targetHours.toFixed(1)} Hrs`, 'Payment Method:', payroll.payment_method || 'Bank Transfer'],
+      ['Actual Hours Logged:', `${actualHours.toFixed(1)} Hrs`, 'Late / Shortfall Hours:', shortfallHours > 0 ? `${shortfallHours.toFixed(1)} Hrs Shortfall` : 'None (Full Hours)'],
     ]
   });
 
@@ -71,7 +75,7 @@ export function generatePayslipPdf(payroll: PayrollRecord, companyName = 'Goinfi
   ];
 
   const deductionsData = [
-    ['Late Arrival Penalties', `NPR ${payroll.late_deduction.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
+    [shortfallHours > 0 ? `Late Arrival / Shortfall (${shortfallHours.toFixed(1)} hrs)` : 'Late Arrival Penalties', `NPR ${payroll.late_deduction.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
     ['Absence Deductions', `NPR ${payroll.absent_deduction.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
     ['Unpaid Leave (LWP)', `NPR ${payroll.unpaid_leave_deduction.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
     ['Advance Salary Repayment', `NPR ${payroll.advance_deduction.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],

@@ -440,68 +440,81 @@ export default function ShiftsPage() {
       {/* ========================================================================= */}
       {/* 4. LATE ARRIVAL PENALTY ENGINE */}
       {/* ========================================================================= */}
-      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
-            <AlertTriangle className="w-5 h-5" />
+      {/* ========================================================================= */}
+      {/* 4. LATE ARRIVAL & MONTHLY WORKING HOURS PENALTY ENGINE */}
+      {/* ========================================================================= */}
+      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-700 border border-purple-200">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-bold text-slate-900 text-base">
+                Late Arrival & Monthly Working Hours Engine
+              </h4>
+              <p className="text-xs text-slate-500">
+                Accounts-defined monthly target working hours and pro-rata late arrival salary deduction formula
+              </p>
+            </div>
           </div>
-          <div>
-            <h4 className="font-bold text-slate-900 text-base">
-              Late Arrival Penalty Engine
-            </h4>
-            <p className="text-xs text-slate-500">
-              Automated salary deduction formula applied when staff punch in after the 15-minute grace period
+          <a
+            href="/payroll"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-900 font-bold text-xs transition-colors self-start sm:self-auto"
+          >
+            <span>Open Accounts Payroll</span>
+            <span>→</span>
+          </a>
+        </div>
+
+        {/* Policy explanation box */}
+        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-2">
+          <p className="font-bold text-slate-900 flex items-center gap-1.5 text-sm">
+            <ShieldCheck className="w-4 h-4 text-purple-700" />
+            <span>कार्य घण्टा तथा ढिलो आगमन कट्टी नियम (Accounts Hours Policy):</span>
+          </p>
+          <ul className="list-disc list-inside space-y-1 text-slate-600 pl-1 leading-relaxed">
+            <li><strong>मासिक कुल कार्य घण्टा (Monthly Target Hours):</strong> प्रत्येक महिना क्यालेन्डरमा परेका कुल कार्य दिन अनुसार Accounts शाखाले आवश्यक कुल कार्य घण्टा (उदा. २६ दिन × ८ घण्टा = <strong>२०८ घण्टा</strong>) प्रणालीमा प्रविष्टि गर्दछ।</li>
+            <li><strong>वास्तविक हाजिरी गणना (Biometric Logged Hours):</strong> कर्मचारीले बायोमेट्रिक मेसिनमा गरेको दैनिक Check-In र Check-Out अनुसार महिनाभरको कुल काम गरेको घण्टा स्वतः जोडिएर आउँछ।</li>
+            <li><strong>ढिलो आगमन तथा समय नपुगेको कट्टी (Shortfall Deduction):</strong> १५ मिनेटको ग्रेस पिरियड कटेपछि ढिलो आउँदा वा कार्य अवधि नपुग्दा कुल घण्टा घट्न जान्छ। नपुगेको घण्टालाई <code className="px-1.5 py-0.5 bg-slate-200 text-slate-800 rounded font-mono">प्रति घण्टा तलब दर (Hourly Rate)</code> अनुसार हिसाब गरी Payslip मा कट्टी गरिन्छ।</li>
+          </ul>
+        </div>
+
+        {/* Calculation Formula Card */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
+            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">१. प्रति घण्टा तलब दर</p>
+            <p className="font-bold text-slate-900 mt-1 text-sm font-mono">
+              Hourly Rate = Base Salary ÷ Target Monthly Hours
             </p>
+            <p className="text-[11px] text-slate-500 mt-0.5">आधारभूत तलबलाई कुल तोकिएको घण्टाले भाग गर्दा</p>
+          </div>
+          <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
+            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">२. नपुगेको घण्टा (Shortfall)</p>
+            <p className="font-bold text-amber-700 mt-1 text-sm font-mono">
+              Shortfall = Target Hours − Actual Worked Hours
+            </p>
+            <p className="text-[11px] text-slate-500 mt-0.5">तोकिएको घण्टाबाट बायोमेट्रिकमा काम गरेको घण्टा घटाउँदा</p>
+          </div>
+          <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
+            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">३. पेरोल कट्टी (Late Deduction)</p>
+            <p className="font-bold text-red-600 mt-1 text-sm font-mono">
+              Late Deduction = Shortfall Hours × Hourly Rate
+            </p>
+            <p className="text-[11px] text-slate-500 mt-0.5">नपुगेको घण्टालाई प्रति घण्टा दरले गुणा गरी Payslip मा कट्टी</p>
           </div>
         </div>
 
-        <div className="space-y-3 max-w-xl text-xs">
-          <label className="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 cursor-pointer hover:bg-slate-50 transition-colors">
-            <input
-              type="radio"
-              name="penalty_rule"
-              value="three_late_half_day"
-              checked={latePenaltyRule === 'three_late_half_day'}
-              onChange={() => setLatePenaltyRule('three_late_half_day')}
-              className="mt-0.5 text-purple-600 focus:ring-purple-500"
-            />
-            <div>
-              <p className="font-bold text-slate-900">
-                3 Late Arrivals = 0.5 Day Salary Deduction (Standard Nepal Media Rule)
-              </p>
-              <p className="text-slate-500 mt-0.5 leading-relaxed">
-                Every 3 late arrivals past grace period in a payroll month automatically deducts 0.5 day&apos;s wage during monthly payroll processing.
-              </p>
-            </div>
-          </label>
-
-          <label className="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 cursor-pointer hover:bg-slate-50 transition-colors">
-            <input
-              type="radio"
-              name="penalty_rule"
-              value="fixed_penalty"
-              checked={latePenaltyRule === 'fixed_penalty'}
-              onChange={() => setLatePenaltyRule('fixed_penalty')}
-              className="mt-0.5 text-purple-600 focus:ring-purple-500"
-            />
-            <div>
-              <p className="font-bold text-slate-900">
-                Fixed Fine per Late Punch (e.g. NPR 200)
-              </p>
-              <p className="text-slate-500 mt-0.5">
-                Applies a constant fine for every punch occurring after grace period ends.
-              </p>
-            </div>
-          </label>
-
-          <div className="pt-2">
-            <button
-              onClick={() => showToast('✓ Shift policies and deduction rules successfully saved!')}
-              className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs transition-colors shadow-xs cursor-pointer"
-            >
-              {t.saveSettings}
-            </button>
-          </div>
+        <div className="pt-2 flex items-center justify-between">
+          <button
+            onClick={() => showToast('✓ Late Arrival & Monthly Hours Engine settings verified and saved!')}
+            className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs transition-colors shadow-xs cursor-pointer"
+          >
+            {t.saveSettings}
+          </button>
+          <span className="text-[11px] text-slate-500">
+            Accounts can directly adjust monthly hours under <a href="/payroll" className="text-purple-700 underline font-semibold">Payroll</a>
+          </span>
         </div>
       </div>
 
