@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'AP1 Staff Portal',
     short_name: 'Staff Portal',
-    description: 'AP1 Television HD Staff Self-Service Portal - Attendance, Leave, Payslips & Digital ID',
+    description: 'AP1 Television Staff Self-Service Portal - Attendance, Leave, Payslips & Digital ID',
     start_url: '/portal',
     id: '/portal',
     display: 'standalone',

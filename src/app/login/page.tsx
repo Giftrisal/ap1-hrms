@@ -50,7 +50,7 @@ export default function LoginPage() {
         <div className="flex flex-col items-center text-center mb-8">
           <img 
             src="/ap1-logo.png" 
-            alt="AP1 HD" 
+            alt="AP1 Television" 
             className="h-16 w-auto shrink-0 object-contain drop-shadow-2xl mb-4" 
             style={{ aspectRatio: '800/339' }} 
           />

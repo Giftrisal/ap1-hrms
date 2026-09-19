@@ -22,7 +22,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "AP1 Staff & HR Portal | Goinfi HRMS",
-  description: "AP1 Television HD Staff Portal - Attendance, Leave, Payslips & Digital ID",
+  description: "AP1 Television Staff Portal - Attendance, Leave, Payslips & Digital ID",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [

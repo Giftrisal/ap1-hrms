@@ -136,7 +136,7 @@ export default function Header({
           <Link href="/dashboard" className="lg:hidden shrink-0 cursor-pointer active:scale-95 transition-transform" title="Go to Dashboard">
             <img 
               src="/ap1-logo.png" 
-              alt="AP1 HD" 
+              alt="AP1 Television" 
               className="h-8 sm:h-9 w-auto shrink-0 object-contain drop-shadow" 
               style={{ aspectRatio: '800/339' }} 
             />

@@ -80,7 +80,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           >
             <img 
               src="/ap1-logo.png" 
-              alt="AP1 HD" 
+              alt="AP1 Television" 
               className="h-10 w-auto shrink-0 object-contain drop-shadow group-hover:scale-105 transition-transform" 
               style={{ aspectRatio: '800/339' }} 
             />

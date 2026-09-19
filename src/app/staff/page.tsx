@@ -706,7 +706,7 @@ export default function StaffPage() {
         </div>
       )}
 
-      {/* Enterprise Executive Strip with Official AP1 HD Logo */}
+      {/* Enterprise Executive Strip with Official AP1 Logo */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-purple-950 p-5 sm:p-6 rounded-2xl text-white shadow-md border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
         <div className="flex items-center gap-4 sm:gap-5">
           <Link 
@@ -716,7 +716,7 @@ export default function StaffPage() {
           >
             <img 
               src="/ap1-logo.png" 
-              alt="AP1 HD Logo" 
+              alt="AP1 Logo" 
               className="h-16 sm:h-20 w-auto shrink-0 object-contain drop-shadow-xl group-hover:scale-105 transition-transform" 
               style={{ aspectRatio: '800/339' }}
             />
@@ -1697,11 +1697,11 @@ export default function StaffPage() {
               <div className="flex items-center justify-center gap-2 mb-3 bg-white/5 py-1.5 px-3 rounded-xl border border-white/10">
                 <img 
                   src="/ap1-logo.png" 
-                  alt="AP1 HD" 
+                  alt="AP1 Television" 
                   className="h-7 w-auto shrink-0 object-contain drop-shadow" 
                   style={{ aspectRatio: '800/339' }} 
                 />
-                <h3 className="font-black text-[11px] tracking-wider text-white uppercase">AP1 TELEVISION HD</h3>
+                <h3 className="font-black text-[11px] tracking-wider text-white uppercase">AP1 TELEVISION</h3>
               </div>
 
               {idCardStaff.photo_url && !idCardStaff.photo_url.includes('unsplash') ? (

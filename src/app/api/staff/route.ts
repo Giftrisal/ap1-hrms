@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
       let smsResult: any = null;
       if (targetPhone) {
         try {
-          const smsText = `Dear ${staffName || 'Staff'}, Your AP1 Staff Portal account (PIN #${cleanPin}) has been APPROVED and activated by HR. You can now log in at https://ap1hr.goinfi.biz/portal. - AP1 Television HD`;
+          const smsText = `Dear ${staffName || 'Staff'}, Your AP1 Staff Portal account (PIN #${cleanPin}) has been APPROVED and activated by HR. You can now log in at https://ap1hr.goinfi.biz/portal. - AP1 Television`;
           smsResult = await sendGoinfiSms(targetPhone, smsText, undefined, body.gatewayConfig);
         } catch (err: any) {
           console.warn('[Staff Approval SMS error]:', err?.message);
@@ -194,7 +194,7 @@ export async function POST(req: NextRequest) {
       let smsResult: any = null;
       if (targetPhone) {
         try {
-          const smsText = `Dear ${staffName || 'Staff'}, Your AP1 Staff Portal registration request (PIN #${cleanPin}) was not approved by administration. Please contact the HR department for assistance. - AP1 Television HD`;
+          const smsText = `Dear ${staffName || 'Staff'}, Your AP1 Staff Portal registration request (PIN #${cleanPin}) was not approved by administration. Please contact the HR department for assistance. - AP1 Television`;
           smsResult = await sendGoinfiSms(targetPhone, smsText, undefined, body.gatewayConfig);
         } catch (err: any) {
           console.warn('[Staff Rejection SMS error]:', err?.message);

@@ -1002,7 +1002,7 @@ export default function StaffPortalPage() {
       bank_account_number: activeEmployee.bank_account_number || '102000000001',
       pan_number: activeEmployee.pan_number || 'PAN000001'
     };
-    generatePayslipPdf(mockPayroll, 'AP1 Television HD');
+    generatePayslipPdf(mockPayroll, 'AP1 Television');
   };
 
   // Desktop / Laptop Access Restriction Guard (Mobile Only Application)
@@ -1016,7 +1016,7 @@ export default function StaffPortalPage() {
           <div className="flex flex-col items-center gap-2">
             <img 
               src="/ap1-logo.png" 
-              alt="AP1 HD" 
+              alt="AP1 Television" 
               className="h-14 w-auto shrink-0 object-contain drop-shadow mb-1" 
               style={{ aspectRatio: '800/339' }} 
             />
@@ -1082,7 +1082,7 @@ export default function StaffPortalPage() {
         </div>
 
         <p className="text-[11px] text-slate-500 mt-5 relative z-10">
-          🔒 AP1 Television HD • Powered by Goinfi HRMS
+          🔒 AP1 Television • Powered by Goinfi HRMS
         </p>
       </div>
     );
@@ -1097,13 +1097,13 @@ export default function StaffPortalPage() {
           <div className="flex items-center gap-2.5 sm:gap-3">
             <img 
               src="/ap1-logo.png" 
-              alt="AP1 HD" 
+              alt="AP1 Television" 
               className="h-8 sm:h-11 w-auto shrink-0 object-contain drop-shadow" 
               style={{ aspectRatio: '800/339' }} 
             />
             <div className="border-l border-slate-700/80 pl-2 sm:pl-2.5">
               <span className="text-[11px] sm:text-xs font-black tracking-wider text-fuchsia-400 uppercase block">STAFF PORTAL</span>
-              <span className="text-[9px] sm:text-[10px] text-purple-300/80">AP1 Television HD</span>
+              <span className="text-[9px] sm:text-[10px] text-purple-300/80">AP1 Television</span>
             </div>
           </div>
           {!isAlreadyInstalled && (
@@ -1847,7 +1847,7 @@ export default function StaffPortalPage() {
 
         {/* Footer Note */}
         <div className="text-center py-1 text-[10px] sm:text-[11px] text-slate-500 select-none shrink-0">
-          <p>🔒 AP1 Television HD • Goinfi Biometric HRMS 2026</p>
+          <p>🔒 AP1 Television • Goinfi Biometric HRMS 2026</p>
         </div>
 
         {/* Non-intrusive Install Toast */}
@@ -1870,7 +1870,7 @@ export default function StaffPortalPage() {
           <div className="flex items-center gap-3">
             <img 
               src="/ap1-logo.png" 
-              alt="AP1 HD" 
+              alt="AP1 Television" 
               className="h-9 sm:h-10 w-auto shrink-0 object-contain drop-shadow" 
               style={{ aspectRatio: '800/339' }} 
             />
@@ -2259,11 +2259,11 @@ export default function StaffPortalPage() {
               <div className="flex items-center justify-center gap-2 mb-3 bg-white/5 py-1.5 px-3 rounded-xl border border-white/10">
                 <img 
                   src="/ap1-logo.png" 
-                  alt="AP1 HD" 
+                  alt="AP1 Television" 
                   className="h-7 w-auto shrink-0 object-contain drop-shadow" 
                   style={{ aspectRatio: '800/339' }} 
                 />
-                <h3 className="font-black text-[11px] tracking-wider text-white uppercase">AP1 TELEVISION HD</h3>
+                <h3 className="font-black text-[11px] tracking-wider text-white uppercase">AP1 TELEVISION</h3>
               </div>
 
               {activeEmployee.photo_url && !activeEmployee.photo_url.includes('unsplash') ? (

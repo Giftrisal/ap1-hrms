@@ -278,8 +278,8 @@ export function formatOtpMessage(otp: string, type: 'signup' | 'reset', staffNam
 }
 
 /**
- * Format Monthly Invoice Message for AP1 Television HD
+ * Format Monthly Invoice Message for AP1 Television
  */
 export function formatMonthlyBillMessage(nepaliMonth: string, nepaliYear: number, billNumber: string): string {
-  return `[Goinfi Technologies] AP1 Television HD: Monthly HRMS cloud platform and biometric service invoice (${billNumber}) for ${nepaliMonth} ${nepaliYear} is ready. Contact: support@goinfi.biz. Thank you!`;
+  return `[Goinfi Technologies] AP1 Television: Monthly HRMS cloud platform and biometric service invoice (${billNumber}) for ${nepaliMonth} ${nepaliYear} is ready. Contact: support@goinfi.biz. Thank you!`;
 }
