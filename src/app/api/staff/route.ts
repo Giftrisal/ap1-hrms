@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { sendGoinfiSms } from '@/lib/sms';
 
 export const dynamic = 'force-dynamic';
 
@@ -107,6 +108,9 @@ export async function POST(req: NextRequest) {
       const cleanPin = String(body.pin).trim();
       const regIdx = registrationsDatabase.findIndex(r => String(r.pin) === cleanPin);
       
+      let staffName = '';
+      let targetPhone = '';
+
       if (regIdx !== -1) {
         registrationsDatabase[regIdx] = {
           ...registrationsDatabase[regIdx],
@@ -114,17 +118,36 @@ export async function POST(req: NextRequest) {
           approvedBy: body.approvedBy || 'HR Admin',
           approvedAt: new Date().toISOString()
         };
+        staffName = registrationsDatabase[regIdx].staffName || '';
+        targetPhone = registrationsDatabase[regIdx].phone || '';
       }
 
       // Also ensure employee is active in staff list
       const empIdx = staffDatabase.findIndex(e => String(e.biometric_pin) === cleanPin || e.id === cleanPin);
       if (empIdx !== -1) {
         staffDatabase[empIdx] = { ...staffDatabase[empIdx], status: 'active' };
+        if (!staffName) staffName = staffDatabase[empIdx].full_name;
+        if (!targetPhone) targetPhone = staffDatabase[empIdx].phone;
+      }
+
+      // Send SMS Notification to staff member
+      let smsResult: any = null;
+      if (targetPhone) {
+        try {
+          const smsText = `Dear ${staffName || 'Staff'}, Your AP1 Staff Portal account (PIN #${cleanPin}) has been APPROVED and activated by HR. You can now log in at https://ap1hr.goinfi.biz/portal. - AP1 Television HD`;
+          smsResult = await sendGoinfiSms(targetPhone, smsText, undefined, body.gatewayConfig);
+        } catch (err: any) {
+          console.warn('[Staff Approval SMS error]:', err?.message);
+        }
       }
 
       return NextResponse.json({
         success: true,
         message: `Staff PIN #${cleanPin} approved and activated successfully`,
+        smsSent: smsResult?.success ?? false,
+        smsChannel: smsResult?.channel,
+        whatsappLink: smsResult?.whatsappLink,
+        phone: targetPhone,
         registrations: registrationsDatabase,
         staff: staffDatabase
       });
@@ -135,6 +158,9 @@ export async function POST(req: NextRequest) {
       const cleanPin = String(body.pin).trim();
       const regIdx = registrationsDatabase.findIndex(r => String(r.pin) === cleanPin);
       
+      let staffName = '';
+      let targetPhone = '';
+
       if (regIdx !== -1) {
         registrationsDatabase[regIdx] = {
           ...registrationsDatabase[regIdx],
@@ -142,11 +168,34 @@ export async function POST(req: NextRequest) {
           rejection_reason: body.reason || 'Registration rejected by administrator',
           rejectedAt: new Date().toISOString()
         };
+        staffName = registrationsDatabase[regIdx].staffName || '';
+        targetPhone = registrationsDatabase[regIdx].phone || '';
+      }
+
+      const empIdx = staffDatabase.findIndex(e => String(e.biometric_pin) === cleanPin || e.id === cleanPin);
+      if (empIdx !== -1) {
+        if (!staffName) staffName = staffDatabase[empIdx].full_name;
+        if (!targetPhone) targetPhone = staffDatabase[empIdx].phone;
+      }
+
+      // Send SMS Notification to staff member
+      let smsResult: any = null;
+      if (targetPhone) {
+        try {
+          const smsText = `Dear ${staffName || 'Staff'}, Your AP1 Staff Portal registration request (PIN #${cleanPin}) was not approved by administration. Please contact the HR department for assistance. - AP1 Television HD`;
+          smsResult = await sendGoinfiSms(targetPhone, smsText, undefined, body.gatewayConfig);
+        } catch (err: any) {
+          console.warn('[Staff Rejection SMS error]:', err?.message);
+        }
       }
 
       return NextResponse.json({
         success: true,
         message: `Staff PIN #${cleanPin} registration rejected`,
+        smsSent: smsResult?.success ?? false,
+        smsChannel: smsResult?.channel,
+        whatsappLink: smsResult?.whatsappLink,
+        phone: targetPhone,
         registrations: registrationsDatabase
       });
     }

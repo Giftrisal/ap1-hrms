@@ -165,7 +165,12 @@ export default function StaffPage() {
       const res = await fetch('/api/staff', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'approve_registration', pin, approvedBy: 'HR Admin' })
+        body: JSON.stringify({ 
+          action: 'approve_registration', 
+          pin, 
+          approvedBy: 'HR Admin',
+          gatewayConfig: smsGatewayConfig 
+        })
       });
       const data = await res.json();
       if (data.success) {
@@ -175,7 +180,8 @@ export default function StaffPage() {
         if (data.staff) {
           saveEmployeesList(data.staff);
         }
-        showNotice(`✓ Staff PIN #${pin} registration approved and activated!`);
+        const smsNote = data.phone ? ` (SMS notification sent to +977-${data.phone})` : '';
+        showNotice(`✓ Staff PIN #${pin} approved and activated!${smsNote}`);
       } else {
         showNotice(data.error || 'Failed to approve registration.');
       }
@@ -193,14 +199,19 @@ export default function StaffPage() {
       const res = await fetch('/api/staff', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reject_registration', pin })
+        body: JSON.stringify({ 
+          action: 'reject_registration', 
+          pin,
+          gatewayConfig: smsGatewayConfig 
+        })
       });
       const data = await res.json();
       if (data.success) {
         if (data.registrations) {
           setPendingRegistrations(data.registrations.filter((r: any) => r.status === 'PENDING_APPROVAL'));
         }
-        showNotice(`Registration for PIN #${pin} was rejected.`);
+        const smsNote = data.phone ? ` (Rejection SMS dispatched to +977-${data.phone})` : '';
+        showNotice(`Registration for PIN #${pin} was rejected.${smsNote}`);
       } else {
         showNotice(data.error || 'Failed to reject registration.');
       }
@@ -2360,7 +2371,7 @@ export default function StaffPage() {
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
               <span className="flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span>Approved accounts gain instant login access to the Staff Portal</span>
+                <span>Instant SMS status alert is automatically sent to the staff member upon Approve or Reject.</span>
               </span>
               <button
                 type="button"
