@@ -78,10 +78,13 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
             className="flex items-center gap-3 group cursor-pointer transition-transform active:scale-95"
             title="Go to Dashboard"
           >
-            <div className="h-11 px-2.5 py-1 rounded-xl bg-white/10 group-hover:bg-white/15 backdrop-blur-md border border-white/15 group-hover:border-white/25 flex items-center justify-center shrink-0 shadow-sm transition-all">
-              <img src="/ap1-logo.png" alt="AP1 HD" className="h-8 w-auto object-contain drop-shadow group-hover:scale-105 transition-transform" />
-            </div>
-            <div>
+            <img 
+              src="/ap1-logo.png" 
+              alt="AP1 HD" 
+              className="h-10 w-auto shrink-0 object-contain drop-shadow group-hover:scale-105 transition-transform" 
+              style={{ aspectRatio: '800/339' }} 
+            />
+            <div className="border-l border-slate-700/80 pl-2.5">
               <h1 className="font-bold text-white text-base tracking-tight leading-none group-hover:text-blue-300 transition-colors">
                 AP1 Television
               </h1>

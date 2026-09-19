@@ -790,7 +790,12 @@ export default function StaffPortalPage() {
         <div className="max-w-md w-full bg-slate-900/95 border border-purple-500/40 rounded-3xl p-7 shadow-2xl backdrop-blur-xl relative z-10 space-y-5">
           {/* Brand Header */}
           <div className="flex flex-col items-center gap-2">
-            <img src="/ap1-logo.png" alt="AP1 HD" className="h-12 w-auto object-contain drop-shadow" />
+            <img 
+              src="/ap1-logo.png" 
+              alt="AP1 HD" 
+              className="h-14 w-auto shrink-0 object-contain drop-shadow mb-1" 
+              style={{ aspectRatio: '800/339' }} 
+            />
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-950/90 border border-purple-700/60 text-fuchsia-400 text-xs font-black tracking-wider uppercase">
               <Smartphone className="w-3.5 h-3.5" />
               <span>Mobile Only Application</span>
@@ -865,9 +870,14 @@ export default function StaffPortalPage() {
       <div className="min-h-[100dvh] max-w-full overflow-x-hidden bg-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 font-sans safe-top safe-bottom overscroll-none touch-pan-y">
         {/* Top Header */}
         <div className="flex items-center justify-between pt-2">
-          <div className="flex items-center gap-2.5">
-            <img src="/ap1-logo.png" alt="AP1 HD" className="h-8 w-auto object-contain drop-shadow" />
-            <div>
+          <div className="flex items-center gap-3">
+            <img 
+              src="/ap1-logo.png" 
+              alt="AP1 HD" 
+              className="h-10 sm:h-12 w-auto shrink-0 object-contain drop-shadow" 
+              style={{ aspectRatio: '800/339' }} 
+            />
+            <div className="border-l border-slate-700/80 pl-2.5">
               <span className="text-xs font-black tracking-wider text-fuchsia-400 uppercase block">STAFF PORTAL</span>
               <span className="text-[10px] text-purple-300/80">AP1 Television HD</span>
             </div>
@@ -1493,9 +1503,14 @@ export default function StaffPortalPage() {
       {/* Top Mobile App Header */}
       <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-4 py-3 safe-top">
         <div className="max-w-lg mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <img src="/ap1-logo.png" alt="AP1 HD" className="h-7 w-auto object-contain drop-shadow" />
-            <div>
+          <div className="flex items-center gap-3">
+            <img 
+              src="/ap1-logo.png" 
+              alt="AP1 HD" 
+              className="h-9 sm:h-10 w-auto shrink-0 object-contain drop-shadow" 
+              style={{ aspectRatio: '800/339' }} 
+            />
+            <div className="border-l border-slate-700/80 pl-2.5">
               <span className="text-[10px] font-black text-fuchsia-400 tracking-wider uppercase block">STAFF PORTAL</span>
               <span className="text-xs font-bold text-white leading-none truncate max-w-[150px] sm:max-w-[200px] block">
                 {activeEmployee.full_name}
@@ -1821,7 +1836,12 @@ export default function StaffPortalPage() {
               <div className="w-12 h-2 bg-slate-800 rounded-full mx-auto mb-4 border border-slate-700"></div>
 
               <div className="flex items-center justify-center gap-2 mb-3 bg-white/5 py-1.5 px-3 rounded-xl border border-white/10">
-                <img src="/ap1-logo.png" alt="AP1 HD" className="h-6 w-auto object-contain drop-shadow" />
+                <img 
+                  src="/ap1-logo.png" 
+                  alt="AP1 HD" 
+                  className="h-7 w-auto shrink-0 object-contain drop-shadow" 
+                  style={{ aspectRatio: '800/339' }} 
+                />
                 <h3 className="font-black text-[11px] tracking-wider text-white uppercase">AP1 TELEVISION HD</h3>
               </div>
 

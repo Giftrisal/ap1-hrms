@@ -48,9 +48,12 @@ export default function LoginPage() {
       <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl relative z-10">
         {/* Header Branding */}
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="px-5 py-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 flex items-center justify-center shadow-xl mb-4">
-            <img src="/ap1-logo.png" alt="AP1 HD" className="h-12 w-auto object-contain drop-shadow" />
-          </div>
+          <img 
+            src="/ap1-logo.png" 
+            alt="AP1 HD" 
+            className="h-16 w-auto shrink-0 object-contain drop-shadow-2xl mb-4" 
+            style={{ aspectRatio: '800/339' }} 
+          />
           <h1 className="text-2xl font-black text-white tracking-tight">AP1 Television Network</h1>
           <p className="text-xs text-slate-400 mt-1">
             Corporate HRMS & Biometric Attendance Portal

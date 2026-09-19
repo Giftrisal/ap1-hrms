@@ -613,10 +613,15 @@ export default function StaffPage() {
         <div className="flex items-center gap-4 sm:gap-5">
           <Link 
             href="/dashboard"
-            className="p-2.5 sm:p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-2xl border border-white/20 hover:border-white/30 shadow-inner shrink-0 transition-all cursor-pointer group active:scale-95 flex items-center justify-center"
+            className="shrink-0 transition-transform active:scale-95 group inline-block"
             title="Go to Dashboard"
           >
-            <img src="/ap1-logo.png" alt="AP1 HD Logo" className="h-16 sm:h-20 w-auto object-contain drop-shadow-lg group-hover:scale-105 transition-transform" />
+            <img 
+              src="/ap1-logo.png" 
+              alt="AP1 HD Logo" 
+              className="h-16 sm:h-20 w-auto shrink-0 object-contain drop-shadow-xl group-hover:scale-105 transition-transform" 
+              style={{ aspectRatio: '800/339' }}
+            />
           </Link>
           <div>
             <div className="flex items-center gap-2">
@@ -1561,7 +1566,12 @@ export default function StaffPage() {
               <div className="w-12 h-2 bg-slate-800 rounded-full mx-auto mb-4 border border-slate-700"></div>
 
               <div className="flex items-center justify-center gap-2 mb-3 bg-white/5 py-1.5 px-3 rounded-xl border border-white/10">
-                <img src="/ap1-logo.png" alt="AP1 HD" className="h-6 w-auto object-contain drop-shadow" />
+                <img 
+                  src="/ap1-logo.png" 
+                  alt="AP1 HD" 
+                  className="h-7 w-auto shrink-0 object-contain drop-shadow" 
+                  style={{ aspectRatio: '800/339' }} 
+                />
                 <h3 className="font-black text-[11px] tracking-wider text-white uppercase">AP1 TELEVISION HD</h3>
               </div>
 
