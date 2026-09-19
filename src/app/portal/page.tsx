@@ -773,6 +773,8 @@ export default function StaffPortalPage() {
   const [isFdModalOpen, setIsFdModalOpen] = useState(false);
   const [fdType, setFdType] = useState<'FIELD_VISIT' | 'WORK_FROM_HOME' | 'CLIENT_MEETING' | 'OFFICIAL_TOUR'>('FIELD_VISIT');
   const [fdDate, setFdDate] = useState(new Date().toISOString().split('T')[0]);
+  const [fdStartTime, setFdStartTime] = useState('09:30');
+  const [fdEndTime, setFdEndTime] = useState('18:00');
   const [fdLocation, setFdLocation] = useState('');
   const [fdPurpose, setFdPurpose] = useState('');
   const [fdSuccess, setFdSuccess] = useState(false);
@@ -806,6 +808,21 @@ export default function StaffPortalPage() {
       }
     } catch (e) {}
   }, [activeEmployee, leaveSuccess]);
+
+  // Load field duty requests
+  const [myDuties, setMyDuties] = useState<FieldDutyRequest[]>([]);
+  useEffect(() => {
+    if (!activeEmployee) return;
+    try {
+      const saved = localStorage.getItem('goinfi_field_duties');
+      if (saved) {
+        const parsed: FieldDutyRequest[] = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setMyDuties(parsed.filter(d => d.employee_id === activeEmployee.id || d.employee_name === activeEmployee.full_name));
+        }
+      }
+    } catch (e) {}
+  }, [activeEmployee, fdSuccess]);
 
   // Handle Leave Apply
   const handleApplyLeave = (e: React.FormEvent) => {
@@ -865,6 +882,8 @@ export default function StaffPortalPage() {
       type: fdType,
       start_date: fdDate,
       end_date: fdDate,
+      start_time: fdStartTime,
+      end_time: fdEndTime,
       location: fdLocation,
       purpose: fdPurpose,
       status: 'pending',
@@ -1295,9 +1314,17 @@ export default function StaffPortalPage() {
                   {/* Staff Preview Card if selected */}
                   {selectedSignupEmp && (
                     <div className="p-3 bg-purple-950/30 rounded-2xl border border-purple-800/40 flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-fuchsia-400 shrink-0 font-mono font-bold text-sm">
-                        #{selectedSignupEmp.biometric_pin}
-                      </div>
+                      {selectedSignupEmp.photo_url && !selectedSignupEmp.photo_url.includes('unsplash') ? (
+                        <img
+                          src={selectedSignupEmp.photo_url}
+                          alt={selectedSignupEmp.full_name}
+                          className="w-11 h-11 rounded-xl object-cover border border-purple-500/40 shrink-0 shadow-xs"
+                        />
+                      ) : (
+                        <div className="w-11 h-11 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-fuchsia-400 shrink-0 font-mono font-bold text-sm">
+                          #{selectedSignupEmp.biometric_pin}
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-white text-xs sm:text-sm truncate">{selectedSignupEmp.full_name}</p>
                         <p className="text-[11px] text-purple-300/80 truncate">{selectedSignupEmp.designation} • {selectedSignupEmp.department_name}</p>
@@ -1517,9 +1544,17 @@ export default function StaffPortalPage() {
 
                   {selectedResetEmp && (
                     <div className="p-3 bg-purple-950/30 rounded-2xl border border-purple-800/40 flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-fuchsia-400 shrink-0 font-mono font-bold text-sm">
-                        #{selectedResetEmp.biometric_pin}
-                      </div>
+                      {selectedResetEmp.photo_url && !selectedResetEmp.photo_url.includes('unsplash') ? (
+                        <img
+                          src={selectedResetEmp.photo_url}
+                          alt={selectedResetEmp.full_name}
+                          className="w-10 h-10 rounded-xl object-cover border border-purple-500/40 shrink-0 shadow-xs"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-fuchsia-400 shrink-0 font-mono font-bold text-sm">
+                          #{selectedResetEmp.biometric_pin}
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-white text-xs sm:text-sm truncate">{selectedResetEmp.full_name}</p>
                         <p className="text-[11px] text-purple-300/80 truncate">{selectedResetEmp.designation}</p>
@@ -1751,11 +1786,17 @@ export default function StaffPortalPage() {
 
               <div className="flex items-center gap-3.5 mb-4">
                 <div className="relative">
-                  <img
-                    src={activeEmployee.photo_url || "https://images.unsplash.com/photo-1534528741775?w=150"}
-                    alt={activeEmployee.full_name}
-                    className="w-14 h-14 rounded-2xl object-cover border-2 border-purple-500 shadow-md"
-                  />
+                  {activeEmployee.photo_url && !activeEmployee.photo_url.includes('unsplash') ? (
+                    <img
+                      src={activeEmployee.photo_url}
+                      alt={activeEmployee.full_name}
+                      className="w-14 h-14 rounded-2xl object-cover border-2 border-purple-500 shadow-md"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-700 to-indigo-600 flex items-center justify-center text-white font-bold text-lg border-2 border-purple-400 shadow-md">
+                      {activeEmployee.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                    </div>
+                  )}
                   <span className="absolute -bottom-1 -right-1 px-1.5 py-0.2 bg-gradient-to-r from-purple-600 to-fuchsia-600 text-[9px] font-black text-white rounded-full shadow">
                     PIN {activeEmployee.biometric_pin}
                   </span>
@@ -2004,6 +2045,53 @@ export default function StaffPortalPage() {
                 </div>
               )}
             </div>
+
+            {/* My Field Duty Applications */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4.5 space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-amber-400" />
+                  <span>Field Duty & WFH ({myDuties.length})</span>
+                </h3>
+              </div>
+              {myDuties.length === 0 ? (
+                <div className="py-6 text-center text-slate-500 space-y-1">
+                  <MapPin className="w-8 h-8 text-slate-700 mx-auto" />
+                  <p className="text-xs">No field duty requests submitted yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {myDuties.map(duty => (
+                    <div key={duty.id} className="p-3 bg-slate-950 rounded-2xl border border-slate-800 text-xs space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-amber-400">
+                          {duty.type === 'FIELD_VISIT' ? 'Field Visit' : 
+                           duty.type === 'CLIENT_MEETING' ? 'Client Meeting' : 
+                           duty.type === 'WORK_FROM_HOME' ? 'Work From Home' : 'Official Tour'}
+                        </span>
+                        <span className={`px-2 py-0.2 rounded-full text-[10px] font-bold ${
+                          duty.status === 'approved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' :
+                          duty.status === 'rejected' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30' :
+                          'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                        }`}>
+                          {duty.status.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-slate-400">
+                        <span>📅 {duty.start_date}</span>
+                        {duty.start_time && (
+                          <span className="text-fuchsia-300 font-mono font-bold bg-purple-950/60 px-2 py-0.5 rounded-lg border border-purple-800/40">
+                            🕒 {duty.start_time} - {duty.end_time || duty.start_time}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-slate-300 text-[11px]">📍 {duty.location}</p>
+                      <p className="text-slate-400 text-[11px] italic">&quot;{duty.purpose}&quot;</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -2026,11 +2114,17 @@ export default function StaffPortalPage() {
                 <h3 className="font-black text-[11px] tracking-wider text-white uppercase">AP1 TELEVISION HD</h3>
               </div>
 
-              <img
-                src={activeEmployee.photo_url || "https://images.unsplash.com/photo-1534528741775?w=150"}
-                alt={activeEmployee.full_name}
-                className="w-24 h-24 rounded-full object-cover border-2 border-purple-500 mx-auto shadow-xl mb-3"
-              />
+              {activeEmployee.photo_url && !activeEmployee.photo_url.includes('unsplash') ? (
+                <img
+                  src={activeEmployee.photo_url}
+                  alt={activeEmployee.full_name}
+                  className="w-24 h-24 rounded-full object-cover border-2 border-purple-500 mx-auto shadow-xl mb-3"
+                />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-purple-700 to-indigo-600 text-white font-black text-2xl flex items-center justify-center border-2 border-purple-400 mx-auto shadow-xl mb-3">
+                  {activeEmployee.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                </div>
+              )}
 
               <h3 className="font-black text-lg text-white">{activeEmployee.full_name}</h3>
               <p className="text-xs font-bold text-fuchsia-400 mt-0.5">{activeEmployee.designation}</p>
@@ -2055,25 +2149,6 @@ export default function StaffPortalPage() {
                 <QrCode className="w-4 h-4 text-fuchsia-400" />
                 <span>Verified by Goinfi Biometric HRMS</span>
               </div>
-            </div>
-
-            {/* Quick Action Buttons */}
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={handleDownloadPayslip}
-                className="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl flex items-center gap-2.5 text-xs font-bold text-white transition-colors cursor-pointer"
-              >
-                <Download className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Download Payslip</span>
-              </button>
-
-              <button
-                onClick={() => window.print()}
-                className="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl flex items-center gap-2.5 text-xs font-bold text-white transition-colors cursor-pointer"
-              >
-                <Printer className="w-4 h-4 text-blue-400 shrink-0" />
-                <span>Print ID Badge</span>
-              </button>
             </div>
 
             {/* Assigned Assets Full List */}
@@ -2303,6 +2378,29 @@ export default function StaffPortalPage() {
                     onChange={e => setFdDate(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-medium"
                   />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Start Time *</label>
+                    <input
+                      type="time"
+                      required
+                      value={fdStartTime}
+                      onChange={e => setFdStartTime(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">End Time *</label>
+                    <input
+                      type="time"
+                      required
+                      value={fdEndTime}
+                      onChange={e => setFdEndTime(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-medium"
+                    />
+                  </div>
                 </div>
 
                 <div>

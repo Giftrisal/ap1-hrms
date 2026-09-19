@@ -18,7 +18,7 @@ const defaultAdminUser: Employee = {
   full_name: 'Aayush Shrestha',
   email: 'aayush.s@goinfi.com',
   phone: '+977-9841100101',
-  photo_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+  photo_url: '',
   department_id: 'a1111111-1111-1111-1111-111111111111',
   department_name: 'Executive Management',
   shift_id: '11111111-1111-1111-1111-111111111111',

@@ -205,6 +205,8 @@ export interface FieldDutyRequest {
   type: FieldDutyType;
   start_date: string;
   end_date: string;
+  start_time?: string;
+  end_time?: string;
   location: string;
   purpose: string;
   status: 'pending' | 'approved' | 'rejected';

@@ -39,6 +39,8 @@ export default function FieldDutyPage() {
     type: 'FIELD_VISIT' as FieldDutyType,
     start_date: new Date().toISOString().split('T')[0],
     end_date: new Date().toISOString().split('T')[0],
+    start_time: '09:30',
+    end_time: '18:00',
     location: '',
     purpose: ''
   });
@@ -55,6 +57,8 @@ export default function FieldDutyPage() {
       type: formData.type,
       start_date: formData.start_date,
       end_date: formData.end_date,
+      start_time: formData.start_time,
+      end_time: formData.end_time,
       location: formData.location,
       purpose: formData.purpose,
       status: 'pending', // Always pending until Administrator explicitly approves
@@ -69,6 +73,8 @@ export default function FieldDutyPage() {
       type: 'FIELD_VISIT',
       start_date: new Date().toISOString().split('T')[0],
       end_date: new Date().toISOString().split('T')[0],
+      start_time: '09:30',
+      end_time: '18:00',
       location: '',
       purpose: ''
     });
@@ -263,11 +269,17 @@ export default function FieldDutyPage() {
                   <tr key={req.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={req.employee_photo || "https://images.unsplash.com/photo-1534528741775?w=150"}
-                          alt={req.employee_name || 'Staff'}
-                          className="w-9 h-9 rounded-full object-cover border border-slate-200"
-                        />
+                        {req.employee_photo && !req.employee_photo.includes('unsplash') ? (
+                          <img
+                            src={req.employee_photo}
+                            alt={req.employee_name || 'Staff'}
+                            className="w-9 h-9 rounded-full object-cover border border-slate-200"
+                          />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-700 to-indigo-600 text-white font-bold text-xs flex items-center justify-center border border-purple-400/30 shadow-xs shrink-0">
+                            {(req.employee_name || 'Staff').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                          </div>
+                        )}
                         <div>
                           <p className="font-semibold text-slate-900 leading-tight">{req.employee_name}</p>
                           <p className="text-xs text-slate-500 mt-0.5">{req.department_name}</p>
@@ -288,6 +300,12 @@ export default function FieldDutyPage() {
                         <p className="font-semibold text-slate-800">
                           {req.start_date === req.end_date ? req.start_date : `${req.start_date} to ${req.end_date}`}
                         </p>
+                        {req.start_time && (
+                          <p className="text-[11px] text-amber-700 font-semibold flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-amber-600" />
+                            {req.start_time} - {req.end_time || req.start_time}
+                          </p>
+                        )}
                         <p className="text-[11px] text-blue-600 font-medium">
                           {getNepaliDate(req.start_date).formattedNp}
                         </p>
@@ -410,6 +428,30 @@ export default function FieldDutyPage() {
                       required
                       value={formData.end_date}
                       onChange={e => setFormData({ ...formData, end_date: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Duty Timings */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Start Time *</label>
+                    <input
+                      type="time"
+                      required
+                      value={formData.start_time}
+                      onChange={e => setFormData({ ...formData, start_time: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">End Time *</label>
+                    <input
+                      type="time"
+                      required
+                      value={formData.end_time}
+                      onChange={e => setFormData({ ...formData, end_time: e.target.value })}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                     />
                   </div>

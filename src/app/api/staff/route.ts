@@ -21,7 +21,7 @@ let staffDatabase: any[] = [
     join_date: "2024-01-01",
     base_salary: 85000,
     monthly_salary: 85000,
-    photo_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"
+    photo_url: ""
   }
 ];
 

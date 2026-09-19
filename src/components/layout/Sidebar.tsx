@@ -181,11 +181,17 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           {currentUser && (
             <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-2.5 overflow-hidden">
-                <img
-                  src={currentUser.photo_url || "https://images.unsplash.com/photo-1534528741775?w=150"}
-                  alt={currentUser.full_name}
-                  className="w-8 h-8 rounded-full object-cover border border-slate-700"
-                />
+                {currentUser.photo_url && !currentUser.photo_url.includes('unsplash') ? (
+                  <img
+                    src={currentUser.photo_url}
+                    alt={currentUser.full_name}
+                    className="w-8 h-8 rounded-full object-cover border border-slate-700"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-700 to-indigo-600 text-white font-bold text-xs flex items-center justify-center border border-purple-400/30 shrink-0">
+                    {currentUser.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                  </div>
+                )}
                 <div className="overflow-hidden">
                   <p className="text-xs font-semibold text-white truncate leading-snug">
                     {currentUser.full_name}

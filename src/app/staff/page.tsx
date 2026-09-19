@@ -517,7 +517,7 @@ export default function StaffPage() {
       full_name: formData.full_name!,
       email: formData.email || `${formData.full_name.toLowerCase().replace(/\s+/g, '.')}@ap1.tv`,
       phone: formData.phone || '+977-9800000000',
-      photo_url: formData.photo_url || `https://images.unsplash.com/photo-${1534528741775 + employees.length}?w=150`,
+      photo_url: formData.photo_url || '',
       department_id: formData.department_id || departments[0]?.id || 'dept-1',
       department_name: dept?.name || 'Operations & Broadcasting',
       shift_id: 'shift-1',
@@ -985,11 +985,17 @@ export default function StaffPage() {
 
                 {/* Avatar & Name */}
                 <div className="flex items-center gap-3 mb-3">
-                  <img
-                    src={emp.photo_url || "https://images.unsplash.com/photo-1534528741775?w=150"}
-                    alt={emp.full_name}
-                    className="w-12 h-12 rounded-xl object-cover border border-slate-200"
-                  />
+                  {emp.photo_url && !emp.photo_url.includes('unsplash') ? (
+                    <img
+                      src={emp.photo_url}
+                      alt={emp.full_name}
+                      className="w-12 h-12 rounded-xl object-cover border border-slate-200"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-purple-700 to-indigo-600 text-white font-bold text-sm flex items-center justify-center border border-purple-400/30 shadow-xs shrink-0">
+                      {emp.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                    </div>
+                  )}
                   <div>
                     <h4 className="font-bold text-slate-900 text-sm leading-snug">{emp.full_name}</h4>
                     <p className="text-xs text-blue-600 font-semibold">{emp.designation}</p>
@@ -1093,11 +1099,17 @@ export default function StaffPage() {
                   <tr key={emp.id} className="hover:bg-blue-50/40 transition-colors">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={emp.photo_url || "https://images.unsplash.com/photo-1534528741775?w=150"}
-                          alt={emp.full_name}
-                          className="w-9 h-9 rounded-full object-cover border border-slate-200"
-                        />
+                        {emp.photo_url && !emp.photo_url.includes('unsplash') ? (
+                          <img
+                            src={emp.photo_url}
+                            alt={emp.full_name}
+                            className="w-9 h-9 rounded-full object-cover border border-slate-200"
+                          />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-700 to-indigo-600 text-white font-bold text-xs flex items-center justify-center border border-purple-400/30 shadow-xs shrink-0">
+                            {emp.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                          </div>
+                        )}
                         <div>
                           <p className="font-bold text-slate-900 leading-tight">{emp.full_name}</p>
                           <p className="text-[11px] text-slate-500 leading-tight">{emp.email}</p>
@@ -1681,11 +1693,17 @@ export default function StaffPage() {
                 <h3 className="font-black text-[11px] tracking-wider text-white uppercase">AP1 TELEVISION HD</h3>
               </div>
 
-              <img
-                src={idCardStaff.photo_url || "https://images.unsplash.com/photo-1534528741775?w=150"}
-                alt={idCardStaff.full_name}
-                className="w-20 h-20 rounded-full object-cover border-2 border-red-500 mx-auto shadow-lg mb-2"
-              />
+              {idCardStaff.photo_url && !idCardStaff.photo_url.includes('unsplash') ? (
+                <img
+                  src={idCardStaff.photo_url}
+                  alt={idCardStaff.full_name}
+                  className="w-20 h-20 rounded-full object-cover border-2 border-red-500 mx-auto shadow-lg mb-2"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-purple-700 to-indigo-600 text-white font-black text-2xl flex items-center justify-center border-2 border-red-400 mx-auto shadow-lg mb-2">
+                  {idCardStaff.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                </div>
+              )}
 
               <h4 className="font-bold text-base text-white">{idCardStaff.full_name}</h4>
               <p className="text-xs font-semibold text-red-400 mt-0.5">{idCardStaff.designation}</p>
