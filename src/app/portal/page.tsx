@@ -2184,13 +2184,13 @@ export default function StaffPortalPage() {
               )}
             </div>
 
-            {/* Logout / Switch Device User */}
+            {/* Sign Out */}
             <button
               onClick={handleLogout}
-              className="w-full py-3 bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 border border-purple-800/60 rounded-2xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-2"
+              className="w-full py-3 bg-red-950/30 hover:bg-red-900/40 text-rose-300 border border-rose-800/40 rounded-2xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-2"
             >
-              <LogOut className="w-4 h-4" />
-              <span>Sign Out / Switch Staff PIN</span>
+              <LogOut className="w-4 h-4 text-rose-400" />
+              <span>Sign Out</span>
             </button>
           </div>
         )}
