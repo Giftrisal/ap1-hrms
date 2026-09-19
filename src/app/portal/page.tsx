@@ -560,32 +560,62 @@ export default function StaffPortalPage() {
   // PWA Install Prompt State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
+  const [isAlreadyInstalled, setIsAlreadyInstalled] = useState(false);
 
   useEffect(() => {
-    // Register PWA service worker so browser triggers native beforeinstallprompt
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(err => {
-        console.warn('Service worker registration note:', err);
-      });
+    // Check if app is already running in standalone mode or installed
+    if (typeof window !== 'undefined') {
+      const isStandalone = 
+        window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as any).standalone === true ||
+        document.referrer.includes('android-app://') ||
+        localStorage.getItem('ap1_pwa_installed') === 'true';
+
+      if (isStandalone) {
+        setIsAlreadyInstalled(true);
+      }
+
+      const mediaQuery = window.matchMedia('(display-mode: standalone)');
+      const handleMediaChange = (e: MediaQueryListEvent) => {
+        if (e.matches) {
+          setIsAlreadyInstalled(true);
+          localStorage.setItem('ap1_pwa_installed', 'true');
+        }
+      };
+      if (mediaQuery.addEventListener) {
+        mediaQuery.addEventListener('change', handleMediaChange);
+      }
+
+      // Register PWA service worker so browser triggers native beforeinstallprompt
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(err => {
+          console.warn('Service worker registration note:', err);
+        });
+      }
+
+      const handleBeforeInstallPrompt = (e: Event) => {
+        e.preventDefault();
+        setDeferredPrompt(e);
+        setIsInstallable(true);
+      };
+
+      const handleAppInstalled = () => {
+        setIsInstallable(false);
+        setIsAlreadyInstalled(true);
+        setDeferredPrompt(null);
+        localStorage.setItem('ap1_pwa_installed', 'true');
+      };
+
+      window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.addEventListener('appinstalled', handleAppInstalled);
+      return () => {
+        if (mediaQuery.removeEventListener) {
+          mediaQuery.removeEventListener('change', handleMediaChange);
+        }
+        window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        window.removeEventListener('appinstalled', handleAppInstalled);
+      };
     }
-
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setIsInstallable(true);
-    };
-
-    const handleAppInstalled = () => {
-      setIsInstallable(false);
-      setDeferredPrompt(null);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
-    };
   }, []);
 
   const handleInstallClick = async () => {
@@ -596,6 +626,8 @@ export default function StaffPortalPage() {
         const choice = await prompt.userChoice;
         if (choice && choice.outcome === 'accepted') {
           setIsInstallable(false);
+          setIsAlreadyInstalled(true);
+          if (typeof window !== 'undefined') localStorage.setItem('ap1_pwa_installed', 'true');
         }
         setDeferredPrompt(null);
         if (typeof window !== 'undefined') (window as any).__deferredPrompt = null;
@@ -882,13 +914,15 @@ export default function StaffPortalPage() {
               <span className="text-[10px] text-purple-300/80">AP1 Television HD</span>
             </div>
           </div>
-          <button
-            onClick={handleInstallClick}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-purple-700 via-purple-600 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-500 text-white shadow-lg shadow-purple-600/30 transition-transform active:scale-95 cursor-pointer"
-          >
-            <Smartphone className="w-3.5 h-3.5" />
-            <span>Install App</span>
-          </button>
+          {!isAlreadyInstalled && (
+            <button
+              onClick={handleInstallClick}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-purple-700 via-purple-600 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-500 text-white shadow-lg shadow-purple-600/30 transition-transform active:scale-95 cursor-pointer"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>Install App</span>
+            </button>
+          )}
         </div>
 
         {/* Central Auth Container */}
@@ -1519,14 +1553,16 @@ export default function StaffPortalPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleInstallClick}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-950/80 text-fuchsia-400 border border-purple-700/50 text-[11px] font-bold active:scale-95 cursor-pointer shadow-sm"
-              title="Install App"
-            >
-              <Smartphone className="w-3 h-3" />
-              <span>App</span>
-            </button>
+            {!isAlreadyInstalled && (
+              <button
+                onClick={handleInstallClick}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-950/80 text-fuchsia-400 border border-purple-700/50 text-[11px] font-bold active:scale-95 cursor-pointer shadow-sm"
+                title="Install App"
+              >
+                <Smartphone className="w-3 h-3" />
+                <span>App</span>
+              </button>
+            )}
             <button
               onClick={handleLogout}
               className="p-1.5 text-slate-400 hover:text-fuchsia-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
@@ -1541,23 +1577,25 @@ export default function StaffPortalPage() {
       {/* Main Mobile Content Area */}
       <main className="flex-1 max-w-lg w-full mx-auto p-4 space-y-4">
         {/* PWA Floating Install Helper Banner */}
-        <div className="bg-gradient-to-r from-purple-950/80 via-slate-900 to-fuchsia-950/40 border border-purple-500/40 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-700 to-fuchsia-600 flex items-center justify-center shrink-0 shadow-md shadow-purple-600/30">
-              <Smartphone className="w-5 h-5 text-white" />
+        {!isAlreadyInstalled && (
+          <div className="bg-gradient-to-r from-purple-950/80 via-slate-900 to-fuchsia-950/40 border border-purple-500/40 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-700 to-fuchsia-600 flex items-center justify-center shrink-0 shadow-md shadow-purple-600/30">
+                <Smartphone className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-white">Install AP1 Staff Portal</h4>
+                <p className="text-[11px] text-purple-200/70">Add to your home screen for quick daily access</p>
+              </div>
             </div>
-            <div>
-              <h4 className="text-xs font-bold text-white">Install AP1 Staff Portal</h4>
-              <p className="text-[11px] text-purple-200/70">Add to your home screen for quick daily access</p>
-            </div>
+            <button
+              onClick={handleInstallClick}
+              className="px-3 py-1.5 bg-gradient-to-r from-purple-700 via-purple-600 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-500 text-white rounded-xl text-xs font-bold shrink-0 shadow-md cursor-pointer active:scale-95"
+            >
+              Install
+            </button>
           </div>
-          <button
-            onClick={handleInstallClick}
-            className="px-3 py-1.5 bg-gradient-to-r from-purple-700 via-purple-600 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-500 text-white rounded-xl text-xs font-bold shrink-0 shadow-md cursor-pointer active:scale-95"
-          >
-            Install
-          </button>
-        </div>
+        )}
 
         {/* ========================================================================= */}
         {/* TAB 1: HOME */}
