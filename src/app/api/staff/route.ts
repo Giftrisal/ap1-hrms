@@ -76,6 +76,7 @@ export async function POST(req: NextRequest) {
         staffName: reg.staffName,
         department_name: reg.department_name || 'General Operations',
         designation: reg.designation || 'Staff Member',
+        photo_url: reg.photo_url || '',
         registeredAt: reg.registeredAt || new Date().toISOString(),
         status: cleanPin === '1' ? 'APPROVED' : 'PENDING_APPROVAL',
         approvedBy: cleanPin === '1' ? 'System SuperAdmin' : null,
@@ -88,10 +89,14 @@ export async function POST(req: NextRequest) {
         registrationsDatabase.unshift(newReg);
       }
 
-      // Update employee record with confirmed phone
+      // Update employee record with confirmed phone and photo
       const empIdx = staffDatabase.findIndex(e => String(e.biometric_pin) === cleanPin || e.id === cleanPin);
-      if (empIdx !== -1 && reg.phone) {
-        staffDatabase[empIdx] = { ...staffDatabase[empIdx], phone: reg.phone };
+      if (empIdx !== -1) {
+        staffDatabase[empIdx] = { 
+          ...staffDatabase[empIdx], 
+          ...(reg.phone ? { phone: reg.phone } : {}),
+          ...(reg.photo_url ? { photo_url: reg.photo_url } : {})
+        };
       }
 
       return NextResponse.json({
@@ -99,7 +104,8 @@ export async function POST(req: NextRequest) {
         message: cleanPin === '1' ? 'Admin account active' : 'Registration submitted for Admin approval',
         status: newReg.status,
         registration: newReg,
-        registrations: registrationsDatabase
+        registrations: registrationsDatabase,
+        staff: staffDatabase
       });
     }
 
@@ -110,6 +116,7 @@ export async function POST(req: NextRequest) {
       
       let staffName = '';
       let targetPhone = '';
+      let approvedPhoto = '';
 
       if (regIdx !== -1) {
         registrationsDatabase[regIdx] = {
@@ -120,12 +127,17 @@ export async function POST(req: NextRequest) {
         };
         staffName = registrationsDatabase[regIdx].staffName || '';
         targetPhone = registrationsDatabase[regIdx].phone || '';
+        approvedPhoto = registrationsDatabase[regIdx].photo_url || '';
       }
 
-      // Also ensure employee is active in staff list
+      // Also ensure employee is active in staff list and update photo if uploaded
       const empIdx = staffDatabase.findIndex(e => String(e.biometric_pin) === cleanPin || e.id === cleanPin);
       if (empIdx !== -1) {
-        staffDatabase[empIdx] = { ...staffDatabase[empIdx], status: 'active' };
+        staffDatabase[empIdx] = { 
+          ...staffDatabase[empIdx], 
+          status: 'active',
+          ...(approvedPhoto ? { photo_url: approvedPhoto } : {})
+        };
         if (!staffName) staffName = staffDatabase[empIdx].full_name;
         if (!targetPhone) targetPhone = staffDatabase[empIdx].phone;
       }

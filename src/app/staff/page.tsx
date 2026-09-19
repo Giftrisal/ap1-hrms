@@ -2309,9 +2309,17 @@ export default function StaffPage() {
                       className="p-4 rounded-2xl border border-amber-200/80 bg-amber-50/40 hover:bg-amber-50/70 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
                     >
                       <div className="flex items-start gap-3">
-                        <div className="w-11 h-11 rounded-2xl bg-amber-600/15 border border-amber-500/30 flex items-center justify-center text-amber-700 font-mono font-black text-sm shrink-0">
-                          #{req.pin}
-                        </div>
+                        {req.photo_url && !req.photo_url.includes('unsplash') ? (
+                          <img
+                            src={req.photo_url}
+                            alt={req.staffName}
+                            className="w-12 h-12 rounded-2xl object-cover border-2 border-amber-400 shadow-sm shrink-0"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-2xl bg-amber-600/15 border border-amber-500/30 flex items-center justify-center text-amber-700 font-mono font-black text-sm shrink-0">
+                            #{req.pin}
+                          </div>
+                        )}
                         <div>
                           <div className="flex items-center gap-2">
                             <h4 className="font-bold text-slate-900 text-sm">{req.staffName}</h4>

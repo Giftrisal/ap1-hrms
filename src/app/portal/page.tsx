@@ -94,6 +94,7 @@ export default function StaffPortalPage() {
   const [signupStep, setSignupStep] = useState<1 | 2>(1);
   const [signupPin, setSignupPin] = useState('');
   const [signupPhone, setSignupPhone] = useState('');
+  const [signupPhotoUrl, setSignupPhotoUrl] = useState('');
   const [signupOtp, setSignupOtp] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
@@ -117,6 +118,52 @@ export default function StaffPortalPage() {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState('');
   const [resetSuccess, setResetSuccess] = useState('');
+
+  // Client-side photo compressor for registration (one-time upload)
+  const handleSignupPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setSignupError('Please select a valid image file (JPG, PNG, WebP).');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 600;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.85);
+          setSignupPhotoUrl(compressed);
+          setSignupError('');
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Countdown timer for OTP resend
   useEffect(() => {
@@ -153,6 +200,7 @@ export default function StaffPortalPage() {
     phone: string;
     password: string;
     staffName: string;
+    photo_url?: string;
     registeredAt: string;
     status?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
   }
@@ -193,7 +241,7 @@ export default function StaffPortalPage() {
     e => e.biometric_pin === resetPin
   ) || null;
 
-  // Auto-populate phone when staff is selected during signup
+  // Auto-populate phone and photo when staff is selected during signup
   const handleSelectSignupStaff = (pin: string) => {
     setSignupPin(pin);
     setSignupError('');
@@ -206,6 +254,13 @@ export default function StaffPortalPage() {
         setSignupPhone(clean);
       } else {
         setSignupPhone('');
+      }
+
+      // Check for existing photo
+      if (emp.photo_url && !emp.photo_url.includes('unsplash')) {
+        setSignupPhotoUrl(emp.photo_url);
+      } else {
+        setSignupPhotoUrl('');
       }
     }
   };
@@ -438,6 +493,7 @@ export default function StaffPortalPage() {
 
       const cleanPin = String(emp.biometric_pin);
       const isMasterAdmin = cleanPin === '1';
+      const photoToSave = signupPhotoUrl || emp.photo_url || '';
 
       // Submit registration request to centralized staff database
       try {
@@ -453,6 +509,7 @@ export default function StaffPortalPage() {
               staffName: emp.full_name,
               department_name: emp.department_name,
               designation: emp.designation,
+              photo_url: photoToSave,
               registeredAt: new Date().toISOString()
             }
           })
@@ -467,13 +524,16 @@ export default function StaffPortalPage() {
         phone: cleanPhone,
         password: signupPassword,
         staffName: emp.full_name,
+        photo_url: photoToSave,
         registeredAt: new Date().toISOString(),
         status: isMasterAdmin ? 'APPROVED' : 'PENDING_APPROVAL'
       });
 
-      // Update employee record with confirmed phone number
+      // Update employee record with confirmed phone number & uploaded photo
       const updatedEmps = employees.map(item =>
-        item.biometric_pin === emp.biometric_pin ? { ...item, phone: `+977-${cleanPhone}` } : item
+        item.biometric_pin === emp.biometric_pin 
+          ? { ...item, phone: `+977-${cleanPhone}`, ...(photoToSave ? { photo_url: photoToSave } : {}) } 
+          : item
       );
       setEmployees(updatedEmps);
       if (typeof window !== 'undefined') {
@@ -1314,7 +1374,13 @@ export default function StaffPortalPage() {
                   {/* Staff Preview Card if selected */}
                   {selectedSignupEmp && (
                     <div className="p-3 bg-purple-950/30 rounded-2xl border border-purple-800/40 flex items-center gap-3">
-                      {selectedSignupEmp.photo_url && !selectedSignupEmp.photo_url.includes('unsplash') ? (
+                      {signupPhotoUrl ? (
+                        <img
+                          src={signupPhotoUrl}
+                          alt={selectedSignupEmp.full_name}
+                          className="w-11 h-11 rounded-xl object-cover border-2 border-fuchsia-400 shrink-0 shadow-xs"
+                        />
+                      ) : selectedSignupEmp.photo_url && !selectedSignupEmp.photo_url.includes('unsplash') ? (
                         <img
                           src={selectedSignupEmp.photo_url}
                           alt={selectedSignupEmp.full_name}
@@ -1331,6 +1397,62 @@ export default function StaffPortalPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Profile Photo Upload Section (One-Time Upload) */}
+                  <div className="p-3.5 bg-slate-800/60 rounded-2xl border border-slate-700/80 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-slate-200 uppercase tracking-wider">
+                        Staff Profile Photo
+                      </label>
+                      <span className="text-[10px] font-bold text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-full border border-amber-800/60 flex items-center gap-1">
+                        <Lock className="w-3 h-3 text-amber-400" />
+                        <span>One-Time Upload</span>
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="relative shrink-0">
+                        {signupPhotoUrl ? (
+                          <img
+                            src={signupPhotoUrl}
+                            alt="Preview"
+                            className="w-14 h-14 rounded-2xl object-cover border-2 border-fuchsia-400 shadow-md"
+                          />
+                        ) : selectedSignupEmp?.photo_url && !selectedSignupEmp.photo_url.includes('unsplash') ? (
+                          <img
+                            src={selectedSignupEmp.photo_url}
+                            alt="Preview"
+                            className="w-14 h-14 rounded-2xl object-cover border-2 border-purple-500/60 shadow-md"
+                          />
+                        ) : (
+                          <div className="w-14 h-14 rounded-2xl bg-purple-950/60 border-2 border-dashed border-purple-500/50 flex flex-col items-center justify-center text-purple-300">
+                            <Camera className="w-5 h-5 mb-0.5 opacity-80" />
+                            <span className="text-[8px] font-bold tracking-tight uppercase">Upload</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <input
+                          type="file"
+                          id="signup-photo-upload"
+                          accept="image/*"
+                          onChange={handleSignupPhotoChange}
+                          className="hidden"
+                        />
+                        <label
+                          htmlFor="signup-photo-upload"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-700 via-purple-600 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-500 text-white font-bold rounded-xl text-xs shadow-md shadow-purple-600/20 cursor-pointer transition-transform active:scale-95"
+                        >
+                          <Camera className="w-3.5 h-3.5" />
+                          <span>{signupPhotoUrl ? 'Change Photo' : 'Upload / Take Photo'}</span>
+                        </label>
+                        <p className="text-[10px] text-slate-400 leading-tight">
+                          This photo will be set in the Admin Dashboard and Digital ID Card. Cannot be modified from the portal after registration.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
@@ -1373,6 +1495,36 @@ export default function StaffPortalPage() {
               {/* SIGNUP STEP 2: Verify OTP & Create Password */}
               {signupStep === 2 && (
                 <form onSubmit={handleVerifySignupAndCreatePassword} className="space-y-4">
+                  {/* Selected Staff Info Chip */}
+                  {selectedSignupEmp && (
+                    <div className="p-2.5 bg-purple-950/40 rounded-2xl border border-purple-800/40 flex items-center gap-3">
+                      {signupPhotoUrl ? (
+                        <img
+                          src={signupPhotoUrl}
+                          alt={selectedSignupEmp.full_name}
+                          className="w-10 h-10 rounded-xl object-cover border border-fuchsia-400 shrink-0"
+                        />
+                      ) : selectedSignupEmp.photo_url && !selectedSignupEmp.photo_url.includes('unsplash') ? (
+                        <img
+                          src={selectedSignupEmp.photo_url}
+                          alt={selectedSignupEmp.full_name}
+                          className="w-10 h-10 rounded-xl object-cover border border-purple-500/40 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-fuchsia-400 shrink-0 font-mono font-bold text-xs">
+                          #{selectedSignupEmp.biometric_pin}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-white text-xs truncate">{selectedSignupEmp.full_name}</span>
+                          <span className="text-[10px] font-mono text-fuchsia-300">#{selectedSignupEmp.biometric_pin}</span>
+                        </div>
+                        <span className="text-[10px] text-purple-300/80 block truncate">{selectedSignupEmp.designation}</span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Clean SMS Notification Card */}
                   <div className="p-3.5 bg-slate-800/80 border border-purple-500/30 rounded-2xl text-xs space-y-1.5 shadow-md">
                     <div className="flex items-center gap-2 text-purple-300 font-semibold">
@@ -2125,6 +2277,11 @@ export default function StaffPortalPage() {
                   {activeEmployee.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                 </div>
               )}
+
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/90 border border-slate-700 text-[10px] text-amber-300 font-medium mb-2.5">
+                <Lock className="w-3 h-3 text-amber-400" />
+                <span>Official HR Photo • Locked</span>
+              </div>
 
               <h3 className="font-black text-lg text-white">{activeEmployee.full_name}</h3>
               <p className="text-xs font-bold text-fuchsia-400 mt-0.5">{activeEmployee.designation}</p>
