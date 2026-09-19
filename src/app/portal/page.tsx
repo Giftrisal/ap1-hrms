@@ -85,8 +85,10 @@ export default function StaffPortalPage() {
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [notRegisteredStaff, setNotRegisteredStaff] = useState<Employee | null>(null);
+  const [signupAwaitingApproval, setSignupAwaitingApproval] = useState<{ pin: string; staffName: string; phone: string } | null>(null);
 
   // Signup form state
   const [signupStep, setSignupStep] = useState<1 | 2>(1);
@@ -152,6 +154,7 @@ export default function StaffPortalPage() {
     password: string;
     staffName: string;
     registeredAt: string;
+    status?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
   }
 
   const getStoredCredentials = (): Record<string, StaffAuthCredential> => {
@@ -226,7 +229,7 @@ export default function StaffPortalPage() {
   };
 
   // 1. LOGIN HANDLER
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
     setNotRegisteredStaff(null);
@@ -248,13 +251,50 @@ export default function StaffPortalPage() {
       return;
     }
 
+    const cleanPin = String(emp.biometric_pin);
+    const isMasterAdmin = cleanPin === '1';
+
     const creds = getStoredCredentials();
-    const cred = creds[emp.biometric_pin];
+    let cred = creds[cleanPin];
+
+    // Check live registration status from server API
+    setLoginLoading(true);
+    let serverReg: any = null;
+    try {
+      const statusRes = await fetch('/api/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'check_registration', pin: cleanPin })
+      });
+      if (statusRes.ok) {
+        const statusData = await statusRes.json();
+        if (statusData.registration) {
+          serverReg = statusData.registration;
+        }
+      }
+    } catch (err) {
+      console.warn('Could not verify registration with server API:', err);
+    } finally {
+      setLoginLoading(false);
+    }
 
     // Check if staff has already signed up
-    if (!cred) {
+    if (!cred && !serverReg && !isMasterAdmin) {
       setNotRegisteredStaff(emp);
-      setLoginError(`PIN #${emp.biometric_pin} (${emp.full_name}) has not registered yet. Please create a new account first.`);
+      setLoginError(`PIN #${cleanPin} (${emp.full_name}) has not registered yet. Please create a new account first.`);
+      return;
+    }
+
+    // Evaluate approval status
+    const approvalStatus = isMasterAdmin ? 'APPROVED' : (serverReg?.status || cred?.status || 'PENDING_APPROVAL');
+
+    if (!isMasterAdmin && approvalStatus === 'PENDING_APPROVAL') {
+      setLoginError(`⏳ Approval Pending: Registration for ${emp.full_name} (PIN #${cleanPin}) is awaiting Admin / HR approval. Once approved, you will be able to log in.`);
+      return;
+    }
+
+    if (!isMasterAdmin && approvalStatus === 'REJECTED') {
+      setLoginError(`❌ Registration Rejected: Your registration request was not approved by administration. Please contact HR.`);
       return;
     }
 
@@ -263,15 +303,28 @@ export default function StaffPortalPage() {
       return;
     }
 
-    if (cred.password !== loginPassword) {
+    const expectedPassword = cred?.password || serverReg?.password;
+    if (expectedPassword && expectedPassword !== loginPassword) {
       setLoginError('Incorrect password! Please enter the correct password or click "Forgot Password?" below.');
       return;
     }
 
+    // Update stored local credentials if server had fresher status
+    if (serverReg) {
+      saveStoredCredential({
+        pin: cleanPin,
+        phone: serverReg.phone || emp.phone,
+        password: serverReg.password || cred?.password || loginPassword,
+        staffName: serverReg.staffName || emp.full_name,
+        registeredAt: serverReg.registeredAt || new Date().toISOString(),
+        status: 'APPROVED'
+      });
+    }
+
     // Login successful
-    setActivePin(emp.biometric_pin);
+    setActivePin(cleanPin);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('goinfi_portal_user_pin', emp.biometric_pin);
+      localStorage.setItem('goinfi_portal_user_pin', cleanPin);
     }
     setLoginPassword('');
     setLoginError('');
@@ -383,13 +436,39 @@ export default function StaffPortalPage() {
         throw new Error(data.error || 'Invalid or expired OTP code.');
       }
 
+      const cleanPin = String(emp.biometric_pin);
+      const isMasterAdmin = cleanPin === '1';
+
+      // Submit registration request to centralized staff database
+      try {
+        await fetch('/api/staff', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'submit_registration',
+            registration: {
+              pin: cleanPin,
+              phone: `+977-${cleanPhone}`,
+              password: signupPassword,
+              staffName: emp.full_name,
+              department_name: emp.department_name,
+              designation: emp.designation,
+              registeredAt: new Date().toISOString()
+            }
+          })
+        });
+      } catch (err) {
+        console.warn('Could not submit registration to API:', err);
+      }
+
       // Save credentials in local storage
       saveStoredCredential({
-        pin: emp.biometric_pin,
+        pin: cleanPin,
         phone: cleanPhone,
         password: signupPassword,
         staffName: emp.full_name,
-        registeredAt: new Date().toISOString()
+        registeredAt: new Date().toISOString(),
+        status: isMasterAdmin ? 'APPROVED' : 'PENDING_APPROVAL'
       });
 
       // Update employee record with confirmed phone number
@@ -399,22 +478,25 @@ export default function StaffPortalPage() {
       setEmployees(updatedEmps);
       if (typeof window !== 'undefined') {
         localStorage.setItem('goinfi_staff_list', JSON.stringify(updatedEmps));
-        localStorage.setItem('goinfi_portal_user_pin', emp.biometric_pin);
       }
 
-      // Sync confirmed phone number to centralized staff database
-      fetch('/api/staff', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'upsert',
-          employee: { ...emp, phone: `+977-${cleanPhone}` }
-        })
-      }).catch(e => console.warn('Could not sync staff update to API:', e));
-
-      setActivePin(emp.biometric_pin);
-      setAuthMode('login');
-      setSignupStep(1);
+      if (isMasterAdmin) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('goinfi_portal_user_pin', cleanPin);
+        }
+        setActivePin(cleanPin);
+        setAuthMode('login');
+        setSignupStep(1);
+      } else {
+        // Non-admin staff requires Admin approval
+        setSignupAwaitingApproval({
+          pin: cleanPin,
+          staffName: emp.full_name,
+          phone: cleanPhone
+        });
+        setAuthMode('login');
+        setSignupStep(1);
+      }
     } catch (err: any) {
       setSignupError(err.message || 'Failed to complete registration.');
     } finally {
@@ -974,6 +1056,31 @@ export default function StaffPortalPage() {
                 </p>
               </div>
 
+              {/* Registration submitted & pending admin approval banner */}
+              {signupAwaitingApproval && (
+                <div className="p-3 bg-amber-950/70 border border-amber-500/70 rounded-xl sm:rounded-2xl text-xs text-amber-200 space-y-2">
+                  <div className="flex items-start gap-2.5">
+                    <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5 animate-pulse" />
+                    <div className="flex-1">
+                      <p className="font-bold text-amber-300 text-xs sm:text-sm">Registration Submitted! ⏳</p>
+                      <p className="text-[11px] text-amber-200/90 mt-0.5 leading-relaxed">
+                        Account for <strong>{signupAwaitingApproval.staffName}</strong> (PIN #{signupAwaitingApproval.pin}) is now waiting for <strong>Admin / HR approval</strong>.
+                      </p>
+                      <p className="text-[10px] text-amber-300/80 mt-1">
+                        Once approved by administration, you can sign in directly using your PIN and password.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSignupAwaitingApproval(null)}
+                    className="w-full py-1.5 px-3 bg-amber-600/30 hover:bg-amber-600/50 border border-amber-500/50 rounded-lg text-amber-200 font-semibold text-[11px] transition-colors cursor-pointer"
+                  >
+                    Dismiss Notice
+                  </button>
+                </div>
+              )}
+
               {/* Error or Alert banner */}
               {loginError && (
                 <div className="p-2.5 sm:p-3 bg-red-950/60 border border-red-800/80 rounded-xl sm:rounded-2xl text-xs text-red-300 flex items-start gap-2">
@@ -1083,11 +1190,16 @@ export default function StaffPortalPage() {
 
                 <button
                   type="submit"
-                  className="w-full py-2.5 sm:py-3 bg-gradient-to-r from-purple-700 via-purple-600 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-purple-600/30 transition-transform active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+                  disabled={loginLoading}
+                  className="w-full py-2.5 sm:py-3 bg-gradient-to-r from-purple-700 via-purple-600 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-500 disabled:opacity-60 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-purple-600/30 transition-transform active:scale-98 cursor-pointer flex items-center justify-center gap-2"
                 >
-                  <Lock className="w-4 h-4" />
-                  <span>Sign In</span>
-                  <ChevronRight className="w-4 h-4" />
+                  {loginLoading ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Lock className="w-4 h-4" />
+                  )}
+                  <span>{loginLoading ? 'Verifying...' : 'Sign In'}</span>
+                  {!loginLoading && <ChevronRight className="w-4 h-4" />}
                 </button>
               </form>
 

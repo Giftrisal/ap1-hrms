@@ -39,7 +39,12 @@ import {
   Settings,
   ExternalLink,
   Copy,
-  RefreshCw
+  RefreshCw,
+  ShieldCheck,
+  Check,
+  UserCheck,
+  UserX,
+  Clock
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -124,25 +129,87 @@ export default function StaffPage() {
     return [];
   });
 
-  // Sync staff list from backend API on mount
+  // Portal Registration Approvals State
+  const [pendingRegistrations, setPendingRegistrations] = useState<any[]>([]);
+  const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
+  const [approvalLoading, setApprovalLoading] = useState<string | null>(null);
+
+  // Sync staff list & pending registrations from backend API on mount
   useEffect(() => {
     fetch('/api/staff')
       .then(r => r.json())
       .then(d => {
-        if (d.success && Array.isArray(d.staff) && d.staff.length > 0) {
-          setEmployees(prev => {
-            if (prev.length === 0) {
-              if (typeof window !== 'undefined') {
-                localStorage.setItem('goinfi_staff_list', JSON.stringify(d.staff));
+        if (d.success) {
+          if (Array.isArray(d.staff) && d.staff.length > 0) {
+            setEmployees(prev => {
+              if (prev.length === 0) {
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('goinfi_staff_list', JSON.stringify(d.staff));
+                }
+                return d.staff;
               }
-              return d.staff;
-            }
-            return prev;
-          });
+              return prev;
+            });
+          }
+          if (Array.isArray(d.registrations)) {
+            setPendingRegistrations(d.registrations.filter((r: any) => r.status === 'PENDING_APPROVAL'));
+          }
         }
       })
       .catch(err => console.warn('Could not fetch staff from server:', err));
   }, []);
+
+  const handleApproveRegistration = async (pin: string) => {
+    setApprovalLoading(pin);
+    try {
+      const res = await fetch('/api/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve_registration', pin, approvedBy: 'HR Admin' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (data.registrations) {
+          setPendingRegistrations(data.registrations.filter((r: any) => r.status === 'PENDING_APPROVAL'));
+        }
+        if (data.staff) {
+          saveEmployeesList(data.staff);
+        }
+        showNotice(`✓ Staff PIN #${pin} registration approved and activated!`);
+      } else {
+        showNotice(data.error || 'Failed to approve registration.');
+      }
+    } catch (e) {
+      showNotice(`Error approving staff PIN #${pin}`);
+    } finally {
+      setApprovalLoading(null);
+    }
+  };
+
+  const handleRejectRegistration = async (pin: string) => {
+    if (!confirm(`Are you sure you want to reject registration request for PIN #${pin}?`)) return;
+    setApprovalLoading(pin);
+    try {
+      const res = await fetch('/api/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject_registration', pin })
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (data.registrations) {
+          setPendingRegistrations(data.registrations.filter((r: any) => r.status === 'PENDING_APPROVAL'));
+        }
+        showNotice(`Registration for PIN #${pin} was rejected.`);
+      } else {
+        showNotice(data.error || 'Failed to reject registration.');
+      }
+    } catch (e) {
+      showNotice(`Error rejecting registration`);
+    } finally {
+      setApprovalLoading(null);
+    }
+  };
 
   const handleOpenIndividualSms = (emp: Employee) => {
     setSmsTab('individual');
@@ -843,6 +910,25 @@ export default function StaffPage() {
               <span>Clear All</span>
             </button>
           )}
+
+          {/* Staff Registration Approvals Button */}
+          <button
+            onClick={() => setIsApprovalModalOpen(true)}
+            className={`relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm ${
+              pendingRegistrations.length > 0
+                ? 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white animate-pulse'
+                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
+            }`}
+            title="Approve or Reject Staff Portal Signups"
+          >
+            <ShieldCheck className={`w-4 h-4 ${pendingRegistrations.length > 0 ? 'text-white' : 'text-amber-500'}`} />
+            <span>Portal Approvals</span>
+            {pendingRegistrations.length > 0 && (
+              <span className="px-1.5 py-0.5 bg-white text-orange-700 font-black rounded-full text-[10px] shadow-xs">
+                {pendingRegistrations.length}
+              </span>
+            )}
+          </button>
 
           {/* Big Add Staff Button */}
           <button
@@ -2140,6 +2226,132 @@ export default function StaffPage() {
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: STAFF PORTAL REGISTRATION APPROVALS */}
+      {/* ========================================================================= */}
+      {isApprovalModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 border border-amber-200 flex items-center justify-center text-amber-700">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-900 text-base">Portal Registration Approvals</h3>
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200">
+                      {pendingRegistrations.length} Pending
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Review and authorize staff accounts created via the mobile portal
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsApprovalModalOpen(false)}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-5 overflow-y-auto flex-1 space-y-4">
+              {pendingRegistrations.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-emerald-500 opacity-80" />
+                  <p className="text-sm font-bold text-slate-700">No Pending Approvals</p>
+                  <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+                    All new staff registrations are up-to-date and authorized.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {pendingRegistrations.map((req: any) => (
+                    <div
+                      key={req.pin}
+                      className="p-4 rounded-2xl border border-amber-200/80 bg-amber-50/40 hover:bg-amber-50/70 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-11 h-11 rounded-2xl bg-amber-600/15 border border-amber-500/30 flex items-center justify-center text-amber-700 font-mono font-black text-sm shrink-0">
+                          #{req.pin}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-slate-900 text-sm">{req.staffName}</h4>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                              PIN #{req.pin}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-600 mt-0.5">
+                            {req.designation || 'Staff Member'} • <span className="font-medium text-slate-700">{req.department_name || 'Operations'}</span>
+                          </p>
+                          <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-500">
+                            <span className="flex items-center gap-1 font-mono font-medium text-slate-700">
+                              <Phone className="w-3 h-3 text-slate-400" />
+                              {req.phone}
+                            </span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              {req.registeredAt ? new Date(req.registeredAt).toLocaleString() : 'Just now'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-amber-200/50">
+                        <button
+                          onClick={() => handleRejectRegistration(req.pin)}
+                          disabled={approvalLoading === req.pin}
+                          className="px-3 py-2 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                          title="Reject this registration"
+                        >
+                          <UserX className="w-3.5 h-3.5" />
+                          <span>Reject</span>
+                        </button>
+                        <button
+                          onClick={() => handleApproveRegistration(req.pin)}
+                          disabled={approvalLoading === req.pin}
+                          className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm shadow-emerald-600/30 transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                          title="Authorize and activate staff portal account"
+                        >
+                          {approvalLoading === req.pin ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <UserCheck className="w-3.5 h-3.5" />
+                          )}
+                          <span>Approve & Activate</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>Approved accounts gain instant login access to the Staff Portal</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsApprovalModalOpen(false)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

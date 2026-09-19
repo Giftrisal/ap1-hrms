@@ -25,12 +25,30 @@ let staffDatabase: any[] = [
   }
 ];
 
+// Centralized portal registrations & approval requests
+let registrationsDatabase: any[] = [
+  {
+    pin: "1",
+    phone: "9705355569",
+    staffName: "Gift",
+    department_name: "Operations & Broadcasting",
+    designation: "Station Manager / Operations",
+    registeredAt: "2024-01-01T00:00:00.000Z",
+    status: "APPROVED",
+    approvedBy: "System SuperAdmin",
+    approvedAt: "2024-01-01T00:00:00.000Z"
+  }
+];
+
 export async function GET() {
+  const pendingCount = registrationsDatabase.filter(r => r.status === 'PENDING_APPROVAL').length;
   return NextResponse.json(
     {
       success: true,
       count: staffDatabase.length,
-      staff: staffDatabase
+      staff: staffDatabase,
+      registrations: registrationsDatabase,
+      pending_count: pendingCount
     },
     {
       headers: {
@@ -44,7 +62,108 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    // Direct full list update
+    // 1. Submit Registration from Staff Portal (Awaiting Admin Approval)
+    if (body.action === 'submit_registration' && body.registration) {
+      const reg = body.registration;
+      const cleanPin = String(reg.pin).trim();
+      
+      const existingIdx = registrationsDatabase.findIndex(r => String(r.pin) === cleanPin);
+      const newReg = {
+        pin: cleanPin,
+        phone: reg.phone,
+        password: reg.password,
+        staffName: reg.staffName,
+        department_name: reg.department_name || 'General Operations',
+        designation: reg.designation || 'Staff Member',
+        registeredAt: reg.registeredAt || new Date().toISOString(),
+        status: cleanPin === '1' ? 'APPROVED' : 'PENDING_APPROVAL',
+        approvedBy: cleanPin === '1' ? 'System SuperAdmin' : null,
+        approvedAt: cleanPin === '1' ? new Date().toISOString() : null
+      };
+
+      if (existingIdx !== -1) {
+        registrationsDatabase[existingIdx] = { ...registrationsDatabase[existingIdx], ...newReg };
+      } else {
+        registrationsDatabase.unshift(newReg);
+      }
+
+      // Update employee record with confirmed phone
+      const empIdx = staffDatabase.findIndex(e => String(e.biometric_pin) === cleanPin || e.id === cleanPin);
+      if (empIdx !== -1 && reg.phone) {
+        staffDatabase[empIdx] = { ...staffDatabase[empIdx], phone: reg.phone };
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: cleanPin === '1' ? 'Admin account active' : 'Registration submitted for Admin approval',
+        status: newReg.status,
+        registration: newReg,
+        registrations: registrationsDatabase
+      });
+    }
+
+    // 2. Admin Approve Registration
+    if (body.action === 'approve_registration' && body.pin) {
+      const cleanPin = String(body.pin).trim();
+      const regIdx = registrationsDatabase.findIndex(r => String(r.pin) === cleanPin);
+      
+      if (regIdx !== -1) {
+        registrationsDatabase[regIdx] = {
+          ...registrationsDatabase[regIdx],
+          status: 'APPROVED',
+          approvedBy: body.approvedBy || 'HR Admin',
+          approvedAt: new Date().toISOString()
+        };
+      }
+
+      // Also ensure employee is active in staff list
+      const empIdx = staffDatabase.findIndex(e => String(e.biometric_pin) === cleanPin || e.id === cleanPin);
+      if (empIdx !== -1) {
+        staffDatabase[empIdx] = { ...staffDatabase[empIdx], status: 'active' };
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Staff PIN #${cleanPin} approved and activated successfully`,
+        registrations: registrationsDatabase,
+        staff: staffDatabase
+      });
+    }
+
+    // 3. Admin Reject Registration
+    if (body.action === 'reject_registration' && body.pin) {
+      const cleanPin = String(body.pin).trim();
+      const regIdx = registrationsDatabase.findIndex(r => String(r.pin) === cleanPin);
+      
+      if (regIdx !== -1) {
+        registrationsDatabase[regIdx] = {
+          ...registrationsDatabase[regIdx],
+          status: 'REJECTED',
+          rejection_reason: body.reason || 'Registration rejected by administrator',
+          rejectedAt: new Date().toISOString()
+        };
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Staff PIN #${cleanPin} registration rejected`,
+        registrations: registrationsDatabase
+      });
+    }
+
+    // 4. Check Registration Status for Login
+    if (body.action === 'check_registration' && body.pin) {
+      const cleanPin = String(body.pin).trim();
+      const reg = registrationsDatabase.find(r => String(r.pin) === cleanPin);
+      return NextResponse.json({
+        success: true,
+        isRegistered: !!reg,
+        status: reg?.status || (cleanPin === '1' ? 'APPROVED' : 'NOT_REGISTERED'),
+        registration: reg || null
+      });
+    }
+
+    // 5. Direct full staff list update
     if (Array.isArray(body.staff)) {
       staffDatabase = body.staff;
       return NextResponse.json({
@@ -55,7 +174,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Single staff add or edit
+    // 6. Single staff add or edit
     if (body.action === 'upsert' && body.employee) {
       const emp = body.employee;
       const idx = staffDatabase.findIndex(
@@ -75,9 +194,10 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Delete staff
+    // 7. Delete staff
     if (body.action === 'delete' && body.id) {
       staffDatabase = staffDatabase.filter(e => e.id !== body.id && e.biometric_pin !== body.id);
+      registrationsDatabase = registrationsDatabase.filter(r => r.pin !== body.id);
       return NextResponse.json({
         success: true,
         message: 'Staff member deleted',
