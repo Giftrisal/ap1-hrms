@@ -128,7 +128,7 @@ export default function StaffPortalPage() {
   useEffect(() => {
     const fetchStaff = async () => {
       try {
-        const res = await fetch('/api/staff');
+        const res = await fetch('/api/staff', { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
           if (data.success && Array.isArray(data.staff) && data.staff.length > 0) {
@@ -930,25 +930,25 @@ export default function StaffPortalPage() {
   // If no staff is currently logged into the mobile app: Show Clean Login / Signup / Reset Screen
   if (!activeEmployee) {
     return (
-      <div className="min-h-[100dvh] max-w-full overflow-x-hidden bg-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 font-sans safe-top safe-bottom overscroll-none touch-pan-y">
+      <div className="min-h-[100dvh] max-w-full overflow-x-hidden bg-slate-950 text-slate-100 flex flex-col justify-between px-3.5 py-2 sm:px-6 sm:py-4 font-sans safe-top safe-bottom overscroll-none touch-pan-y">
         {/* Top Header */}
-        <div className="flex items-center justify-between pt-2">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between pt-1 sm:pt-2">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <img 
               src="/ap1-logo.png" 
               alt="AP1 HD" 
-              className="h-10 sm:h-12 w-auto shrink-0 object-contain drop-shadow" 
+              className="h-8 sm:h-11 w-auto shrink-0 object-contain drop-shadow" 
               style={{ aspectRatio: '800/339' }} 
             />
-            <div className="border-l border-slate-700/80 pl-2.5">
-              <span className="text-xs font-black tracking-wider text-fuchsia-400 uppercase block">STAFF PORTAL</span>
-              <span className="text-[10px] text-purple-300/80">AP1 Television HD</span>
+            <div className="border-l border-slate-700/80 pl-2 sm:pl-2.5">
+              <span className="text-[11px] sm:text-xs font-black tracking-wider text-fuchsia-400 uppercase block">STAFF PORTAL</span>
+              <span className="text-[9px] sm:text-[10px] text-purple-300/80">AP1 Television HD</span>
             </div>
           </div>
           {!isAlreadyInstalled && (
             <button
               onClick={handleInstallClick}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-purple-700 via-purple-600 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-500 text-white shadow-lg shadow-purple-600/30 transition-transform active:scale-95 cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-bold bg-gradient-to-r from-purple-700 via-purple-600 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-500 text-white shadow-md shadow-purple-600/30 transition-transform active:scale-95 cursor-pointer"
             >
               <Smartphone className="w-3.5 h-3.5" />
               <span>Install App</span>
@@ -957,29 +957,29 @@ export default function StaffPortalPage() {
         </div>
 
         {/* Central Auth Container */}
-        <div className="max-w-md w-full mx-auto my-auto py-4">
+        <div className="max-w-md w-full mx-auto my-auto py-1 sm:py-3">
 
           {/* =============================================================== */}
           {/* VIEW 1: LOGIN */}
           {/* =============================================================== */}
           {authMode === 'login' && (
-            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl backdrop-blur-md space-y-5">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl backdrop-blur-md space-y-3 sm:space-y-4">
               <div className="text-center">
-                <div className="w-14 h-14 bg-gradient-to-tr from-purple-700 via-purple-600 to-fuchsia-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-purple-600/30 mb-2.5">
-                  <Lock className="w-7 h-7 text-white" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-tr from-purple-700 via-purple-600 to-fuchsia-600 rounded-xl sm:rounded-2xl mx-auto flex items-center justify-center shadow-md shadow-purple-600/30 mb-1.5 sm:mb-2">
+                  <Lock className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
-                <h1 className="text-xl font-bold text-white">Staff Login</h1>
-                <p className="text-xs text-purple-200/80 mt-0.5">
+                <h1 className="text-lg sm:text-xl font-bold text-white">Staff Login</h1>
+                <p className="text-[11px] sm:text-xs text-purple-200/80 mt-0.5">
                   Sign in securely using your Biometric PIN and password
                 </p>
               </div>
 
               {/* Error or Alert banner */}
               {loginError && (
-                <div className="p-3 bg-red-950/60 border border-red-800/80 rounded-2xl text-xs text-red-300 flex items-start gap-2.5">
+                <div className="p-2.5 sm:p-3 bg-red-950/60 border border-red-800/80 rounded-xl sm:rounded-2xl text-xs text-red-300 flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p className="font-medium leading-relaxed">{loginError}</p>
+                    <p className="font-medium leading-relaxed text-[11px] sm:text-xs">{loginError}</p>
                     {notRegisteredStaff && (
                       <button
                         type="button"
@@ -989,9 +989,9 @@ export default function StaffPortalPage() {
                           handleSelectSignupStaff(notRegisteredStaff.biometric_pin);
                           setLoginError('');
                         }}
-                        className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white font-bold rounded-lg text-xs shadow-md transition-transform active:scale-95 cursor-pointer"
+                        className="mt-1.5 inline-flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white font-bold rounded-lg text-xs shadow-md transition-transform active:scale-95 cursor-pointer"
                       >
-                        <Sparkles className="w-3.5 h-3.5" />
+                        <Sparkles className="w-3 h-3" />
                         <span>Sign Up Now</span>
                       </button>
                     )}
@@ -999,11 +999,11 @@ export default function StaffPortalPage() {
                 </div>
               )}
 
-              <form onSubmit={handleLogin} className="space-y-4">
+              <form onSubmit={handleLogin} className="space-y-2.5 sm:space-y-3">
                 {/* PIN / Name selector */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                    <label className="block text-[11px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider">
                       Biometric PIN or Staff Name
                     </label>
                   </div>
@@ -1017,10 +1017,10 @@ export default function StaffPortalPage() {
                       setLoginError('');
                       setNotRegisteredStaff(null);
                     }}
-                    className="w-full px-4 py-2.5 bg-slate-800/90 border border-slate-700 rounded-xl text-white font-mono font-bold text-sm focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all placeholder:text-slate-500"
+                    className="w-full px-3 py-2 bg-slate-800/90 border border-slate-700 rounded-xl text-white font-mono font-bold text-xs sm:text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20 transition-all placeholder:text-slate-500"
                   />
                   {/* Quick helper picker */}
-                  <div className="mt-1.5">
+                  <div className="mt-1">
                     <select
                       value={loginIdentifier}
                       onChange={e => {
@@ -1028,7 +1028,7 @@ export default function StaffPortalPage() {
                         setLoginError('');
                         setNotRegisteredStaff(null);
                       }}
-                      className="w-full px-3 py-1.5 bg-slate-800/60 border border-slate-700/60 rounded-lg text-[11px] text-slate-300 focus:outline-none focus:border-purple-500"
+                      className="w-full px-2.5 py-1.5 bg-slate-800/60 border border-slate-700/60 rounded-lg text-[10px] sm:text-[11px] text-slate-300 focus:outline-none focus:border-purple-500"
                     >
                       <option value="">-- Or select name from list ({employees.length} Staff) --</option>
                       {employees.map(emp => (
@@ -1043,7 +1043,7 @@ export default function StaffPortalPage() {
                 {/* Password field */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                    <label className="block text-[11px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider">
                       Password
                     </label>
                     <button
@@ -1054,7 +1054,7 @@ export default function StaffPortalPage() {
                         setResetPin(loginIdentifier);
                         if (loginIdentifier) handleSelectResetStaff(loginIdentifier);
                       }}
-                      className="text-[11px] text-fuchsia-400 hover:text-fuchsia-300 hover:underline cursor-pointer"
+                      className="text-[10px] sm:text-[11px] text-fuchsia-400 hover:text-fuchsia-300 hover:underline cursor-pointer"
                     >
                       Forgot Password?
                     </button>
@@ -1069,12 +1069,12 @@ export default function StaffPortalPage() {
                         setLoginPassword(e.target.value);
                         setLoginError('');
                       }}
-                      className="w-full pl-4 pr-11 py-2.5 bg-slate-800/90 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all placeholder:text-slate-500 font-medium"
+                      className="w-full pl-3 pr-10 py-2 bg-slate-800/90 border border-slate-700 rounded-xl text-white text-xs sm:text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20 transition-all placeholder:text-slate-500 font-medium"
                     />
                     <button
                       type="button"
                       onClick={() => setShowLoginPassword(!showLoginPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1"
                     >
                       {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -1083,7 +1083,7 @@ export default function StaffPortalPage() {
 
                 <button
                   type="submit"
-                  className="w-full py-3 bg-gradient-to-r from-purple-700 via-purple-600 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-purple-600/30 transition-transform active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full py-2.5 sm:py-3 bg-gradient-to-r from-purple-700 via-purple-600 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-purple-600/30 transition-transform active:scale-98 cursor-pointer flex items-center justify-center gap-2"
                 >
                   <Lock className="w-4 h-4" />
                   <span>Sign In</span>
@@ -1092,8 +1092,8 @@ export default function StaffPortalPage() {
               </form>
 
               {/* Bottom switch to Sign Up */}
-              <div className="pt-4 border-t border-slate-800 text-center">
-                <p className="text-xs text-slate-400 mb-2">First time using the staff app?</p>
+              <div className="pt-2 sm:pt-3 border-t border-slate-800/80 text-center">
+                <p className="text-[10px] sm:text-xs text-slate-400 mb-1 sm:mb-1.5">First time using the staff app?</p>
                 <button
                   type="button"
                   onClick={() => {
@@ -1102,9 +1102,9 @@ export default function StaffPortalPage() {
                     setSignupError('');
                     setSignupSuccess('');
                   }}
-                  className="w-full py-2.5 px-4 bg-purple-950/40 hover:bg-purple-900/50 text-purple-200 hover:text-white rounded-xl text-xs font-bold border border-purple-800/60 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-2 px-3 bg-purple-950/40 hover:bg-purple-900/50 text-purple-200 hover:text-white rounded-xl text-[11px] sm:text-xs font-semibold border border-purple-800/50 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <KeyRound className="w-4 h-4 text-amber-400" />
+                  <KeyRound className="w-3.5 h-3.5 text-amber-400" />
                   <span>Register New Account (Sign Up)</span>
                 </button>
               </div>
@@ -1115,7 +1115,7 @@ export default function StaffPortalPage() {
           {/* VIEW 2: SIGN UP */}
           {/* =============================================================== */}
           {authMode === 'signup' && (
-            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl backdrop-blur-md space-y-4">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl backdrop-blur-md space-y-3 sm:space-y-4">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <button
                   type="button"
@@ -1338,7 +1338,7 @@ export default function StaffPortalPage() {
           {/* VIEW 3: FORGOT / RESET PASSWORD */}
           {/* =============================================================== */}
           {authMode === 'forgot_password' && (
-            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl backdrop-blur-md space-y-4">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl backdrop-blur-md space-y-3 sm:space-y-4">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <button
                   type="button"
@@ -1547,7 +1547,7 @@ export default function StaffPortalPage() {
         </div>
 
         {/* Footer Note */}
-        <div className="text-center pb-2 text-[11px] text-slate-500">
+        <div className="text-center py-1 text-[10px] sm:text-[11px] text-slate-500 select-none shrink-0">
           <p>🔒 AP1 Television HD • Goinfi Biometric HRMS 2026</p>
         </div>
 

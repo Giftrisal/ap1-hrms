@@ -26,11 +26,18 @@ let staffDatabase: any[] = [
 ];
 
 export async function GET() {
-  return NextResponse.json({
-    success: true,
-    count: staffDatabase.length,
-    staff: staffDatabase
-  });
+  return NextResponse.json(
+    {
+      success: true,
+      count: staffDatabase.length,
+      staff: staffDatabase
+    },
+    {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0'
+      }
+    }
+  );
 }
 
 export async function POST(req: NextRequest) {
