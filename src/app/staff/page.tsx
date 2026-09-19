@@ -54,16 +54,10 @@ export default function StaffPage() {
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          // Permanently purge old 263 AP1 biometric staff so they never restore
+          // Only purge the legacy 263 mock imported staff
           const isOldBulk = Array.isArray(parsed) && (
             parsed.length > 200 ||
-            parsed.some((e: any) => 
-              (typeof e.id === 'string' && e.id.startsWith('ap1-')) ||
-              e.id === 'emp-101' || e.full_name === 'Aayush Shrestha' ||
-              e.full_name === 'Yeshoda' || e.full_name === 'Roji Maharjan' ||
-              (e.id === 'emp-1' && e.full_name === 'Gift') ||
-              (e.id === 'emp-2' && e.full_name === 'NN-2')
-            )
+            parsed.some((e: any) => typeof e.id === 'string' && e.id.startsWith('ap1-'))
           );
           if (isOldBulk) {
             localStorage.removeItem('goinfi_staff_list');
@@ -75,7 +69,7 @@ export default function StaffPage() {
         } catch (e) {}
       }
     }
-    return [];
+    return initialEmployees;
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -129,6 +123,26 @@ export default function StaffPage() {
     }
     return [];
   });
+
+  // Sync staff list from backend API on mount
+  useEffect(() => {
+    fetch('/api/staff')
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && Array.isArray(d.staff) && d.staff.length > 0) {
+          setEmployees(prev => {
+            if (prev.length === 0) {
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('goinfi_staff_list', JSON.stringify(d.staff));
+              }
+              return d.staff;
+            }
+            return prev;
+          });
+        }
+      })
+      .catch(err => console.warn('Could not fetch staff from server:', err));
+  }, []);
 
   const handleOpenIndividualSms = (emp: Employee) => {
     setSmsTab('individual');
@@ -342,6 +356,12 @@ export default function StaffPage() {
     if (typeof window !== 'undefined') {
       localStorage.setItem('goinfi_staff_list', JSON.stringify(newList));
     }
+    // Sync with centralized API so mobile portal and all devices stay up-to-date
+    fetch('/api/staff', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staff: newList })
+    }).catch(e => console.warn('Could not sync staff list to API:', e));
   };
 
   const handleClearAllStaff = () => {

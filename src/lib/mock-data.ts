@@ -65,7 +65,25 @@ export const initialShifts: Shift[] = [
   }
 ];
 
-export const initialEmployees: Employee[] = [];
+export const initialEmployees: Employee[] = [
+  {
+    id: "emp-1",
+    biometric_pin: "1",
+    full_name: "Gift",
+    email: "gift@ap1tv.com",
+    phone: "9705355569",
+    photo_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    department_id: "dept-6",
+    department_name: "Operations & Broadcasting",
+    shift_id: "shift-1",
+    shift_name: "Regular Morning Shift (9 AM - 5 PM)",
+    designation: "Station Manager / Operations",
+    role: "admin",
+    status: "active",
+    join_date: "2024-01-01",
+    base_salary: 85000
+  }
+];
 
 export const initialHolidays: PublicHoliday[] = [];
 

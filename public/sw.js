@@ -1,5 +1,5 @@
-// AP1 Staff Portal Service Worker (PWA Enablement)
-const CACHE_NAME = 'ap1-staff-portal-v1';
+// AP1 Staff Portal Service Worker (PWA Auto-Update Enabled)
+const CACHE_NAME = 'ap1-staff-portal-v2';
 const PRECACHE_ASSETS = [
   '/portal',
   '/ap1-logo.png',
@@ -7,12 +7,12 @@ const PRECACHE_ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(PRECACHE_ASSETS).catch(() => {});
     })
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -30,23 +30,30 @@ self.addEventListener('fetch', (event) => {
   // Only handle GET requests
   if (event.request.method !== 'GET') return;
 
-  // Let browser handle cross-origin or API calls directly
   const url = new URL(event.request.url);
+  // Pass API requests directly to network
   if (url.pathname.startsWith('/api/')) return;
 
+  // Network-first strategy: Always fetch latest updates from server
+  // Fall back to offline cache only when offline
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      return (
-        cachedResponse ||
-        fetch(event.request).then((networkResponse) => {
-          return networkResponse;
-        }).catch(() => {
-          // If offline and requesting portal, return portal cache
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        return networkResponse;
+      })
+      .catch(() => {
+        return caches.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) return cachedResponse;
           if (event.request.mode === 'navigate') {
             return caches.match('/portal');
           }
-        })
-      );
-    })
+        });
+      })
   );
 });

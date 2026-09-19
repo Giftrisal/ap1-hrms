@@ -37,7 +37,7 @@ export default function DashboardPage() {
   const [livePunches, setLivePunches] = useState<any[]>([]);
 
   // Load employees from storage with purge of old bulk staff
-  const [employees] = useState<Employee[]>(() => {
+  const [employees, setEmployees] = useState<Employee[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('goinfi_staff_list');
       if (saved) {
@@ -55,8 +55,20 @@ export default function DashboardPage() {
         } catch (e) {}
       }
     }
-    return [];
+    return initialEmployees;
   });
+
+  // Sync staff list from backend API
+  React.useEffect(() => {
+    fetch('/api/staff')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.staff) && data.staff.length > 0) {
+          setEmployees(prev => (prev.length === 0 ? data.staff : prev));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Poll /api/biometric/sync for real-time punches from hardware device
   React.useEffect(() => {

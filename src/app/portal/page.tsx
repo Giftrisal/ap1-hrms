@@ -67,7 +67,7 @@ export default function StaffPortalPage() {
         } catch (e) {}
       }
     }
-    return [];
+    return initialEmployees;
   });
 
   // Active Staff Authentication via Biometric Machine PIN
@@ -123,6 +123,27 @@ export default function StaffPortalPage() {
       return () => clearTimeout(timer);
     }
   }, [resendTimer]);
+
+  // Sync staff directory from backend API so all mobile and desktop devices have current staff
+  useEffect(() => {
+    const fetchStaff = async () => {
+      try {
+        const res = await fetch('/api/staff');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.staff) && data.staff.length > 0) {
+            setEmployees(data.staff);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('goinfi_staff_list', JSON.stringify(data.staff));
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch staff from /api/staff:', err);
+      }
+    };
+    fetchStaff();
+  }, []);
 
   // Credentials storage helper
   interface StaffAuthCredential {
@@ -380,6 +401,16 @@ export default function StaffPortalPage() {
         localStorage.setItem('goinfi_staff_list', JSON.stringify(updatedEmps));
         localStorage.setItem('goinfi_portal_user_pin', emp.biometric_pin);
       }
+
+      // Sync confirmed phone number to centralized staff database
+      fetch('/api/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'upsert',
+          employee: { ...emp, phone: `+977-${cleanPhone}` }
+        })
+      }).catch(e => console.warn('Could not sync staff update to API:', e));
 
       setActivePin(emp.biometric_pin);
       setAuthMode('login');
