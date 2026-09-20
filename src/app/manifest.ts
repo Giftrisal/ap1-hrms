@@ -2,13 +2,13 @@ import { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'AP1 Staff Portal',
-    short_name: 'Staff Portal',
-    description: 'AP1 Television Staff Self-Service Portal - Attendance, Leave, Payslips & Digital ID',
-    start_url: '/portal',
-    id: '/portal',
+    name: 'AP1 Television HRMS',
+    short_name: 'AP1 HRMS',
+    description: 'AP1 Television Corporate HRMS, Biometric Attendance & Office Management System',
+    start_url: '/',
+    id: '/',
     display: 'standalone',
-    orientation: 'portrait',
+    orientation: 'any',
     background_color: '#020617',
     theme_color: '#7e22ce',
     icons: [

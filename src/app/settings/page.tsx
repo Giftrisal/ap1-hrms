@@ -14,7 +14,10 @@ import {
   RefreshCw, 
   Save, 
   CheckCircle2, 
-  ExternalLink 
+  ExternalLink,
+  Monitor,
+  Download,
+  Laptop
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -228,6 +231,59 @@ export default function SettingsPage() {
                 onChange={(e) => setSettings({ ...settings, nepali_fiscal_year: e.target.value })}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:outline-none"
               />
+            </div>
+          </div>
+        </div>
+
+        {/* Section 4: Office PC Desktop App & Workstation Setup */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-700 border border-purple-200">
+                <Monitor className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-slate-900 text-base">Office PC Desktop Workstation (अफिस कम्प्युटर सफ्टवेयर)</h4>
+                <p className="text-xs text-slate-500">
+                  Run AP1 Television HRMS as a standalone native desktop application without browser tabs
+                </p>
+              </div>
+            </div>
+
+            <a
+              href="/installers/Install_AP1_HRMS.bat"
+              download="Install_AP1_HRMS.bat"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-xl font-bold text-xs transition-colors shadow-xs self-start sm:self-auto"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download 1-Click Desktop Setup (.bat)</span>
+            </a>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+              <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                <Laptop className="w-4 h-4 text-purple-700" />
+                <span>विधि १: १-क्लिक Windows Desktop App इन्स्टलर (सिफारिस गरिएको):</span>
+              </p>
+              <ol className="list-decimal list-inside space-y-1 text-slate-600 pl-1 leading-relaxed">
+                <li>माथिको <strong>"Download 1-Click Desktop Setup (.bat)"</strong> बटनमा क्लिक गर्नुहोस्।</li>
+                <li>डाउनलोड भएको <code className="px-1.5 py-0.5 bg-slate-200 rounded text-slate-800 font-mono">Install_AP1_HRMS.bat</code> फाइललाई अफिस PC मा Double-Click गरी खोल्नुहोस्।</li>
+                <li>तपाईंको कम्प्युटरको Desktop मा <strong>"AP1 Television HRMS"</strong> को आधिकारिक आइकन बन्नेछ।</li>
+                <li>अब सो आइकन डबल-क्लिक गर्नासाथ ब्राउजरका ट्याब वा ठेगाना बार बिना सिधै सफ्टवेयर जस्तै खुल्नेछ।</li>
+              </ol>
+            </div>
+
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+              <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>विधि २: Chrome वा Edge ब्राउजरबाट सिधै App इन्स्टल गर्नुहोस्:</span>
+              </p>
+              <ol className="list-decimal list-inside space-y-1 text-slate-600 pl-1 leading-relaxed">
+                <li>कम्प्युटरमा Microsoft Edge वा Google Chrome खोली <code className="px-1.5 py-0.5 bg-slate-200 rounded text-slate-800 font-mono">https://ap1hr.goinfi.biz</code> खोल्नुहोस्।</li>
+                <li>ब्राउजरको URL (Address Bar) को दायाँ छेउमा रहेको <strong>"Install app" (कम्प्युटरमा इन्स्टल)</strong> आइकनमा क्लिक गर्नुहोस्।</li>
+                <li><strong>"Install"</strong> मा क्लिक गरेपछि यो प्रणाली Windows Taskbar र Start Menu मा सफ्टवेयरको रूपमा पिन हुन्छ।</li>
+              </ol>
             </div>
           </div>
         </div>
