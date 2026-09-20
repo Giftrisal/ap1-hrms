@@ -526,7 +526,7 @@ export default function StaffPage() {
       id: `emp-${Date.now()}`,
       biometric_pin: formData.biometric_pin!,
       full_name: formData.full_name!,
-      email: formData.email || `${formData.full_name.toLowerCase().replace(/\s+/g, '.')}@ap1.tv`,
+      email: formData.email || `${formData.full_name.toLowerCase().replace(/\s+/g, '.')}@ap1hdtv.com`,
       phone: formData.phone || '+977-9800000000',
       photo_url: formData.photo_url || '',
       department_id: formData.department_id || departments[0]?.id || 'dept-1',

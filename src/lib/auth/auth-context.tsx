@@ -46,20 +46,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const pass = (password || '').trim();
 
     // 1. Check Master Admin Credentials
-    // Username: admin@ap1.tv, master@ap1.tv, admin, master, 999
+    // Username: admin@ap1hdtv.com, master@ap1hdtv.com, admin, master, 999
     const isMasterMatch = 
-      query === 'admin@ap1.tv' || 
-      query === 'master@ap1.tv' || 
+      query === 'admin@ap1hdtv.com' || 
+      query === 'master@ap1hdtv.com' || 
       query === 'admin' || 
       query === 'master' || 
       query === '999';
 
     if (isMasterMatch) {
-      // Allow passwords: admin123, admin, ap1@admin2026, ap12026, 123456
-      const validPasswords = ['admin123', 'admin', 'ap1@admin2026', 'ap12026', '123456', 'ap1admin'];
-      if (!pass || validPasswords.includes(pass) || pass.length >= 4) {
+      // Strong Master Admin Passwords
+      const strongMasterPasswords = [
+        'AP1#Master@2026!',
+        'AP1@Master#2026',
+        'AP1#Master2026',
+        'AP1@Master2026',
+        'AP1Master#2026',
+        'ap1#master@2026!'
+      ];
+      if (pass && strongMasterPasswords.includes(pass)) {
         const user: Employee = {
           ...masterAdminUser,
+          email: 'admin@ap1hdtv.com',
           is_master_admin: true,
           role: 'admin'
         };
@@ -69,62 +77,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('goinfi_auth_user', JSON.stringify(user));
         return true;
       }
+      return false; // Rejects weak or incorrect passwords for Master Admin
     }
 
     // 2. Check Gift (Station Manager / Operations Admin)
-    const isGiftMatch = query === 'gift@ap1tv.com' || query === 'gift' || query === '1' || query === 'station';
+    const isGiftMatch = query === 'gift@ap1hdtv.com' || query === 'gift@ap1tv.com' || query === 'gift' || query === '1' || query === 'station';
     if (isGiftMatch) {
-      const user: Employee = {
-        id: "emp-1",
-        biometric_pin: "1",
-        full_name: "Gift",
-        email: "gift@ap1tv.com",
-        phone: "9705355569",
-        photo_url: "",
-        department_id: "dept-6",
-        department_name: "Operations & Broadcasting",
-        shift_id: "shift-day",
-        shift_name: "Day Shift (10:00 AM - 6:00 PM)",
-        designation: "Station Manager / Operations",
-        role: "admin",
-        status: "active",
-        join_date: "2024-01-01",
-        base_salary: 85000,
-        is_master_admin: false
-      };
-      setCurrentUser(user);
-      setRole('admin');
-      setIsAuthenticated(true);
-      localStorage.setItem('goinfi_auth_user', JSON.stringify(user));
-      return true;
+      const validGiftPasswords = ['Gift@AP1#2026', 'gift123', 'admin123', 'admin'];
+      if (pass && validGiftPasswords.includes(pass)) {
+        const user: Employee = {
+          id: "emp-1",
+          biometric_pin: "1",
+          full_name: "Gift",
+          email: "gift@ap1hdtv.com",
+          phone: "9705355569",
+          photo_url: "",
+          department_id: "dept-6",
+          department_name: "Operations & Broadcasting",
+          shift_id: "shift-day",
+          shift_name: "Day Shift (10:00 AM - 6:00 PM)",
+          designation: "Station Manager / Operations",
+          role: "admin",
+          status: "active",
+          join_date: "2024-01-01",
+          base_salary: 85000,
+          is_master_admin: false
+        };
+        setCurrentUser(user);
+        setRole('admin');
+        setIsAuthenticated(true);
+        localStorage.setItem('goinfi_auth_user', JSON.stringify(user));
+        return true;
+      }
+      return false;
     }
 
     // 3. Check HR Manager
-    const isHrMatch = query === 'hr@ap1.tv' || query === 'hr' || query === 'pooja';
+    const isHrMatch = query === 'hr@ap1hdtv.com' || query === 'hr' || query === 'pooja';
     if (isHrMatch) {
-      const user: Employee = {
-        id: "emp-hr-1",
-        biometric_pin: "102",
-        full_name: "Pooja Thapa",
-        email: "hr@ap1.tv",
-        phone: "+977-9841234567",
-        photo_url: "",
-        department_id: "dept-2",
-        department_name: "Human Resources",
-        shift_id: "shift-day",
-        shift_name: "Day Shift (10:00 AM - 6:00 PM)",
-        designation: "HR Operations Manager",
-        role: "hr",
-        status: "active",
-        join_date: "2023-06-01",
-        base_salary: 75000,
-        is_master_admin: false
-      };
-      setCurrentUser(user);
-      setRole('hr');
-      setIsAuthenticated(true);
-      localStorage.setItem('goinfi_auth_user', JSON.stringify(user));
-      return true;
+      const validHrPasswords = ['HR@AP1#2026', 'hr123', 'admin123', 'admin'];
+      if (pass && validHrPasswords.includes(pass)) {
+        const user: Employee = {
+          id: "emp-hr-1",
+          biometric_pin: "102",
+          full_name: "Pooja Thapa",
+          email: "hr@ap1hdtv.com",
+          phone: "+977-9841234567",
+          photo_url: "",
+          department_id: "dept-2",
+          department_name: "Human Resources",
+          shift_id: "shift-day",
+          shift_name: "Day Shift (10:00 AM - 6:00 PM)",
+          designation: "HR Operations Manager",
+          role: "hr",
+          status: "active",
+          join_date: "2023-06-01",
+          base_salary: 75000,
+          is_master_admin: false
+        };
+        setCurrentUser(user);
+        setRole('hr');
+        setIsAuthenticated(true);
+        localStorage.setItem('goinfi_auth_user', JSON.stringify(user));
+        return true;
+      }
+      return false;
     }
 
     // 4. Check Registered Staff in System (localStorage or initialEmployees)

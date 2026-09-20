@@ -27,7 +27,7 @@ export function generatePayslipPdf(payroll: PayrollRecord, companyName = 'AP1 Te
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(203, 213, 225);
-  doc.text('Kathmandu, Nepal | Phone: +977-1-4498765 | info@ap1.tv | ap1.tv', 14, 23);
+  doc.text('Kathmandu, Nepal | Phone: +977-1-4498765 | info@ap1hdtv.com | ap1hdtv.com', 14, 23);
 
   // Payslip Title Badge
   doc.setTextColor(15, 23, 42);
