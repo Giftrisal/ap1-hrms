@@ -181,16 +181,16 @@ export default function Header({
           <span>{currentTime || '09:00:00 AM'} (NPT)</span>
         </div>
 
-        {/* Goinfi Technologies Promotion Badge */}
+        {/* Goinfi Labs Promotion Badge */}
         <a
-          href="https://goinfi.biz"
+          href="https://www.goinfi.biz/labs"
           target="_blank"
           rel="noopener noreferrer"
           className="hidden 2xl:flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-lg border border-slate-200 text-xs font-medium transition-colors"
-          title="Powered by Goinfi Technologies"
+          title="Engineered by Goinfi Labs"
         >
           <span className="text-[10px] text-slate-400">Powered by</span>
-          <span className="font-bold text-blue-600">Goinfi</span>
+          <span className="font-bold text-blue-600">Goinfi Labs</span>
         </a>
 
         {/* Machine Status Card */}

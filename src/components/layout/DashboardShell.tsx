@@ -85,13 +85,13 @@ export default function DashboardShell({
             <div className="flex items-center gap-1.5">
               <span>Engineered & Developed by</span>
               <a
-                href="https://goinfi.biz"
+                href="https://www.goinfi.biz/labs"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1.5 transition-colors"
               >
-                Goinfi Technologies
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200 font-semibold">goinfi.biz</span>
+                Goinfi Labs
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200 font-semibold">goinfi.biz/labs</span>
               </a>
             </div>
           </footer>

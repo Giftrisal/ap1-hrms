@@ -258,12 +258,12 @@ export default function LoginPage() {
           <p className="text-[11px] text-slate-400">
             Engineered & Powered by{' '}
             <a 
-              href="https://goinfi.biz" 
+              href="https://www.goinfi.biz/labs" 
               target="_blank" 
               rel="noopener noreferrer" 
               className="font-bold text-blue-400 hover:text-blue-300 underline underline-offset-2 transition-colors"
             >
-              Goinfi Technologies
+              Goinfi Labs
             </a>
           </p>
         </div>
