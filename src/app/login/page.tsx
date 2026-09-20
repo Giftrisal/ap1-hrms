@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { 
   Lock, 
   Mail, 
@@ -13,7 +12,6 @@ import {
   Crown, 
   UserCheck, 
   Users, 
-  Smartphone,
   AlertCircle
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -249,17 +247,6 @@ export default function LoginPage() {
               <span className="text-[9px] text-emerald-300 font-medium">HR Operations</span>
             </button>
           </div>
-        </div>
-
-        {/* Staff Mobile Portal Navigation link */}
-        <div className="pt-2 text-center">
-          <Link
-            href="/portal"
-            className="inline-flex items-center gap-2 text-xs font-bold text-purple-400 hover:text-purple-300 transition-colors p-2 rounded-xl hover:bg-purple-950/30"
-          >
-            <Smartphone className="w-3.5 h-3.5" />
-            <span>कर्मचारी पोर्टल (Staff Mobile Portal) मा जानुहोस् →</span>
-          </Link>
         </div>
 
         {/* Footer Security Badge */}
