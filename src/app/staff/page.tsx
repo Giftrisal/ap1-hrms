@@ -5,8 +5,8 @@ import Link from 'next/link';
 import DashboardShell from '@/components/layout/DashboardShell';
 import { useLanguage } from '@/lib/i18n/context';
 import { useAuth } from '@/lib/auth/auth-context';
-import { initialEmployees, initialDepartments, getStoredDepartments, saveStoredDepartments } from '@/lib/mock-data';
-import { Employee, Department } from '@/lib/types';
+import { initialEmployees, initialDepartments, initialShifts, getStoredDepartments, saveStoredDepartments } from '@/lib/mock-data';
+import { Employee, Department, Shift } from '@/lib/types';
 import { 
   Users, 
   Search, 
@@ -346,6 +346,22 @@ export default function StaffPage() {
     saveStoredDepartments(newList);
   };
 
+  // Active Shifts loaded from localStorage
+  const [shifts, setShifts] = useState<Shift[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('goinfi_shifts_list');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        } catch (e) {}
+      }
+    }
+    return initialShifts;
+  });
+
   // Department Modal State
   const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
   const [newDeptName, setNewDeptName] = useState('');
@@ -476,6 +492,8 @@ export default function StaffPage() {
 
     setEditingStaff({
       ...emp,
+      shift_id: emp.shift_id || 'shift-day',
+      shift_name: emp.shift_name || shifts.find(s => s.id === emp.shift_id)?.name || 'Day Shift (10:00 AM - 6:00 PM)',
       join_date: isAutoOrToday ? '' : emp.join_date,
       dob: emp.dob || ''
     });
@@ -519,6 +537,7 @@ export default function StaffPage() {
     }
 
     const dept = departments.find(d => d.id === formData.department_id);
+    const selectedShift = shifts.find(s => s.id === formData.shift_id) || shifts[0];
     const newEmp: Employee = {
       id: `emp-${Date.now()}`,
       biometric_pin: formData.biometric_pin!,
@@ -528,8 +547,8 @@ export default function StaffPage() {
       photo_url: formData.photo_url || '',
       department_id: formData.department_id || departments[0]?.id || 'dept-1',
       department_name: dept?.name || 'Operations & Broadcasting',
-      shift_id: 'shift-day',
-      shift_name: 'Day Shift (10:00 AM - 6:00 PM)',
+      shift_id: formData.shift_id || selectedShift?.id || 'shift-day',
+      shift_name: selectedShift?.name || 'Day Shift (10:00 AM - 6:00 PM)',
       designation: formData.designation || 'Staff',
       role: formData.role || 'employee',
       status: 'active',
@@ -618,9 +637,12 @@ export default function StaffPage() {
     if (!editingStaff) return;
 
     const dept = departments.find(d => d.id === editingStaff.department_id);
+    const selectedShift = shifts.find(s => s.id === editingStaff.shift_id);
     const updated = {
       ...editingStaff,
       department_name: dept?.name || editingStaff.department_name,
+      shift_id: editingStaff.shift_id || 'shift-day',
+      shift_name: selectedShift?.name || editingStaff.shift_name || 'Day Shift (10:00 AM - 6:00 PM)',
       base_salary: Number(editingStaff.base_salary),
       join_date: editingStaff.join_date || '',
       is_joining_date_set: Boolean(editingStaff.join_date)
@@ -1042,6 +1064,15 @@ export default function StaffPage() {
                     <span>Email:</span>
                     <span className="truncate max-w-[140px] text-slate-700">{emp.email}</span>
                   </div>
+                  <div className="flex justify-between items-center text-[11px] text-slate-500">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-blue-600" />
+                      <span>Shift:</span>
+                    </span>
+                    <span className="font-semibold text-slate-800 truncate max-w-[150px]" title={emp.shift_name}>
+                      {emp.shift_name || 'Day Shift (10:00 AM - 6:00 PM)'}
+                    </span>
+                  </div>
                   {emp.join_date && emp.join_date !== '2023-01-01' && emp.join_date !== '2026-09-19' && emp.join_date !== '2026-09-20' && (
                     <div className="flex justify-between items-center text-[11px] text-slate-500">
                       <span>Joined:</span>
@@ -1116,6 +1147,7 @@ export default function StaffPage() {
                   <th className="py-3 px-4">Machine PIN</th>
                   <th className="py-3 px-4">Department</th>
                   <th className="py-3 px-4">Designation</th>
+                  <th className="py-3 px-4">Assigned Shift</th>
                   <th className="py-3 px-4">Join Date & DOB</th>
                   <th className="py-3 px-4">Base Salary</th>
                   <th className="py-3 px-4 text-center">Actions</th>
@@ -1154,6 +1186,13 @@ export default function StaffPage() {
 
                     <td className="py-3 px-4 font-semibold text-slate-800">
                       {emp.designation}
+                    </td>
+
+                    <td className="py-3 px-4">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-800 border border-slate-200">
+                        <Clock className="w-3 h-3 text-blue-600 shrink-0" />
+                        <span>{emp.shift_name || 'Day Shift'}</span>
+                      </span>
                     </td>
 
                     <td className="py-3 px-4 text-[11px] text-slate-600">
@@ -1347,6 +1386,36 @@ export default function StaffPage() {
                     ))}
                   </select>
                 </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-700">Assigned Shift (कार्य सिफ्ट) *</label>
+                    <span className="text-[10px] text-blue-600 font-bold font-mono">
+                      {shifts.find(s => s.id === editingStaff.shift_id)?.start_time ? `${shifts.find(s => s.id === editingStaff.shift_id)?.start_time?.substring(0, 5)} - ${shifts.find(s => s.id === editingStaff.shift_id)?.end_time?.substring(0, 5)}` : 'Flexible'}
+                    </span>
+                  </div>
+                  <select
+                    value={editingStaff.shift_id || 'shift-day'}
+                    onChange={(e) => {
+                      const sft = shifts.find(s => s.id === e.target.value);
+                      setEditingStaff({ 
+                        ...editingStaff, 
+                        shift_id: e.target.value,
+                        shift_name: sft?.name || editingStaff.shift_name
+                      });
+                    }}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 font-medium text-slate-900"
+                  >
+                    {shifts.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">System Access Role</label>
                   <select
@@ -1359,11 +1428,8 @@ export default function StaffPage() {
                     <option value="admin">Administrator</option>
                   </select>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Email Address</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Work Email Address</label>
                   <input
                     type="email"
                     value={editingStaff.email}
@@ -1371,6 +1437,9 @@ export default function StaffPage() {
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Phone Number</label>
                   <input
@@ -1380,9 +1449,6 @@ export default function StaffPage() {
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none"
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
                     Date of Joining
@@ -1394,6 +1460,9 @@ export default function StaffPage() {
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-medium text-slate-800"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
                     Date of Birth
@@ -1585,18 +1654,34 @@ export default function StaffPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Designation / Role</label>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Assigned Shift (कार्य सिफ्ट) *
+                  </label>
+                  <select
+                    value={formData.shift_id || 'shift-day'}
+                    onChange={(e) => setFormData({ ...formData, shift_id: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-medium text-slate-800"
+                  >
+                    {shifts.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Designation / Position *</label>
                   <input
                     type="text"
                     value={formData.designation}
                     onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none"
-                    placeholder="e.g. Full Stack Developer"
+                    placeholder="e.g. Lead Engineer, Editor"
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Monthly Base Salary (NPR)</label>
                   <input
@@ -1606,6 +1691,9 @@ export default function StaffPage() {
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-bold text-sm"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Access Role</label>
                   <select
