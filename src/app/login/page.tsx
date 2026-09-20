@@ -249,11 +249,22 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Footer Security Badge */}
-        <div className="pt-2 text-center border-t border-slate-800/60">
+        {/* Footer Security Badge & Goinfi Promotion */}
+        <div className="pt-3 text-center border-t border-slate-800/60 space-y-1.5">
           <p className="text-[10px] text-slate-500 flex items-center justify-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
             <span>AP1 TV Security Gateway • ZKTeco TCP 4370 Protected</span>
+          </p>
+          <p className="text-[11px] text-slate-400">
+            Engineered & Powered by{' '}
+            <a 
+              href="https://goinfi.biz" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="font-bold text-blue-400 hover:text-blue-300 underline underline-offset-2 transition-colors"
+            >
+              Goinfi Technologies
+            </a>
           </p>
         </div>
       </div>

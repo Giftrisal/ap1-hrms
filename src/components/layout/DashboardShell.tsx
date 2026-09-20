@@ -70,10 +70,31 @@ export default function DashboardShell({
         />
 
         {/* Scrollable Page Body */}
-        <main className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 bg-slate-50">
-          <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 bg-slate-50 flex flex-col justify-between">
+          <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6 w-full flex-1">
             {children}
           </div>
+
+          {/* Global Enterprise Footer with Goinfi Promotion */}
+          <footer className="max-w-7xl mx-auto w-full pt-8 pb-3 border-t border-slate-200 mt-8 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="font-semibold text-slate-700">AP1 Television HRMS</span>
+              <span>•</span>
+              <span>Enterprise Biometric Network</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span>Engineered & Developed by</span>
+              <a
+                href="https://goinfi.biz"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1.5 transition-colors"
+              >
+                Goinfi Technologies
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200 font-semibold">goinfi.biz</span>
+              </a>
+            </div>
+          </footer>
         </main>
       </div>
     </div>

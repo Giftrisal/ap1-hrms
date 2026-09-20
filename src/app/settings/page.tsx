@@ -288,6 +288,31 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* Goinfi Technologies Partner & Engineering Card */}
+        <div className="bg-gradient-to-r from-slate-900 to-blue-950 p-5 rounded-2xl text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-blue-900/50 shadow-md">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-bold uppercase tracking-wider border border-blue-400/30">
+              Technology & Engineering Partner
+            </div>
+            <h4 className="text-base font-bold text-white flex items-center gap-2">
+              <span>Goinfi Technologies</span>
+              <span className="text-xs font-normal text-blue-300">• Cloud & Biometrics Solution</span>
+            </h4>
+            <p className="text-xs text-slate-300">
+              Architected, customized, and maintained for AP1 Television Network.
+            </p>
+          </div>
+          <a
+            href="https://goinfi.biz"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs transition-colors shadow-xs shrink-0"
+          >
+            <span>Visit goinfi.biz</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
+
         {/* Save Button Bar */}
         <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
           {isSaved ? (

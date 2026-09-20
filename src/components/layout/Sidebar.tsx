@@ -223,6 +223,23 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
             </div>
           )}
         </div>
+
+        {/* Powered by Goinfi Branding & Promotion */}
+        <div className="px-3 py-2.5 border-t border-slate-800/80 bg-slate-950 text-center">
+          <a
+            href="https://goinfi.biz"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center justify-center gap-1.5 text-[11px] text-slate-400 hover:text-blue-400 transition-colors"
+            title="Goinfi Technologies - IT & Cloud Engineering"
+          >
+            <span className="text-[10px] text-slate-500">Powered by</span>
+            <span className="font-bold text-slate-200 group-hover:text-blue-400">
+              Goinfi Technologies
+            </span>
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 group-hover:animate-ping" />
+          </a>
+        </div>
       </aside>
     </>
   );
