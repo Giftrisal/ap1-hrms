@@ -52,29 +52,30 @@ export default function StaffPage() {
   const { t, language } = useLanguage();
   const { role } = useAuth();
   
-  // Load employees from localStorage if previously edited
+  // Load employees from localStorage with clean purge of old staff
   const [employees, setEmployees] = useState<Employee[]>(() => {
     if (typeof window !== 'undefined') {
+      const resetDone = localStorage.getItem('goinfi_clean_reset_2026_v2');
+      if (!resetDone) {
+        localStorage.removeItem('goinfi_staff_list');
+        localStorage.removeItem('goinfi_attendance_records');
+        localStorage.removeItem('goinfi_portal_user_pin');
+        localStorage.setItem('goinfi_clean_reset_2026_v2', 'true');
+        return [];
+      }
       const saved = localStorage.getItem('goinfi_staff_list');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          // Only purge the legacy 263 mock imported staff
-          const isOldBulk = Array.isArray(parsed) && (
-            parsed.length > 200 ||
-            parsed.some((e: any) => typeof e.id === 'string' && e.id.startsWith('ap1-'))
-          );
-          if (isOldBulk) {
-            localStorage.removeItem('goinfi_staff_list');
-            return [];
-          }
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed;
+          if (Array.isArray(parsed)) {
+            // Strictly exclude master admin with pin 999 from regular staff list
+            const cleaned = parsed.filter((p: any) => String(p.biometric_pin) !== '999' && !p.is_master_admin && p.id !== 'emp-master');
+            return cleaned;
           }
         } catch (e) {}
       }
     }
-    return initialEmployees;
+    return [];
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -140,16 +141,12 @@ export default function StaffPage() {
       .then(r => r.json())
       .then(d => {
         if (d.success) {
-          if (Array.isArray(d.staff) && d.staff.length > 0) {
-            setEmployees(prev => {
-              if (prev.length === 0) {
-                if (typeof window !== 'undefined') {
-                  localStorage.setItem('goinfi_staff_list', JSON.stringify(d.staff));
-                }
-                return d.staff;
-              }
-              return prev;
-            });
+          if (Array.isArray(d.staff)) {
+            const clean = d.staff.filter((p: any) => String(p.biometric_pin) !== '999' && !p.is_master_admin && p.id !== 'emp-master');
+            setEmployees(clean);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('goinfi_staff_list', JSON.stringify(clean));
+            }
           }
           if (Array.isArray(d.registrations)) {
             setPendingRegistrations(d.registrations.filter((r: any) => r.status === 'PENDING_APPROVAL'));
@@ -888,6 +885,25 @@ export default function StaffPage() {
           >
             <Download className="w-3.5 h-3.5" />
             <span>Excel</span>
+          </button>
+
+          {/* 1-Click Refresh Staff Directory */}
+          <button
+            onClick={() => {
+              fetch('/api/staff')
+                .then(r => r.json())
+                .then(d => {
+                  const clean = (d.staff || []).filter((p: any) => String(p.biometric_pin) !== '999' && !p.is_master_admin && p.id !== 'emp-master');
+                  saveEmployeesList(clean);
+                  showNotice(`✅ Staff directory refreshed (${clean.length} active staff)`);
+                })
+                .catch(() => showNotice('Could not reach staff server'));
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 shadow-2xs transition-all cursor-pointer"
+            title="Refresh staff directory from server"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
+            <span>Refresh ({employees.length})</span>
           </button>
 
           {/* Manage Departments Button */}

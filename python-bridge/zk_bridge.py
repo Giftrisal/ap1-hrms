@@ -22,6 +22,7 @@ import time
 import socket
 import argparse
 import logging
+import json
 from datetime import datetime
 import requests
 from dotenv import load_dotenv
@@ -151,20 +152,61 @@ def pull_and_sync_attendance(ip, port, api_url, api_secret):
                     "device_ip": ip
                 })
 
-            logger.info(f"Pushing {len(payload)} punch logs to Goinfi-HR API: {api_url}...")
+            # Offline Queue check: merge any previously failed offline punches
+            offline_cache_file = os.path.join(os.path.dirname(__file__), "offline_queue.json")
+            if os.path.exists(offline_cache_file):
+                try:
+                    with open(offline_cache_file, "r", encoding="utf-8") as f:
+                        cached_records = json.load(f)
+                    if isinstance(cached_records, list) and cached_records:
+                        logger.info(f"Loaded {len(cached_records)} queued offline punches from local disk.")
+                        existing_keys = {f"{p.get('user_id')}_{p.get('punch_time')}" for p in payload}
+                        for cp in cached_records:
+                            key = f"{cp.get('user_id')}_{cp.get('punch_time')}"
+                            if key not in existing_keys:
+                                payload.append(cp)
+                                existing_keys.add(key)
+                except Exception as cache_err:
+                    logger.warning(f"Could not read offline cache: {cache_err}")
+
             headers = {
                 "Content-Type": "application/json",
                 "x-biometric-secret": api_secret
             }
 
-            response = requests.post(api_url, json={"logs": payload, "device_ip": ip}, headers=headers, timeout=20)
-            
-            if response.status_code == 200:
-                result = response.json()
-                logger.info(f"Sync complete! Processed: {result.get('processed_count', len(payload))}, New: {result.get('inserted_count', 0)}")
-                return True
-            else:
-                logger.error(f"API rejected punch payload with status {response.status_code}: {response.text}")
+            # Try primary cloud API URL, fallback to local office server (http://localhost:3000)
+            target_urls = [api_url]
+            if "localhost" not in api_url and "127.0.0.1" not in api_url:
+                target_urls.append("http://localhost:3000/api/biometric/sync")
+
+            sync_success = False
+            for target in target_urls:
+                try:
+                    logger.info(f"Pushing {len(payload)} punch logs to: {target}...")
+                    response = requests.post(target, json={"logs": payload, "device_ip": ip}, headers=headers, timeout=12)
+                    if response.status_code == 200:
+                        result = response.json()
+                        logger.info(f"Sync complete via {target}! Processed: {result.get('processed_count', len(payload))}")
+                        sync_success = True
+                        if os.path.exists(offline_cache_file):
+                            try:
+                                os.remove(offline_cache_file)
+                            except Exception:
+                                pass
+                        return True
+                    else:
+                        logger.warning(f"Target {target} returned status {response.status_code}: {response.text[:200]}")
+                except Exception as req_err:
+                    logger.warning(f"Could not reach {target}: {req_err}")
+
+            # If all targets failed (e.g. internet down and local server off), save to offline queue
+            if not sync_success:
+                try:
+                    with open(offline_cache_file, "w", encoding="utf-8") as f:
+                        json.dump(payload, f, indent=2)
+                    logger.warning(f"[OFFLINE MODE] Internet down! Saved {len(payload)} punches safely in local queue. Will auto-sync when internet reconnects.")
+                except Exception as save_err:
+                    logger.error(f"Failed to persist offline queue: {save_err}")
                 return False
 
         finally:

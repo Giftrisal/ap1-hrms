@@ -4,42 +4,10 @@ import { sendGoinfiSms } from '@/lib/sms';
 export const dynamic = 'force-dynamic';
 
 // Centralized staff store (shared across desktop, mobile portal, tablets)
-let staffDatabase: any[] = [
-  {
-    id: "emp-1",
-    biometric_pin: "1",
-    full_name: "Gift",
-    employee_code: "AP1-001",
-    department_id: "dept-6",
-    department_name: "Operations & Broadcasting",
-    shift_id: "shift-1",
-    shift_name: "Regular Morning Shift (9 AM - 5 PM)",
-    designation: "HRMS Manager",
-    phone: "9705355569",
-    email: "gift@ap1hdtv.com",
-    role: "admin",
-    status: "active",
-    join_date: "2024-01-01",
-    base_salary: 85000,
-    monthly_salary: 85000,
-    photo_url: ""
-  }
-];
+let staffDatabase: any[] = [];
 
 // Centralized portal registrations & approval requests
-let registrationsDatabase: any[] = [
-  {
-    pin: "1",
-    phone: "9705355569",
-    staffName: "Gift",
-    department_name: "Operations & Broadcasting",
-    designation: "HRMS Manager",
-    registeredAt: "2024-01-01T00:00:00.000Z",
-    status: "APPROVED",
-    approvedBy: "System SuperAdmin",
-    approvedAt: "2024-01-01T00:00:00.000Z"
-  }
-];
+let registrationsDatabase: any[] = [];
 
 export async function GET() {
   const pendingCount = registrationsDatabase.filter(r => r.status === 'PENDING_APPROVAL').length;

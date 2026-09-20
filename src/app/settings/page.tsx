@@ -17,7 +17,8 @@ import {
   ExternalLink,
   Monitor,
   Download,
-  Laptop
+  Laptop,
+  Trash2
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -26,6 +27,31 @@ export default function SettingsPage() {
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionMessage, setConnectionMessage] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
+
+  const handleFactoryReset = async () => {
+    if (!confirm('चेतावनी: के तपाईं साँच्चिकै सबै स्टाफ, हाजिरी र डाटा मेटाएर ० (Zero) बाट नयाँ सुरु गर्न चाहनुहुन्छ? यो कार्य फिर्ता गर्न सकिँदैन।')) return;
+    try {
+      await fetch('/api/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ staff: [] })
+      });
+    } catch (e) {}
+
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('goinfi_staff_list');
+      localStorage.removeItem('goinfi_attendance_records');
+      localStorage.removeItem('goinfi_leave_requests');
+      localStorage.removeItem('goinfi_field_duty_requests');
+      localStorage.removeItem('goinfi_overtime_permissions');
+      localStorage.removeItem('goinfi_portal_user_pin');
+      localStorage.removeItem('goinfi_sms_logs');
+      localStorage.setItem('goinfi_clean_reset_2026_v2', 'true');
+    }
+
+    alert('✅ सफ्टवेयर पूर्ण रूपमा रिसेट भयो! Total Staff = 0. अब ड्यासबोर्ड खुल्नेछ।');
+    window.location.href = '/dashboard';
+  };
 
   const handleTestMachine = async () => {
     setTestingConnection(true);
@@ -286,6 +312,35 @@ export default function SettingsPage() {
               </ol>
             </div>
           </div>
+        </div>
+
+        {/* Section 5: Database Factory Reset & Clean Slate */}
+        <div className="bg-rose-50 border border-rose-200 p-6 rounded-2xl shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center text-rose-700 border border-rose-200">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-rose-900 text-base">Factory Reset Database (पूर्ण क्लिन स्लेट - ० बाट सुरु)</h4>
+                <p className="text-xs text-rose-700">
+                  Wipe all staff directory, attendance punches, and requests to start 100% fresh from 0.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleFactoryReset}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs transition-colors shadow-xs self-start sm:self-auto cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Reset Everything to 0 (Factory Reset)</span>
+            </button>
+          </div>
+          <p className="text-[11px] text-rose-600">
+            * Master Admin account credentials remain intact. All demo employees, biometric logs, and portal accounts are reset to 0.
+          </p>
         </div>
 
         {/* Goinfi Labs Partner & Engineering Card */}

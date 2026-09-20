@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import DashboardShell from '@/components/layout/DashboardShell';
 import { initialFieldDutyRequests, initialEmployees } from '@/lib/mock-data';
-import { FieldDutyRequest, FieldDutyType } from '@/lib/types';
+import { FieldDutyRequest, FieldDutyType, Employee } from '@/lib/types';
 import { useLanguage } from '@/lib/i18n/context';
 import { useAuth } from '@/lib/auth/auth-context';
 import { getNepaliDate } from '@/lib/nepali-date';
@@ -27,7 +27,54 @@ import {
 export default function FieldDutyPage() {
   const { t } = useLanguage();
   const { role, currentUser } = useAuth();
-  const [requests, setRequests] = useState<FieldDutyRequest[]>(initialFieldDutyRequests);
+
+  // Active AP1 employees
+  const [employees] = useState<Employee[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('goinfi_staff_list');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed.filter((p: any) => String(p.biometric_pin) !== '999');
+          }
+        } catch (e) {}
+      }
+    }
+    return initialEmployees;
+  });
+
+  const [requests, setRequests] = useState<FieldDutyRequest[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('goinfi_field_duty_requests');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            // Purge legacy demo requests
+            const clean = parsed.filter(r => 
+              r.id !== 'fdr-1' && 
+              r.id !== 'fdr-2' && 
+              r.id !== 'fdr-3' &&
+              r.employee_name !== 'Samikshya Gautam' &&
+              r.employee_name !== 'Manoj Basnet' &&
+              r.employee_name !== 'Suman Shrestha'
+            );
+            return clean;
+          }
+        } catch (e) {}
+      }
+    }
+    return initialFieldDutyRequests;
+  });
+
+  const saveRequests = (newList: FieldDutyRequest[]) => {
+    setRequests(newList);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('goinfi_field_duty_requests', JSON.stringify(newList));
+    }
+  };
+
   const [filterType, setFilterType] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
@@ -35,7 +82,7 @@ export default function FieldDutyPage() {
 
   // New Request Form State
   const [formData, setFormData] = useState({
-    employee_id: currentUser?.id || 'emp-104',
+    employee_id: currentUser?.id || 'emp-1',
     type: 'FIELD_VISIT' as FieldDutyType,
     start_date: new Date().toISOString().split('T')[0],
     end_date: new Date().toISOString().split('T')[0],
@@ -47,7 +94,12 @@ export default function FieldDutyPage() {
 
   const handleCreateRequest = (e: React.FormEvent) => {
     e.preventDefault();
-    const emp = initialEmployees.find(x => x.id === formData.employee_id) || initialEmployees[0];
+    const emp = employees.find(x => x.id === formData.employee_id) || employees[0] || {
+      id: 'emp-1',
+      full_name: 'Gift Risal',
+      photo_url: '/staff/staff_1.jpg',
+      department_name: 'Digital Media'
+    };
     const newReq: FieldDutyRequest = {
       id: `fdr-${Date.now()}`,
       employee_id: emp.id,
@@ -66,10 +118,10 @@ export default function FieldDutyPage() {
       remarks: 'Submitted for Administrator Approval'
     };
 
-    setRequests([newReq, ...requests]);
+    saveRequests([newReq, ...requests]);
     setIsModalOpen(false);
     setFormData({
-      employee_id: currentUser?.id || 'emp-104',
+      employee_id: currentUser?.id || employees[0]?.id || 'emp-1',
       type: 'FIELD_VISIT',
       start_date: new Date().toISOString().split('T')[0],
       end_date: new Date().toISOString().split('T')[0],
@@ -81,7 +133,7 @@ export default function FieldDutyPage() {
   };
 
   const handleUpdateStatus = (id: string, newStatus: 'approved' | 'rejected') => {
-    setRequests(requests.map(r => {
+    const updated = requests.map(r => {
       if (r.id === id) {
         return {
           ...r,
@@ -91,7 +143,8 @@ export default function FieldDutyPage() {
         };
       }
       return r;
-    }));
+    });
+    saveRequests(updated);
   };
 
   const filteredRequests = requests.filter(r => {
@@ -241,13 +294,28 @@ export default function FieldDutyPage() {
             </select>
           </div>
 
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs sm:text-sm font-semibold transition-colors shadow-xs cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Apply Field Duty / WFH</span>
-          </button>
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            {requests.length > 0 && (
+              <button
+                onClick={() => {
+                  if (confirm('Are you sure you want to clear all field duty records?')) {
+                    saveRequests([]);
+                  }
+                }}
+                className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                title="Delete all field duty records"
+              >
+                Clear All
+              </button>
+            )}
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs sm:text-sm font-semibold transition-colors shadow-xs cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Apply Field Duty / WFH</span>
+            </button>
+          </div>
         </div>
 
         {/* Requests List */}
@@ -265,7 +333,27 @@ export default function FieldDutyPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {filteredRequests.map(req => (
+                {filteredRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-5 py-16 text-center">
+                      <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3 border border-blue-100">
+                        <MapPin className="w-6 h-6" />
+                      </div>
+                      <p className="text-sm font-bold text-slate-800">No Field Duty / WFH Records</p>
+                      <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                        All demo records have been cleared. Click below to submit a new field duty or remote work application.
+                      </p>
+                      <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 cursor-pointer transition-all"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>+ Apply Field Duty</span>
+                      </button>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRequests.map(req => (
                   <tr key={req.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
@@ -349,7 +437,7 @@ export default function FieldDutyPage() {
                       )}
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>
@@ -386,7 +474,7 @@ export default function FieldDutyPage() {
                     onChange={e => setFormData({ ...formData, employee_id: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500 bg-white"
                   >
-                    {initialEmployees.map(emp => (
+                    {employees.map(emp => (
                       <option key={emp.id} value={emp.id}>
                         {emp.full_name} ({emp.designation} - {emp.department_name})
                       </option>

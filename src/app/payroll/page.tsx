@@ -64,18 +64,22 @@ export default function PayrollPage() {
   const [adjustingStaff, setAdjustingStaff] = useState<PayrollRecord | null>(null);
   const [adjustedHours, setAdjustedHours] = useState<number>(0);
 
-  // Load all active employees (combines initialEmployees and approved portal signups from localStorage)
+  // Load all active employees (excluding master admin)
   const [employeesList, setEmployeesList] = useState<Employee[]>(() => {
     if (typeof window !== 'undefined') {
+      const resetDone = localStorage.getItem('goinfi_clean_reset_2026_v2');
+      if (!resetDone) return [];
       const saved = localStorage.getItem('goinfi_staff_list');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          if (Array.isArray(parsed)) {
+            return parsed.filter((p: any) => String(p.biometric_pin) !== '999' && !p.is_master_admin && p.id !== 'emp-master');
+          }
         } catch (e) {}
       }
     }
-    return initialEmployees;
+    return [];
   });
 
   // Calculate payroll based on Accounts-defined Target Working Hours

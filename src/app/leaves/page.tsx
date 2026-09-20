@@ -33,19 +33,15 @@ export default function LeavesPage() {
   // Dynamic full staff list
   const [employees, setEmployees] = useState<Employee[]>(() => {
     if (typeof window !== 'undefined') {
+      const resetDone = localStorage.getItem('goinfi_clean_reset_2026_v2');
+      if (!resetDone) return [];
       const saved = localStorage.getItem('goinfi_staff_list');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          const isOldBulk = Array.isArray(parsed) && (
-            parsed.length > 200 ||
-            parsed.some((e: any) => (typeof e.id === 'string' && e.id.startsWith('ap1-')) || e.full_name === 'Yeshoda')
-          );
-          if (isOldBulk) {
-            localStorage.removeItem('goinfi_staff_list');
-            return [];
+          if (Array.isArray(parsed)) {
+            return parsed.filter((p: any) => String(p.biometric_pin) !== '999' && !p.is_master_admin && p.id !== 'emp-master');
           }
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
         } catch (e) {}
       }
     }

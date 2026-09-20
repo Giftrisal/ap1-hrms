@@ -22,8 +22,22 @@ export default function ReportsPage() {
   const { t, language } = useLanguage();
   const [reportType, setReportType] = useState<'monthly_attendance' | 'department_matrix' | 'leave_summary'>('monthly_attendance');
 
+  const [employees] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      const resetDone = localStorage.getItem('goinfi_clean_reset_2026_v2');
+      if (!resetDone) return [];
+      const saved = localStorage.getItem('goinfi_staff_list');
+      if (saved) {
+        try {
+          return JSON.parse(saved).filter((p: any) => String(p.biometric_pin) !== '999' && !p.is_master_admin && p.id !== 'emp-master');
+        } catch (e) {}
+      }
+    }
+    return [];
+  });
+
   // Generate monthly attendance statistics per staff
-  const staffMonthlyStats = initialEmployees.map((emp, i) => {
+  const staffMonthlyStats = employees.map((emp, i) => {
     const totalWorkingDays = 26;
     const lateDays = (i * 3) % 5;
     const absentDays = i === 28 ? 1 : i === 29 ? 2 : 0;

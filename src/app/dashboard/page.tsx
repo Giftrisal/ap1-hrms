@@ -36,26 +36,30 @@ export default function DashboardPage() {
   const [filterDepartment, setFilterDepartment] = useState('ALL');
   const [livePunches, setLivePunches] = useState<any[]>([]);
 
-  // Load employees from storage with purge of old bulk staff
+  // Load employees from storage with one-time clean purge of all old demo/temporary staff
   const [employees, setEmployees] = useState<Employee[]>(() => {
     if (typeof window !== 'undefined') {
+      const resetDone = localStorage.getItem('goinfi_clean_reset_2026_v2');
+      if (!resetDone) {
+        localStorage.removeItem('goinfi_staff_list');
+        localStorage.removeItem('goinfi_attendance_records');
+        localStorage.removeItem('goinfi_portal_user_pin');
+        localStorage.setItem('goinfi_clean_reset_2026_v2', 'true');
+        return [];
+      }
       const saved = localStorage.getItem('goinfi_staff_list');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          const isOldBulk = Array.isArray(parsed) && (
-            parsed.length > 200 ||
-            parsed.some((e: any) => (typeof e.id === 'string' && e.id.startsWith('ap1-')) || e.full_name === 'Yeshoda')
-          );
-          if (isOldBulk) {
-            localStorage.removeItem('goinfi_staff_list');
-            return [];
+          if (Array.isArray(parsed)) {
+            // Strictly exclude master admin with pin 999 from regular staff list
+            const cleaned = parsed.filter((p: any) => String(p.biometric_pin) !== '999' && !p.is_master_admin && p.id !== 'emp-master');
+            return cleaned;
           }
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
         } catch (e) {}
       }
     }
-    return initialEmployees;
+    return [];
   });
 
   // Sync staff list from backend API
@@ -63,8 +67,12 @@ export default function DashboardPage() {
     fetch('/api/staff')
       .then(res => res.json())
       .then(data => {
-        if (data.success && Array.isArray(data.staff) && data.staff.length > 0) {
-          setEmployees(prev => (prev.length === 0 ? data.staff : prev));
+        if (data.success && Array.isArray(data.staff)) {
+          const clean = data.staff.filter((p: any) => String(p.biometric_pin) !== '999' && !p.is_master_admin && p.id !== 'emp-master');
+          setEmployees(clean);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('goinfi_staff_list', JSON.stringify(clean));
+          }
         }
       })
       .catch(() => {});
@@ -140,12 +148,7 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, [employees]);
 
-  // Key metrics - mathematically bounded to registered workforce and active punches
-  const uniquePunchedPins = new Set(attendanceList.map(a => String(a.employee_pin || a.employee_id)));
-  const registeredPins = new Set(employees.map(e => String(e.biometric_pin || e.id)));
-  const allKnownPins = new Set([...Array.from(registeredPins), ...Array.from(uniquePunchedPins)]);
-  
-  const totalStaff = Math.max(employees.length, allKnownPins.size);
+  const totalStaff = employees.length;
   const validAttendance = attendanceList;
 
   const presentCount = validAttendance.filter(

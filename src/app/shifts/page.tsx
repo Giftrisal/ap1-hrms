@@ -56,19 +56,26 @@ export default function ShiftsPage() {
   // Staff directory lookup
   const [employees, setEmployees] = useState<Employee[]>(() => {
     if (typeof window !== 'undefined') {
+      const resetDone = localStorage.getItem('goinfi_clean_reset_2026_v2');
+      if (!resetDone) return [];
       const saved = localStorage.getItem('goinfi_staff_list');
       if (saved) {
         try {
-          return JSON.parse(saved);
+          return JSON.parse(saved).filter((p: any) => String(p.biometric_pin) !== '999' && !p.is_master_admin && p.id !== 'emp-master');
         } catch (e) {}
       }
     }
-    return initialEmployees;
+    return [];
   });
 
   // Centralized Overtime Permissions List
   const [overtimePermissions, setOvertimePermissions] = useState<OvertimePermission[]>(() => {
     if (typeof window !== 'undefined') {
+      const resetDone = localStorage.getItem('goinfi_clean_reset_2026_v2');
+      if (!resetDone) {
+        localStorage.removeItem('goinfi_overtime_permissions');
+        return [];
+      }
       const saved = localStorage.getItem('goinfi_overtime_permissions');
       if (saved) {
         try {
@@ -76,7 +83,7 @@ export default function ShiftsPage() {
         } catch (e) {}
       }
     }
-    return initialOvertimePermissions;
+    return [];
   });
 
   // Modal State for granting Overtime Permission

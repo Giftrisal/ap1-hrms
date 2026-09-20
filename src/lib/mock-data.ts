@@ -7,6 +7,7 @@ export const initialDepartments: Department[] = [
   { id: 'dept-3', name: 'Broadcast Engineering & IT', code: 'ENG', description: 'Transmission, PCR, MCR, and IT networks', employee_count: 0 },
   { id: 'dept-4', name: 'Program & Production', code: 'PROD', description: 'Studio shoots, shows, and video production', employee_count: 0 },
   { id: 'dept-5', name: 'Camera & Lighting', code: 'CAM', description: 'Outdoor broadcast and studio camera operations', employee_count: 0 },
+  { id: 'dept-digital', name: 'Digital Media', code: 'DIGI', description: 'Social media, digital distribution, and online broadcasts', employee_count: 0 },
   { id: 'dept-mkt', name: 'Marketing & Sales', code: 'MKT', description: 'Advertising, sponsorships, and client partnerships', employee_count: 0 },
   { id: 'dept-7', name: 'Human Resources', code: 'HR', description: 'People operations, payroll, and talent acquisition', employee_count: 0 },
   { id: 'dept-8', name: 'Finance & Accounts', code: 'FIN', description: 'Billing, treasury, auditing, and tax compliance', employee_count: 0 },
@@ -72,24 +73,20 @@ export const initialShifts: Shift[] = [
     half_day_threshold_hours: 4.0,
     full_day_hours: 8.0,
     is_default: false
+  },
+  {
+    id: 'shift-flexible',
+    name: 'Flexible Shift (No Fixed Shift / 24/7 Rotational)',
+    start_time: '00:00:00',
+    end_time: '23:59:59',
+    grace_period_minutes: 60,
+    half_day_threshold_hours: 4.0,
+    full_day_hours: 8.0,
+    is_default: false
   }
 ];
 
-export const initialOvertimePermissions: OvertimePermission[] = [
-  {
-    id: 'ot-1',
-    employee_id: 'emp-1',
-    employee_name: 'Gift',
-    biometric_pin: '1',
-    date: new Date().toISOString().split('T')[0],
-    approved_hours: 2.0,
-    shift_name: 'Day Shift (10:00 AM - 6:00 PM)',
-    reason: 'Live News Broadcast Extended Special Coverage',
-    approved_by: 'HR Admin',
-    status: 'APPROVED',
-    created_at: new Date().toISOString()
-  }
-];
+export const initialOvertimePermissions: OvertimePermission[] = [];
 
 export const masterAdminUser: Employee = {
   id: "emp-master",
@@ -110,26 +107,7 @@ export const masterAdminUser: Employee = {
   is_master_admin: true
 };
 
-export const initialEmployees: Employee[] = [
-  masterAdminUser,
-  {
-    id: "emp-1",
-    biometric_pin: "1",
-    full_name: "Gift",
-    email: "gift@ap1hdtv.com",
-    phone: "9705355569",
-    photo_url: "",
-    department_id: "dept-6",
-    department_name: "Operations & Broadcasting",
-    shift_id: "shift-day",
-    shift_name: "Day Shift (10:00 AM - 6:00 PM)",
-    designation: "HRMS Manager",
-    role: "admin",
-    status: "active",
-    join_date: "2024-01-01",
-    base_salary: 85000
-  }
-];
+export const initialEmployees: Employee[] = [];
 
 export const initialHolidays: PublicHoliday[] = [];
 
@@ -167,60 +145,7 @@ export function generateTodayAttendance(): DailyAttendance[] {
   return [];
 }
 
-export const initialFieldDutyRequests: FieldDutyRequest[] = [
-  {
-    id: 'fdr-1',
-    employee_id: 'emp-104',
-    employee_name: 'Samikshya Gautam',
-    employee_photo: '',
-    department_name: 'Software Engineering',
-    type: 'CLIENT_MEETING',
-    start_date: '2026-09-16',
-    end_date: '2026-09-16',
-    start_time: '10:00 AM',
-    end_time: '04:30 PM',
-    location: 'Nabil Bank Head Office, Teendhara, Kathmandu',
-    purpose: 'Core Banking API Integration & UAT Deployment',
-    status: 'approved',
-    applied_at: '2026-09-15T16:20:00Z',
-    approved_by: 'Aayush Shrestha',
-    remarks: 'Approved for full-day on-site client deployment'
-  },
-  {
-    id: 'fdr-2',
-    employee_id: 'emp-107',
-    employee_name: 'Manoj Basnet',
-    employee_photo: '',
-    department_name: 'Software Engineering',
-    type: 'WORK_FROM_HOME',
-    start_date: '2026-09-17',
-    end_date: '2026-09-17',
-    start_time: '09:00 AM',
-    end_time: '06:00 PM',
-    location: 'Home (Bhaktapur)',
-    purpose: 'Post-release overnight server patch monitoring',
-    status: 'pending',
-    applied_at: '2026-09-16T11:00:00Z'
-  },
-  {
-    id: 'fdr-3',
-    employee_id: 'emp-114',
-    employee_name: 'Suman Shrestha',
-    employee_photo: '',
-    department_name: 'Digital Marketing',
-    type: 'FIELD_VISIT',
-    start_date: '2026-09-18',
-    end_date: '2026-09-19',
-    start_time: '08:00 AM',
-    end_time: '07:00 PM',
-    location: 'Pokhara Event Center',
-    purpose: 'Client video shoot & expo brand sponsorship coverage',
-    status: 'approved',
-    applied_at: '2026-09-14T09:30:00Z',
-    approved_by: 'Pooja Thapa',
-    remarks: 'Approved with travel allowance'
-  }
-];
+export const initialFieldDutyRequests: FieldDutyRequest[] = [];
 
 export const initialAssets: CompanyAsset[] = [];
 

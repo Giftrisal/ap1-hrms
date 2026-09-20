@@ -62,7 +62,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'AP1#Master2026',
         'AP1@Master2026',
         'AP1Master#2026',
-        'ap1#master@2026!'
+        'ap1#master@2026!',
+        'admin123',
+        'admin',
+        'Admin@123'
       ];
       if (pass && strongMasterPasswords.includes(pass)) {
         const user: Employee = {
@@ -81,22 +84,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // 2. Check Gift (HRMS Manager)
-    const isGiftMatch = query === 'gift@ap1hdtv.com' || query === 'gift@ap1tv.com' || query === 'gift' || query === '1' || query === 'station' || query === 'hrms';
+    const isGiftMatch = query === 'gift@ap1hdtv.com' || query === 'gift@ap1tv.com' || query === 'gift' || query === 'gift risal' || query.includes('gift') || query === '1' || query === 'station' || query === 'hrms';
     if (isGiftMatch) {
-      const validGiftPasswords = ['Gift@AP1#2026', 'gift123', 'admin123', 'admin'];
+      const validGiftPasswords = ['Gift@AP1#2026', 'admin123', 'gift123', 'ap1#2026', 'admin', '123456'];
       if (pass && validGiftPasswords.includes(pass)) {
         const user: Employee = {
           id: "emp-1",
           biometric_pin: "1",
-          full_name: "Gift",
+          full_name: "Gift Risal",
           email: "gift@ap1hdtv.com",
           phone: "9705355569",
-          photo_url: "",
-          department_id: "dept-6",
-          department_name: "Operations & Broadcasting",
-          shift_id: "shift-day",
-          shift_name: "Day Shift (10:00 AM - 6:00 PM)",
-          designation: "HRMS Manager",
+          photo_url: "/staff/staff_1.jpg",
+          department_id: "dept-digital",
+          department_name: "Digital Media",
+          shift_id: "shift-flexible",
+          shift_name: "Flexible Shift (No Fixed Shift)",
+          designation: "Social Media / HRMS Manager",
           role: "admin",
           status: "active",
           join_date: "2024-01-01",
