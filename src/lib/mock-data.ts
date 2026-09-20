@@ -123,7 +123,7 @@ export const initialEmployees: Employee[] = [
     department_name: "Operations & Broadcasting",
     shift_id: "shift-day",
     shift_name: "Day Shift (10:00 AM - 6:00 PM)",
-    designation: "Station Manager / Operations",
+    designation: "HRMS Manager",
     role: "admin",
     status: "active",
     join_date: "2024-01-01",

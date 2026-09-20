@@ -211,7 +211,7 @@ export default function LoginPage() {
               <span className="text-[9px] text-purple-300 font-medium">Super Admin</span>
             </button>
 
-            {/* Station Manager Gift */}
+            {/* HRMS Manager Gift */}
             <button
               type="button"
               onClick={() => handleSelectAccount('gift')}
@@ -223,10 +223,10 @@ export default function LoginPage() {
             >
               <div className="flex items-center gap-1.5 text-blue-400 font-black text-[11px]">
                 <UserCheck className="w-3.5 h-3.5" />
-                <span>Station Manager</span>
+                <span>HRMS Manager</span>
               </div>
               <p className="text-[10px] text-slate-400 truncate mt-0.5">gift@ap1hdtv.com</p>
-              <span className="text-[9px] text-blue-300 font-medium">Operations</span>
+              <span className="text-[9px] text-blue-300 font-medium">HRMS Admin</span>
             </button>
 
             {/* HR Manager */}

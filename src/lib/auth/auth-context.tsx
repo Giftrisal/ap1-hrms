@@ -80,8 +80,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return false; // Rejects weak or incorrect passwords for Master Admin
     }
 
-    // 2. Check Gift (Station Manager / Operations Admin)
-    const isGiftMatch = query === 'gift@ap1hdtv.com' || query === 'gift@ap1tv.com' || query === 'gift' || query === '1' || query === 'station';
+    // 2. Check Gift (HRMS Manager)
+    const isGiftMatch = query === 'gift@ap1hdtv.com' || query === 'gift@ap1tv.com' || query === 'gift' || query === '1' || query === 'station' || query === 'hrms';
     if (isGiftMatch) {
       const validGiftPasswords = ['Gift@AP1#2026', 'gift123', 'admin123', 'admin'];
       if (pass && validGiftPasswords.includes(pass)) {
@@ -96,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           department_name: "Operations & Broadcasting",
           shift_id: "shift-day",
           shift_name: "Day Shift (10:00 AM - 6:00 PM)",
-          designation: "Station Manager / Operations",
+          designation: "HRMS Manager",
           role: "admin",
           status: "active",
           join_date: "2024-01-01",

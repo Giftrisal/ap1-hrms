@@ -96,7 +96,7 @@ export default function PayrollPage() {
           actualHours = Number(savedHour);
         } else {
           // Default distribution: most staff 208h, some with minor late deficits
-          if (i === 0) actualHours = targetHours; // Gift (Station Manager) is 100% on target
+          if (i === 0) actualHours = targetHours; // Gift (HRMS Manager) is 100% on target
           else if (i % 5 === 1) actualHours = Math.max(0, targetHours - 6.5); // 6.5 hrs late deficit
           else if (i % 5 === 2) actualHours = Math.max(0, targetHours - 12.0); // 12 hrs late deficit
           else if (i % 5 === 3) actualHours = Math.max(0, targetHours - 3.5); // 3.5 hrs late deficit
