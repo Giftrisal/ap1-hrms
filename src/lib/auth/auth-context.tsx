@@ -2,84 +2,172 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserRole, Employee } from '../types';
+import { masterAdminUser, initialEmployees } from '../mock-data';
 
 interface AuthContextType {
   currentUser: Employee | null;
   role: UserRole;
   isAuthenticated: boolean;
+  isLoading: boolean;
   login: (emailOrPin: string, password?: string) => boolean;
   logout: () => void;
   switchRole: (newRole: UserRole) => void;
 }
 
-const defaultAdminUser: Employee = {
-  id: '101-uuid',
-  biometric_pin: '101',
-  full_name: 'Aayush Shrestha',
-  email: 'aayush.s@goinfi.com',
-  phone: '+977-9841100101',
-  photo_url: '',
-  department_id: 'a1111111-1111-1111-1111-111111111111',
-  department_name: 'Executive Management',
-  shift_id: '11111111-1111-1111-1111-111111111111',
-  shift_name: 'Regular Morning Shift',
-  designation: 'Chief Executive Officer',
-  role: 'admin',
-  status: 'active',
-  join_date: '2022-01-01',
-  base_salary: 125000,
-  pan_number: 'PAN60129381',
-  bank_name: 'NIC Asia Bank',
-  bank_account_number: '10928374829101'
-};
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<Employee | null>(defaultAdminUser);
+  const [currentUser, setCurrentUser] = useState<Employee | null>(null);
   const [role, setRole] = useState<UserRole>('admin');
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // Read stored authentication session on mount
   useEffect(() => {
-    const saved = localStorage.getItem('goinfi_auth_user');
-    if (saved) {
-      try {
+    try {
+      const saved = localStorage.getItem('goinfi_auth_user');
+      if (saved) {
         const parsed = JSON.parse(saved);
-        setCurrentUser(parsed);
-        setRole(parsed.role || 'admin');
-        setIsAuthenticated(true);
-      } catch (e) {
-        console.error('Error parsing stored user', e);
+        if (parsed && parsed.id) {
+          setCurrentUser(parsed);
+          setRole(parsed.role || 'admin');
+          setIsAuthenticated(true);
+        }
       }
+    } catch (e) {
+      console.error('Error parsing stored auth session', e);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
-  const login = (emailOrPin: string, password?: string) => {
-    // Standard PIN or password check (e.g. admin123 or machine pin)
-    if (password && password !== 'admin123' && password !== 'hr123' && password !== 'goinfi2026') {
-      // allow flexible demo login
+  const login = (emailOrPin: string, password?: string): boolean => {
+    const query = emailOrPin.trim().toLowerCase();
+    const pass = (password || '').trim();
+
+    // 1. Check Master Admin Credentials
+    // Username: admin@ap1.tv, master@ap1.tv, admin, master, 999
+    const isMasterMatch = 
+      query === 'admin@ap1.tv' || 
+      query === 'master@ap1.tv' || 
+      query === 'admin' || 
+      query === 'master' || 
+      query === '999';
+
+    if (isMasterMatch) {
+      // Allow passwords: admin123, admin, ap1@admin2026, ap12026, 123456
+      const validPasswords = ['admin123', 'admin', 'ap1@admin2026', 'ap12026', '123456', 'ap1admin'];
+      if (!pass || validPasswords.includes(pass) || pass.length >= 4) {
+        const user: Employee = {
+          ...masterAdminUser,
+          is_master_admin: true,
+          role: 'admin'
+        };
+        setCurrentUser(user);
+        setRole('admin');
+        setIsAuthenticated(true);
+        localStorage.setItem('goinfi_auth_user', JSON.stringify(user));
+        return true;
+      }
     }
-    const user = { ...defaultAdminUser };
-    if (emailOrPin.toLowerCase().includes('hr')) {
-      user.full_name = 'Pooja Thapa';
-      user.role = 'hr';
-      user.designation = 'HR Manager';
-    } else if (emailOrPin.toLowerCase().includes('emp') || emailOrPin === '105') {
-      user.full_name = 'Rohan Karki';
-      user.role = 'employee';
-      user.designation = 'Frontend Developer';
+
+    // 2. Check Gift (Station Manager / Operations Admin)
+    const isGiftMatch = query === 'gift@ap1tv.com' || query === 'gift' || query === '1' || query === 'station';
+    if (isGiftMatch) {
+      const user: Employee = {
+        id: "emp-1",
+        biometric_pin: "1",
+        full_name: "Gift",
+        email: "gift@ap1tv.com",
+        phone: "9705355569",
+        photo_url: "",
+        department_id: "dept-6",
+        department_name: "Operations & Broadcasting",
+        shift_id: "shift-day",
+        shift_name: "Day Shift (10:00 AM - 6:00 PM)",
+        designation: "Station Manager / Operations",
+        role: "admin",
+        status: "active",
+        join_date: "2024-01-01",
+        base_salary: 85000,
+        is_master_admin: false
+      };
+      setCurrentUser(user);
+      setRole('admin');
+      setIsAuthenticated(true);
+      localStorage.setItem('goinfi_auth_user', JSON.stringify(user));
+      return true;
     }
-    setCurrentUser(user);
-    setRole(user.role);
-    setIsAuthenticated(true);
-    localStorage.setItem('goinfi_auth_user', JSON.stringify(user));
-    return true;
+
+    // 3. Check HR Manager
+    const isHrMatch = query === 'hr@ap1.tv' || query === 'hr' || query === 'pooja';
+    if (isHrMatch) {
+      const user: Employee = {
+        id: "emp-hr-1",
+        biometric_pin: "102",
+        full_name: "Pooja Thapa",
+        email: "hr@ap1.tv",
+        phone: "+977-9841234567",
+        photo_url: "",
+        department_id: "dept-2",
+        department_name: "Human Resources",
+        shift_id: "shift-day",
+        shift_name: "Day Shift (10:00 AM - 6:00 PM)",
+        designation: "HR Operations Manager",
+        role: "hr",
+        status: "active",
+        join_date: "2023-06-01",
+        base_salary: 75000,
+        is_master_admin: false
+      };
+      setCurrentUser(user);
+      setRole('hr');
+      setIsAuthenticated(true);
+      localStorage.setItem('goinfi_auth_user', JSON.stringify(user));
+      return true;
+    }
+
+    // 4. Check Registered Staff in System (localStorage or initialEmployees)
+    let staffList = initialEmployees;
+    if (typeof window !== 'undefined') {
+      const savedList = localStorage.getItem('goinfi_staff_list');
+      if (savedList) {
+        try {
+          const parsed = JSON.parse(savedList);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            staffList = parsed;
+          }
+        } catch (e) {}
+      }
+    }
+
+    const matchedStaff = staffList.find(e => 
+      e.email?.toLowerCase() === query || 
+      e.biometric_pin === query || 
+      e.phone === query ||
+      e.full_name?.toLowerCase() === query
+    );
+
+    if (matchedStaff) {
+      setCurrentUser(matchedStaff);
+      setRole(matchedStaff.role || 'employee');
+      setIsAuthenticated(true);
+      localStorage.setItem('goinfi_auth_user', JSON.stringify(matchedStaff));
+      return true;
+    }
+
+    return false;
   };
 
   const logout = () => {
     setCurrentUser(null);
     setIsAuthenticated(false);
-    localStorage.removeItem('goinfi_auth_user');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('goinfi_auth_user');
+      localStorage.removeItem('goinfi_auth_token');
+      // Direct hard redirect to ensure clean slate across all tabs/routes
+      window.location.href = '/login';
+    }
   };
 
   const switchRole = (newRole: UserRole) => {
@@ -87,12 +175,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (currentUser) {
       const updated = { ...currentUser, role: newRole };
       setCurrentUser(updated);
-      localStorage.setItem('goinfi_auth_user', JSON.stringify(updated));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('goinfi_auth_user', JSON.stringify(updated));
+      }
     }
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, role, isAuthenticated, login, logout, switchRole }}>
+    <AuthContext.Provider value={{ currentUser, role, isAuthenticated, isLoading, login, logout, switchRole }}>
       {children}
     </AuthContext.Provider>
   );

@@ -30,6 +30,7 @@ export interface Employee {
   bank_account_number?: string;
   pan_number?: string;
   emergency_contact?: string;
+  is_master_admin?: boolean;
   created_at?: string;
 }
 

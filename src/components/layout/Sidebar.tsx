@@ -18,7 +18,8 @@ import {
   X,
   MapPin,
   PackageCheck,
-  Smartphone
+  Smartphone,
+  Crown
 } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n/context';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -179,23 +180,34 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         <div className="p-3 border-t border-slate-800 bg-slate-950/70 space-y-2">
           {/* User Card */}
           {currentUser && (
-            <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center justify-between pt-1 gap-2">
               <div className="flex items-center gap-2.5 overflow-hidden">
                 {currentUser.photo_url && !currentUser.photo_url.includes('unsplash') ? (
                   <img
                     src={currentUser.photo_url}
                     alt={currentUser.full_name}
-                    className="w-8 h-8 rounded-full object-cover border border-slate-700"
+                    className="w-8 h-8 rounded-full object-cover border border-slate-700 shrink-0"
                   />
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-700 to-indigo-600 text-white font-bold text-xs flex items-center justify-center border border-purple-400/30 shrink-0">
-                    {currentUser.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                  <div className={`w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center border shrink-0 ${
+                    currentUser.is_master_admin 
+                      ? 'bg-gradient-to-tr from-amber-500 to-purple-600 text-white border-amber-400/50' 
+                      : 'bg-gradient-to-tr from-purple-700 to-indigo-600 text-white border-purple-400/30'
+                  }`}>
+                    {currentUser.is_master_admin ? <Crown className="w-4 h-4 text-amber-200" /> : currentUser.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                   </div>
                 )}
                 <div className="overflow-hidden">
-                  <p className="text-xs font-semibold text-white truncate leading-snug">
-                    {currentUser.full_name}
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-bold text-white truncate leading-snug">
+                      {currentUser.full_name}
+                    </p>
+                    {currentUser.is_master_admin && (
+                      <span className="px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 text-[9px] font-black uppercase tracking-wider shrink-0 border border-amber-400/30">
+                        Master
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[10px] text-slate-400 truncate">
                     {currentUser.designation}
                   </p>
@@ -203,8 +215,8 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
               </div>
               <button
                 onClick={logout}
-                title={t.logout}
-                className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                title="Sign Out / Logout (लगआउट गर्नुहोस्)"
+                className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-950/40 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-red-900/50 shrink-0"
               >
                 <LogOut className="w-4 h-4" />
               </button>

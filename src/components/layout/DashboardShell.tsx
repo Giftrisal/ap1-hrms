@@ -1,8 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import { useAuth } from '@/lib/auth/auth-context';
 
 interface DashboardShellProps {
   title: string;
@@ -17,7 +19,37 @@ export default function DashboardShell({
   children,
   onSyncTriggered
 }: DashboardShellProps) {
+  const router = useRouter();
+  const { isAuthenticated, isLoading } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Enforce authentication guard across all admin dashboard routes
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isLoading, isAuthenticated, router]);
+
+  // Loading screen while checking authentication session
+  if (isLoading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen w-full bg-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-600/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative z-10 flex flex-col items-center text-center space-y-4">
+          <img 
+            src="/ap1-logo.png" 
+            alt="AP1 Television" 
+            className="h-14 sm:h-16 w-auto object-contain drop-shadow mb-1 animate-pulse" 
+            style={{ aspectRatio: '800/339' }} 
+          />
+          <div className="w-8 h-8 border-3 border-purple-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs font-semibold text-slate-300 tracking-wide">
+            Verifying AP1 Television Security Session...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-100">

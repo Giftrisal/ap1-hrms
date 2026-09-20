@@ -91,7 +91,27 @@ export const initialOvertimePermissions: OvertimePermission[] = [
   }
 ];
 
+export const masterAdminUser: Employee = {
+  id: "emp-master",
+  biometric_pin: "999",
+  full_name: "Master Administrator",
+  email: "admin@ap1.tv",
+  phone: "9800000000",
+  photo_url: "",
+  department_id: "dept-1",
+  department_name: "Executive Management",
+  shift_id: "shift-day",
+  shift_name: "Day Shift (10:00 AM - 6:00 PM)",
+  designation: "Master Administrator / Station Head",
+  role: "admin",
+  status: "active",
+  join_date: "2023-01-01",
+  base_salary: 150000,
+  is_master_admin: true
+};
+
 export const initialEmployees: Employee[] = [
+  masterAdminUser,
   {
     id: "emp-1",
     biometric_pin: "1",
