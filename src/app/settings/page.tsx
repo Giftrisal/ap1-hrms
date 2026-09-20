@@ -18,7 +18,14 @@ import {
   Monitor,
   Download,
   Laptop,
-  Trash2
+  Trash2,
+  KeyRound,
+  Smartphone,
+  Lock,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  Crown
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -27,6 +34,108 @@ export default function SettingsPage() {
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionMessage, setConnectionMessage] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
+
+  // Master Admin Password Change (Protected via OTP to 9801239000)
+  const [adminOtpSent, setAdminOtpSent] = useState(false);
+  const [adminOtpSending, setAdminOtpSending] = useState(false);
+  const [adminOtp, setAdminOtp] = useState('');
+  const [adminNewPassword, setAdminNewPassword] = useState('');
+  const [adminConfirmPassword, setAdminConfirmPassword] = useState('');
+  const [adminShowPass, setAdminShowPass] = useState(false);
+  const [adminVerificationToken, setAdminVerificationToken] = useState('');
+  const [adminUpdating, setAdminUpdating] = useState(false);
+  const [adminMessage, setAdminMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [adminResendCountdown, setAdminResendCountdown] = useState(0);
+
+  // Resend Countdown Timer
+  React.useEffect(() => {
+    if (adminResendCountdown > 0) {
+      const timer = setTimeout(() => setAdminResendCountdown(adminResendCountdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [adminResendCountdown]);
+
+  const handleSendAdminOtp = async () => {
+    setAdminOtpSending(true);
+    setAdminMessage(null);
+    try {
+      const res = await fetch('/api/auth/master-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send_otp' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAdminOtpSent(true);
+        setAdminVerificationToken(data.verificationToken || '');
+        setAdminMessage({
+          type: 'success',
+          text: `सुरक्षा कोड (OTP) सफलतापूर्वक +977-9801239000 मा पठाइयो। ${data.devOtp ? `(कोड: ${data.devOtp})` : ''}`
+        });
+        setAdminResendCountdown(60);
+      } else {
+        setAdminMessage({ type: 'error', text: data.error || 'OTP कोड पठाउन सकिएन।' });
+      }
+    } catch (e: any) {
+      setAdminMessage({ type: 'error', text: 'सर्भरसँग सम्पर्क हुन सकेन।' });
+    } finally {
+      setAdminOtpSending(false);
+    }
+  };
+
+  const handleUpdateMasterPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminMessage(null);
+
+    if (!adminOtp || adminOtp.trim().length < 6) {
+      setAdminMessage({ type: 'error', text: 'कृपया 9801239000 मा प्राप्त भएको ६-अंकको OTP कोड हाल्नुहोस्।' });
+      return;
+    }
+
+    if (!adminNewPassword || adminNewPassword.length < 5) {
+      setAdminMessage({ type: 'error', text: 'नयाँ पासवर्ड कम्तीमा ५ क्यारेक्टरको हुनुपर्छ।' });
+      return;
+    }
+
+    if (adminNewPassword !== adminConfirmPassword) {
+      setAdminMessage({ type: 'error', text: 'दुबै पासवर्ड मिलेनन् (Passwords do not match)।' });
+      return;
+    }
+
+    setAdminUpdating(true);
+    try {
+      const res = await fetch('/api/auth/master-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'verify_and_update',
+          otp: adminOtp.trim(),
+          newPassword: adminNewPassword.trim(),
+          verificationToken: adminVerificationToken
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('goinfi_master_admin_password', adminNewPassword.trim());
+        }
+        setAdminMessage({
+          type: 'success',
+          text: '✅ Master Admin पासवर्ड सफलतापूर्वक परिवर्तन भयो! अब यही नयाँ पासवर्डबाट लगइन गर्न सक्नुहुन्छ।'
+        });
+        setAdminOtp('');
+        setAdminNewPassword('');
+        setAdminConfirmPassword('');
+        setAdminOtpSent(false);
+      } else {
+        setAdminMessage({ type: 'error', text: data.error || 'पासवर्ड परिवर्तन असफल भयो।' });
+      }
+    } catch (e: any) {
+      setAdminMessage({ type: 'error', text: 'सर्भर त्रुटि भएकोले पासवर्ड अपडेट हुन सकेन।' });
+    } finally {
+      setAdminUpdating(false);
+    }
+  };
 
   const handleFactoryReset = async () => {
     if (!confirm('चेतावनी: के तपाईं साँच्चिकै सबै स्टाफ, हाजिरी र डाटा मेटाएर ० (Zero) बाट नयाँ सुरु गर्न चाहनुहुन्छ? यो कार्य फिर्ता गर्न सकिँदैन।')) return;
@@ -312,6 +421,145 @@ export default function SettingsPage() {
               </ol>
             </div>
           </div>
+        </div>
+
+        {/* Section: Master Admin Security & Password Change (OTP to 9801239000) */}
+        <div className="bg-white border border-purple-200 p-6 rounded-2xl shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-purple-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-purple-700 border border-purple-200">
+                <Crown className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                  <span>Master Admin पासवर्ड परिवर्तन (Change Password)</span>
+                  <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-extrabold border border-purple-200">2FA OTP Secured</span>
+                </h4>
+                <p className="text-xs text-slate-500">
+                  सुरक्षाका लागि Master Admin को पासवर्ड परिवर्तन गर्दा OTP कोड सिधै मोबाइल नम्बर <span className="font-mono font-bold text-purple-700">+977-9801239000</span> मा जानेछ।
+                </p>
+              </div>
+            </div>
+
+            {!adminOtpSent ? (
+              <button
+                type="button"
+                onClick={handleSendAdminOtp}
+                disabled={adminOtpSending}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 text-white rounded-xl font-bold text-xs transition-all shadow-xs self-start sm:self-auto cursor-pointer disabled:opacity-60"
+              >
+                <Smartphone className={`w-4 h-4 ${adminOtpSending ? 'animate-pulse' : ''}`} />
+                <span>{adminOtpSending ? 'OTP पठाउँदै...' : 'OTP कोड पठाउनुहोस् (9801239000)'}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSendAdminOtp}
+                disabled={adminResendCountdown > 0 || adminOtpSending}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors self-start sm:self-auto cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${adminOtpSending ? 'animate-spin' : ''}`} />
+                <span>{adminResendCountdown > 0 ? `पुनः पठाउनुहोस् (${adminResendCountdown}s)` : 'OTP पुनः पठाउनुहोस्'}</span>
+              </button>
+            )}
+          </div>
+
+          {/* Feedback Alerts */}
+          {adminMessage && (
+            <div className={`p-3.5 rounded-xl text-xs flex items-start gap-2.5 ${
+              adminMessage.type === 'success' 
+                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' 
+                : 'bg-red-50 border border-red-200 text-red-800'
+            }`}>
+              {adminMessage.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+              )}
+              <span className="font-medium">{adminMessage.text}</span>
+            </div>
+          )}
+
+          {/* Form (Active when OTP sent) */}
+          {adminOtpSent && (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-4 animate-in fade-in duration-200">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* OTP Input */}
+                <div>
+                  <label className="block font-bold text-slate-700 text-xs mb-1">
+                    ६-अंकको OTP कोड (9801239000 मा आएको) *
+                  </label>
+                  <div className="relative">
+                    <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      maxLength={6}
+                      value={adminOtp}
+                      onChange={(e) => setAdminOtp(e.target.value.replace(/[^0-9]/g, ''))}
+                      placeholder="उदा. 481920"
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-mono tracking-widest text-slate-900 focus:outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    सिस्टमले +977-9801239000 मा OTP पठाएको छ।
+                  </span>
+                </div>
+
+                {/* New Password */}
+                <div>
+                  <label className="block font-bold text-slate-700 text-xs mb-1">
+                    नयाँ पासवर्ड (New Password) *
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type={adminShowPass ? 'text' : 'password'}
+                      value={adminNewPassword}
+                      onChange={(e) => setAdminNewPassword(e.target.value)}
+                      placeholder="कम्तीमा ५ क्यारेक्टर"
+                      className="w-full pl-9 pr-9 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setAdminShowPass(!adminShowPass)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      {adminShowPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Confirm New Password */}
+                <div>
+                  <label className="block font-bold text-slate-700 text-xs mb-1">
+                    पासवर्ड पुष्टि (Confirm Password) *
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type={adminShowPass ? 'text' : 'password'}
+                      value={adminConfirmPassword}
+                      onChange={(e) => setAdminConfirmPassword(e.target.value)}
+                      placeholder="पुनः नयाँ पासवर्ड हाल्नुहोस्"
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end pt-2 border-t border-slate-200/80">
+                <button
+                  type="button"
+                  onClick={handleUpdateMasterPassword}
+                  disabled={adminUpdating}
+                  className="inline-flex items-center gap-2 px-5 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-xl font-bold text-xs transition-colors shadow-sm cursor-pointer disabled:opacity-60"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>{adminUpdating ? 'प्रमाणीकरण गर्दै...' : 'पासवर्ड सुरक्षित सेभ गर्नुहोस्'}</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Section 5: Database Factory Reset & Clean Slate */}

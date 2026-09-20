@@ -12,7 +12,12 @@ import {
   Crown, 
   UserCheck, 
   Users, 
-  AlertCircle
+  AlertCircle,
+  KeyRound,
+  Smartphone,
+  CheckCircle2,
+  RefreshCw,
+  X
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useLanguage } from '@/lib/i18n/context';
@@ -28,6 +33,114 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Master Admin Reset Modal State (OTP to 9801239000)
+  const [showMasterResetModal, setShowMasterResetModal] = useState(false);
+  const [resetOtpSent, setResetOtpSent] = useState(false);
+  const [resetOtpSending, setResetOtpSending] = useState(false);
+  const [resetOtp, setResetOtp] = useState('');
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+  const [resetShowPassword, setResetShowPassword] = useState(false);
+  const [resetVerificationToken, setResetVerificationToken] = useState('');
+  const [resetUpdating, setResetUpdating] = useState(false);
+  const [resetMessage, setResetMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [resetCountdown, setResetCountdown] = useState(0);
+
+  // Countdown timer
+  useEffect(() => {
+    if (resetCountdown > 0) {
+      const timer = setTimeout(() => setResetCountdown(resetCountdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resetCountdown]);
+
+  const handleSendResetOtp = async () => {
+    setResetOtpSending(true);
+    setResetMessage(null);
+    try {
+      const res = await fetch('/api/auth/master-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send_otp' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setResetOtpSent(true);
+        setResetVerificationToken(data.verificationToken || '');
+        setResetMessage({
+          type: 'success',
+          text: `OTP कोड सफलतापूर्वक +977-9801239000 मा पठाइयो। ${data.devOtp ? `(कोड: ${data.devOtp})` : ''}`
+        });
+        setResetCountdown(60);
+      } else {
+        setResetMessage({ type: 'error', text: data.error || 'OTP कोड पठाउन सकिएन।' });
+      }
+    } catch (e) {
+      setResetMessage({ type: 'error', text: 'सर्भरसँग सम्पर्क हुन सकेन।' });
+    } finally {
+      setResetOtpSending(false);
+    }
+  };
+
+  const handleUpdateMasterPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetMessage(null);
+
+    if (!resetOtp || resetOtp.trim().length < 6) {
+      setResetMessage({ type: 'error', text: 'कृपया 9801239000 मा आएको पूरा ६-अंकको OTP हाल्नुहोस्।' });
+      return;
+    }
+
+    if (!resetNewPassword || resetNewPassword.length < 5) {
+      setResetMessage({ type: 'error', text: 'नयाँ पासवर्ड कम्तीमा ५ क्यारेक्टरको हुनुपर्छ।' });
+      return;
+    }
+
+    if (resetNewPassword !== resetConfirmPassword) {
+      setResetMessage({ type: 'error', text: 'दुबै पासवर्ड मिलेनन्।' });
+      return;
+    }
+
+    setResetUpdating(true);
+    try {
+      const res = await fetch('/api/auth/master-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'verify_and_update',
+          otp: resetOtp.trim(),
+          newPassword: resetNewPassword.trim(),
+          verificationToken: resetVerificationToken
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('goinfi_master_admin_password', resetNewPassword.trim());
+        }
+        setIdentifier('admin@ap1hdtv.com');
+        setPassword(resetNewPassword.trim());
+        setResetMessage({
+          type: 'success',
+          text: '✅ पासवर्ड सफलतापूर्वक परिवर्तन भयो! अब नयाँ पासवर्ड स्वतः भरिएको छ, Sign In गर्न सक्नुहुन्छ।'
+        });
+        setTimeout(() => {
+          setShowMasterResetModal(false);
+          setResetOtpSent(false);
+          setResetOtp('');
+          setResetNewPassword('');
+          setResetConfirmPassword('');
+        }, 1800);
+      } else {
+        setResetMessage({ type: 'error', text: data.error || 'पासवर्ड परिवर्तन असफल भयो।' });
+      }
+    } catch (e) {
+      setResetMessage({ type: 'error', text: 'सर्भर त्रुटि भयो।' });
+    } finally {
+      setResetUpdating(false);
+    }
+  };
 
   // If already authenticated, direct straight to dashboard
   useEffect(() => {
@@ -163,8 +276,19 @@ export default function LoginPage() {
                 onChange={(e) => setRememberMe(e.target.checked)}
                 className="w-3.5 h-3.5 rounded bg-slate-950 border-slate-800 text-purple-600 focus:ring-purple-500"
               />
-              <span>Remember this station session</span>
+              <span>Remember session</span>
             </label>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowMasterResetModal(true);
+                setResetMessage(null);
+              }}
+              className="text-[11px] text-purple-400 hover:text-purple-300 font-semibold underline underline-offset-2 transition-colors cursor-pointer"
+            >
+              Master Admin PW Change?
+            </button>
           </div>
 
           <button
@@ -268,6 +392,154 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+
+      {/* Master Admin Password Reset Modal (OTP to 9801239000) */}
+      {showMasterResetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-slate-900 border border-purple-800/80 rounded-3xl p-6 shadow-2xl space-y-4 relative">
+            <button
+              type="button"
+              onClick={() => setShowMasterResetModal(false)}
+              className="absolute right-4 top-4 text-slate-400 hover:text-white p-1 rounded-full hover:bg-slate-800 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
+              <div className="w-10 h-10 rounded-xl bg-purple-950 border border-purple-700/60 flex items-center justify-center text-amber-400">
+                <Crown className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-white text-base">Master Admin पासवर्ड परिवर्तन</h3>
+                <p className="text-[11px] text-slate-400">
+                  २FA सुरक्षा: OTP कोड <span className="font-mono text-purple-300 font-bold">+977-9801239000</span> मा जानेछ।
+                </p>
+              </div>
+            </div>
+
+            {resetMessage && (
+              <div className={`p-3 rounded-xl text-xs flex items-start gap-2 ${
+                resetMessage.type === 'success' 
+                  ? 'bg-emerald-950/70 border border-emerald-800 text-emerald-200' 
+                  : 'bg-red-950/70 border border-red-800 text-red-200'
+              }`}>
+                {resetMessage.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                )}
+                <span>{resetMessage.text}</span>
+              </div>
+            )}
+
+            {!resetOtpSent ? (
+              <div className="space-y-4 pt-2">
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Master Admin को पासवर्ड परिवर्तन गर्नका लागि आधिकारिक मोबाइल नम्बर <strong>9801239000</strong> मा ६-अंकको सुरक्षा OTP कोड पठाइनेछ।
+                </p>
+                <button
+                  type="button"
+                  onClick={handleSendResetOtp}
+                  disabled={resetOtpSending}
+                  className="w-full py-3 bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-purple-900/30 disabled:opacity-60"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  <span>{resetOtpSending ? 'OTP पठाउँदै...' : 'OTP कोड पठाउनुहोस् (9801239000)'}</span>
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleUpdateMasterPassword} className="space-y-3.5 pt-1 text-xs">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-slate-300">६-अंकको OTP कोड (9801239000 मा आएको) *</label>
+                    <button
+                      type="button"
+                      onClick={handleSendResetOtp}
+                      disabled={resetCountdown > 0 || resetOtpSending}
+                      className="text-[10px] text-purple-400 hover:text-purple-300 disabled:opacity-50"
+                    >
+                      {resetCountdown > 0 ? `पुनः पठाउनुहोस् (${resetCountdown}s)` : 'OTP फेरि पठाउनुहोस्'}
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <KeyRound className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      maxLength={6}
+                      value={resetOtp}
+                      onChange={(e) => setResetOtp(e.target.value.replace(/[^0-9]/g, ''))}
+                      placeholder="उदा. 583921"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm font-mono tracking-widest text-white focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-300 mb-1">नयाँ पासवर्ड (New Password) *</label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type={resetShowPassword ? 'text' : 'password'}
+                      value={resetNewPassword}
+                      onChange={(e) => setResetNewPassword(e.target.value)}
+                      placeholder="कम्तीमा ५ क्यारेक्टर"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setResetShowPassword(!resetShowPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 cursor-pointer"
+                    >
+                      {resetShowPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-300 mb-1">पासवर्ड पुष्टि (Confirm Password) *</label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type={resetShowPassword ? 'text' : 'password'}
+                      value={resetConfirmPassword}
+                      onChange={(e) => setResetConfirmPassword(e.target.value)}
+                      placeholder="पुनः नयाँ पासवर्ड हाल्नुहोस्"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowMasterResetModal(false)}
+                    className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold cursor-pointer"
+                  >
+                    रद्द गर्नुहोस्
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={resetUpdating}
+                    className="flex-1 py-2.5 bg-purple-700 hover:bg-purple-600 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
+                  >
+                    {resetUpdating ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>जाँच्दै...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>पासवर्ड सेभ गर्नुहोस्</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

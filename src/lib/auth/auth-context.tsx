@@ -12,6 +12,7 @@ interface AuthContextType {
   login: (emailOrPin: string, password?: string) => boolean;
   logout: () => void;
   switchRole: (newRole: UserRole) => void;
+  updateMasterPassword: (newPassword: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,6 +42,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const updateMasterPassword = (newPassword: string) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('goinfi_master_admin_password', newPassword);
+    }
+  };
+
   const login = (emailOrPin: string, password?: string): boolean => {
     const query = emailOrPin.trim().toLowerCase();
     const pass = (password || '').trim();
@@ -55,8 +62,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       query === '999';
 
     if (isMasterMatch) {
-      // Strong Master Admin Passwords
+      let customMasterPassword = '';
+      if (typeof window !== 'undefined') {
+        customMasterPassword = (localStorage.getItem('goinfi_master_admin_password') || '').trim();
+      }
+
+      // Master Admin Passwords (including any updated custom password)
       const strongMasterPasswords = [
+        customMasterPassword,
         'AP1#Master@2026!',
         'AP1@Master#2026',
         'AP1#Master2026',
@@ -66,7 +79,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'admin123',
         'admin',
         'Admin@123'
-      ];
+      ].filter(Boolean);
+
       if (pass && strongMasterPasswords.includes(pass)) {
         const user: Employee = {
           ...masterAdminUser,
@@ -202,7 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, role, isAuthenticated, isLoading, login, logout, switchRole }}>
+    <AuthContext.Provider value={{ currentUser, role, isAuthenticated, isLoading, login, logout, switchRole, updateMasterPassword }}>
       {children}
     </AuthContext.Provider>
   );
