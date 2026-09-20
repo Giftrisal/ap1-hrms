@@ -95,10 +95,16 @@ export default function AttendancePage() {
                 (s: any) => String(s.biometric_pin) === pin || String(s.id) === pin || String(s.id) === `emp-${pin}`
               );
 
-              const empName = matchedEmp?.full_name || log.employee_name || `Staff ${pin}`;
-              const deptName = matchedEmp?.department_name || 'AP1 Media / Operations';
-              const designation = matchedEmp?.designation || 'Staff Member';
-              const photo = matchedEmp?.photo_url;
+              // STRICT CHECK: Only process punches for verified, enrolled staff members!
+              // Ignore unlisted PINs and Master Admin PIN 999
+              if (!matchedEmp || pin === '999' || matchedEmp.is_master_admin) {
+                continue;
+              }
+
+              const empName = matchedEmp.full_name;
+              const deptName = matchedEmp.department_name || 'AP1 Media / Operations';
+              const designation = matchedEmp.designation || 'Staff Member';
+              const photo = matchedEmp.photo_url;
               const punchDate = (log.punch_time || new Date().toISOString()).split('T')[0];
 
               const existingIdx = updated.findIndex(

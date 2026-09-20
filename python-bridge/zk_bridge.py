@@ -240,6 +240,115 @@ def run_daemon(ip, port, api_url, api_secret, interval):
         logger.info(f"Sleeping for {interval} seconds until next sync...")
         time.sleep(interval)
 
+def list_machine_users(ip, port):
+    """List all enrolled users from physical machine"""
+    from zk import ZK
+    conn = None
+    for use_udp in [True, False]:
+        try:
+            zk = ZK(ip, port=port, timeout=8, password=0, force_udp=use_udp, verbose=False)
+            conn = zk.connect()
+            break
+        except Exception:
+            pass
+    if not conn:
+        logger.error(f"Could not connect to {ip}:{port}")
+        return False
+    try:
+        users = conn.get_users()
+        logger.info(f"\n==================================================")
+        logger.info(f"ENROLLED USERS IN BIOMETRIC MACHINE ({len(users)} Total):")
+        for u in users:
+            logger.info(f"  • User PIN: #{u.user_id} | Name: {u.name or 'Staff'} | Card: {u.card}")
+        logger.info(f"==================================================\n")
+        return True
+    finally:
+        conn.disconnect()
+
+def delete_machine_user(ip, port, user_pin):
+    """Delete a specific user and fingerprint from physical machine"""
+    from zk import ZK
+    conn = None
+    for use_udp in [True, False]:
+        try:
+            zk = ZK(ip, port=port, timeout=8, password=0, force_udp=use_udp, verbose=False)
+            conn = zk.connect()
+            break
+        except Exception:
+            pass
+    if not conn:
+        logger.error(f"Could not connect to {ip}:{port}")
+        return False
+    try:
+        conn.disable_device()
+        users = conn.get_users()
+        target_u = next((u for u in users if str(u.user_id) == str(user_pin)), None)
+        if target_u:
+            conn.delete_user(uid=target_u.uid, user_id=target_u.user_id)
+            logger.info(f"User #{user_pin} ({target_u.name}) deleted successfully from machine memory!")
+        else:
+            logger.warning(f"User ID #{user_pin} not found in machine users.")
+        return True
+    except Exception as e:
+        logger.error(f"Error deleting user #{user_pin}: {e}")
+        return False
+    finally:
+        conn.enable_device()
+        conn.disconnect()
+
+def clear_machine_users(ip, port):
+    """Clear all enrolled users and fingerprints from machine memory"""
+    from zk import ZK
+    conn = None
+    for use_udp in [True, False]:
+        try:
+            zk = ZK(ip, port=port, timeout=8, password=0, force_udp=use_udp, verbose=False)
+            conn = zk.connect()
+            break
+        except Exception:
+            pass
+    if not conn:
+        logger.error(f"Could not connect to {ip}:{port}")
+        return False
+    try:
+        conn.disable_device()
+        users = conn.get_users()
+        count = 0
+        for u in users:
+            try:
+                conn.delete_user(uid=u.uid, user_id=u.user_id)
+                count += 1
+            except Exception:
+                pass
+        logger.info(f"Deleted {count} users and fingerprints from machine memory.")
+        return True
+    finally:
+        conn.enable_device()
+        conn.disconnect()
+
+def clear_machine_attendance(ip, port):
+    """Clear all stored attendance records from machine memory"""
+    from zk import ZK
+    conn = None
+    for use_udp in [True, False]:
+        try:
+            zk = ZK(ip, port=port, timeout=8, password=0, force_udp=use_udp, verbose=False)
+            conn = zk.connect()
+            break
+        except Exception:
+            pass
+    if not conn:
+        logger.error(f"Could not connect to {ip}:{port}")
+        return False
+    try:
+        conn.disable_device()
+        conn.clear_attendance()
+        logger.info("Biometric machine attendance punch logs cleared successfully!")
+        return True
+    finally:
+        conn.enable_device()
+        conn.disconnect()
+
 def main():
     parser = argparse.ArgumentParser(description="Goinfi-HR ZKTeco Biometric Machine Bridge")
     parser.add_argument("--ip", default=DEFAULT_DEVICE_IP, help=f"Machine LAN IP address (default: {DEFAULT_DEVICE_IP})")
@@ -250,17 +359,28 @@ def main():
     parser.add_argument("--test-connection", action="store_true", help="Test connection to machine and exit")
     parser.add_argument("--sync-now", action="store_true", help="Pull logs immediately once and exit")
     parser.add_argument("--daemon", action="store_true", help="Run in continuous background sync mode")
+    parser.add_argument("--list-users", action="store_true", help="List all users currently saved in biometric machine")
+    parser.add_argument("--delete-user", help="Delete specific user PIN from machine")
+    parser.add_argument("--clear-users", action="store_true", help="Clear all enrolled users and fingerprints from machine")
+    parser.add_argument("--clear-attendance", action="store_true", help="Clear past attendance punch logs from machine")
 
     args = parser.parse_args()
 
     if args.test_connection:
         test_machine_connection(args.ip, args.port)
+    elif args.list_users:
+        list_machine_users(args.ip, args.port)
+    elif args.delete_user:
+        delete_machine_user(args.ip, args.port, args.delete_user)
+    elif args.clear_users:
+        clear_machine_users(args.ip, args.port)
+    elif args.clear_attendance:
+        clear_machine_attendance(args.ip, args.port)
     elif args.sync_now:
         pull_and_sync_attendance(args.ip, args.port, args.api_url, args.secret)
     elif args.daemon:
         run_daemon(args.ip, args.port, args.api_url, args.secret, args.interval)
     else:
-        # Default behavior if no flags: prompt and run sync once
         logger.info("No flags provided. Defaulting to single sync. Use --daemon for 24/7 background sync.")
         pull_and_sync_attendance(args.ip, args.port, args.api_url, args.secret)
 

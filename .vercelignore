@@ -1,0 +1,7 @@
+.git
+node_modules
+.next
+*.zip
+ap1-hrms-cpanel.zip
+python-bridge/__pycache__
+*.bat

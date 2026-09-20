@@ -98,9 +98,14 @@ export default function DashboardPage() {
                 e => String(e.biometric_pin) === pin || String(e.id) === pin || String(e.id) === `emp-${pin}`
               );
 
-              const empName = matchedEmp?.full_name || log.employee_name || `Staff ${pin}`;
-              const deptName = matchedEmp?.department_name || 'AP1 Media / Operations';
-              const designation = matchedEmp?.designation || 'Staff Member';
+              // STRICT VALIDATION: If this PIN does not belong to any active enrolled staff in the directory, or is Master Admin (999), DO NOT register attendance!
+              if (!matchedEmp || pin === '999' || matchedEmp.is_master_admin) {
+                continue;
+              }
+
+              const empName = matchedEmp.full_name;
+              const deptName = matchedEmp.department_name || 'AP1 Media / Operations';
+              const designation = matchedEmp.designation || 'Staff Member';
 
               const idx = updated.findIndex((a) => a.employee_pin === pin);
               if (idx !== -1) {
@@ -117,7 +122,7 @@ export default function DashboardPage() {
               } else {
                 updated.unshift({
                   id: `live-${pin}-${Date.now()}`,
-                  employee_id: matchedEmp?.id || `emp-${pin}`,
+                  employee_id: matchedEmp.id,
                   employee_name: empName,
                   employee_pin: pin,
                   department_name: deptName,
@@ -149,13 +154,21 @@ export default function DashboardPage() {
   }, [employees]);
 
   const totalStaff = employees.length;
-  const validAttendance = attendanceList;
+  // Strictly filter attendance: only records for currently enrolled employees, excluding Master Admin (999)
+  const validAttendance = totalStaff === 0 
+    ? [] 
+    : attendanceList.filter(a => 
+        String(a.employee_pin) !== '999' &&
+        employees.some(e => String(e.biometric_pin) === String(a.employee_pin) || e.id === a.employee_id)
+      );
 
-  const presentCount = validAttendance.filter(
-    a => a.status === 'PRESENT' || a.status === 'LATE' || a.status === 'HALF_DAY'
-  ).length;
+  const presentCount = totalStaff > 0 
+    ? validAttendance.filter(a => a.status === 'PRESENT' || a.status === 'LATE' || a.status === 'HALF_DAY').length
+    : 0;
 
-  const lateCount = validAttendance.filter(a => a.status === 'LATE').length;
+  const lateCount = totalStaff > 0 
+    ? validAttendance.filter(a => a.status === 'LATE').length
+    : 0;
 
   const leaveCount = totalStaff > 0 
     ? validAttendance.filter(a => a.status === 'ON_LEAVE').length

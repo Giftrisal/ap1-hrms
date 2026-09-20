@@ -74,3 +74,12 @@ export async function GET() {
     recent_logs: cachedLogs.slice(0, 20)
   });
 }
+
+export async function DELETE() {
+  cachedLogs = [];
+  lastSyncTime = null;
+  return NextResponse.json({
+    success: true,
+    message: 'All cached biometric logs cleared.'
+  });
+}
