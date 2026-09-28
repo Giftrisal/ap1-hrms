@@ -23,7 +23,8 @@ import {
   MapPin,
   PackageCheck,
   Smartphone,
-  Calendar
+  Calendar,
+  ShieldCheck
 } from 'lucide-react';
 import Link from 'next/link';
 import { getNepaliDate } from '@/lib/nepali-date';
@@ -36,17 +37,9 @@ export default function DashboardPage() {
   const [filterDepartment, setFilterDepartment] = useState('ALL');
   const [livePunches, setLivePunches] = useState<any[]>([]);
 
-  // Load employees from storage with one-time clean purge of all old demo/temporary staff
+  // Load employees from storage
   const [employees, setEmployees] = useState<Employee[]>(() => {
     if (typeof window !== 'undefined') {
-      const resetDone = localStorage.getItem('goinfi_clean_reset_2026_v2');
-      if (!resetDone) {
-        localStorage.removeItem('goinfi_staff_list');
-        localStorage.removeItem('goinfi_attendance_records');
-        localStorage.removeItem('goinfi_portal_user_pin');
-        localStorage.setItem('goinfi_clean_reset_2026_v2', 'true');
-        return [];
-      }
       const saved = localStorage.getItem('goinfi_staff_list');
       if (saved) {
         try {
@@ -62,24 +55,39 @@ export default function DashboardPage() {
     return [];
   });
 
-  // Sync staff list from backend API
+  const [pendingRegistrations, setPendingRegistrations] = React.useState<any[]>([]);
+
+  // Sync staff list & real-time pending approvals from backend API
   React.useEffect(() => {
-    fetch('/api/staff')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && Array.isArray(data.staff)) {
-          const clean = data.staff.filter((p: any) => String(p.biometric_pin) !== '999' && !p.is_master_admin && p.id !== 'emp-master');
-          setEmployees(clean);
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('goinfi_staff_list', JSON.stringify(clean));
+    const fetchStaffData = () => {
+      fetch(`/api/staff?t=${Date.now()}`, { cache: 'no-store' })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && Array.isArray(data.staff) && data.staff.length > 0) {
+            const clean = data.staff.filter((p: any) => String(p.biometric_pin) !== '999' && !p.is_master_admin && p.id !== 'emp-master');
+            setEmployees(clean);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('goinfi_staff_list', JSON.stringify(clean));
+            }
           }
-        }
-      })
-      .catch(() => {});
+          if (data.success && Array.isArray(data.registrations)) {
+            setPendingRegistrations(data.registrations.filter((r: any) => r.status === 'PENDING_APPROVAL'));
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchStaffData();
+    const staffInterval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchStaffData();
+    }, 60000); // 60-second live sync (pauses when tab inactive)
+    return () => clearInterval(staffInterval);
   }, []);
 
   // Poll /api/biometric/sync for real-time punches from hardware device
   React.useEffect(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
     const fetchLivePunches = async () => {
       try {
         const res = await fetch('/api/biometric/sync');
@@ -94,6 +102,12 @@ export default function DashboardPage() {
               const pin = String(log.user_id || log.biometric_pin || '');
               if (!pin) continue;
 
+              // Strictly ignore past days' punches for today's live dashboard
+              const punchDate = log.punch_time ? log.punch_time.split('T')[0].split(' ')[0] : '';
+              if (punchDate && punchDate !== todayStr) {
+                continue;
+              }
+
               const matchedEmp = employees.find(
                 e => String(e.biometric_pin) === pin || String(e.id) === pin || String(e.id) === `emp-${pin}`
               );
@@ -107,16 +121,17 @@ export default function DashboardPage() {
               const deptName = matchedEmp.department_name || 'AP1 Media / Operations';
               const designation = matchedEmp.designation || 'Staff Member';
 
-              const idx = updated.findIndex((a) => a.employee_pin === pin);
+              const idx = updated.findIndex((a) => a.employee_pin === pin && (a.date === todayStr || !a.date));
               if (idx !== -1) {
                 updated[idx] = {
                   ...updated[idx],
                   employee_name: empName,
                   department_name: deptName,
                   designation: designation,
-                  status: log.is_late ? 'LATE' : 'PRESENT',
+                  status: 'PRESENT',
+                  date: todayStr,
                   in_time: log.punch_time,
-                  late_minutes: log.late_minutes || 0,
+                  late_minutes: 0,
                   remarks: 'Live Biometric Machine Punch'
                 };
               } else {
@@ -127,11 +142,11 @@ export default function DashboardPage() {
                   employee_pin: pin,
                   department_name: deptName,
                   designation: designation,
-                  date: new Date().toISOString().split('T')[0],
+                  date: todayStr,
                   in_time: log.punch_time,
                   out_time: undefined,
-                  status: log.is_late ? 'LATE' : 'PRESENT',
-                  late_minutes: log.late_minutes || 0,
+                  status: 'PRESENT',
+                  late_minutes: 0,
                   early_exit_minutes: 0,
                   overtime_minutes: 0,
                   worked_hours: 8,
@@ -149,16 +164,21 @@ export default function DashboardPage() {
     };
 
     fetchLivePunches();
-    const interval = setInterval(fetchLivePunches, 3000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchLivePunches();
+    }, 30000); // 30-second live sync (pauses when tab inactive)
     return () => clearInterval(interval);
   }, [employees]);
 
   const totalStaff = employees.length;
-  // Strictly filter attendance: only records for currently enrolled employees, excluding Master Admin (999)
+  const todayStr = new Date().toISOString().split('T')[0];
+  // Strictly filter attendance: only records for today and for currently enrolled employees, excluding Master Admin (999)
   const validAttendance = totalStaff === 0 
     ? [] 
     : attendanceList.filter(a => 
         String(a.employee_pin) !== '999' &&
+        (a.date === todayStr || (a.in_time && a.in_time.startsWith(todayStr))) &&
         employees.some(e => String(e.biometric_pin) === String(a.employee_pin) || e.id === a.employee_id)
       );
 
@@ -166,8 +186,8 @@ export default function DashboardPage() {
     ? validAttendance.filter(a => a.status === 'PRESENT' || a.status === 'LATE' || a.status === 'HALF_DAY').length
     : 0;
 
-  const lateCount = totalStaff > 0 
-    ? validAttendance.filter(a => a.status === 'LATE').length
+  const completedCount = totalStaff > 0 
+    ? validAttendance.filter(a => a.in_time && a.out_time).length
     : 0;
 
   const leaveCount = totalStaff > 0 
@@ -201,7 +221,6 @@ export default function DashboardPage() {
       'In Time': a.in_time ? new Date(a.in_time).toLocaleTimeString() : 'N/A',
       'Out Time': a.out_time ? new Date(a.out_time).toLocaleTimeString() : 'N/A',
       'Status': a.status,
-      'Late (Mins)': a.late_minutes,
       'Worked Hours': a.worked_hours
     }));
     const worksheet = XLSX.utils.json_to_sheet(data);
@@ -254,6 +273,32 @@ export default function DashboardPage() {
       subtitle="Live real-time staff attendance, biometric sync feed, and key metrics"
       onSyncTriggered={() => setAttendanceList(generateTodayAttendance())}
     >
+      {/* Real-Time Pending Approvals Alert Banner */}
+      {pendingRegistrations.length > 0 && (
+        <div className="mb-4 p-4 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 border-2 border-amber-500/50 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-md">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-bold text-amber-950 dark:text-amber-200 text-sm flex items-center gap-2">
+                <span>🔔 {pendingRegistrations.length} जना कर्मचारीको दर्ता अनुरोध आएको छ (Awaiting HR Approval)</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-red-600 text-white font-black animate-bounce">NEW</span>
+              </h4>
+              <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
+                {pendingRegistrations.map((r: any) => `${r.staffName} (PIN #${r.pin})`).join(', ')}
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/staff"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-600/20 active:scale-95 transition-all shrink-0 cursor-pointer"
+          >
+            <span>Portal Approvals खोल्नुहोस् &rarr;</span>
+          </Link>
+        </div>
+      )}
+
       {/* 5 Key Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Total Staff */}
@@ -289,17 +334,17 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Late Today */}
+        {/* Completed Today */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t.lateToday}</p>
-            <h3 className="text-2xl font-bold text-amber-600 mt-1">{lateCount}</h3>
-            <span className="text-[11px] text-amber-600 font-medium mt-0.5 block">
-              {lateCount > 0 ? 'After 9:15 AM Grace' : 'On-time attendance'}
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">ड्युटी पूरा (Completed)</p>
+            <h3 className="text-2xl font-bold text-indigo-600 mt-1">{completedCount}</h3>
+            <span className="text-[11px] text-indigo-600 font-medium mt-0.5 block">
+              {completedCount > 0 ? 'Punched Out & Verified' : 'Currently in office'}
             </span>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
-            <Clock className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+            <CheckCircle2 className="w-6 h-6" />
           </div>
         </div>
 
@@ -565,21 +610,28 @@ export default function DashboardPage() {
                 <th className="py-3 px-4">{t.colInTime}</th>
                 <th className="py-3 px-4">{t.colOutTime}</th>
                 <th className="py-3 px-4">{t.colWorkedHours}</th>
-                <th className="py-3 px-4">{t.colLateMin}</th>
                 <th className="py-3 px-4">{t.colStatus}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredList.slice(0, 15).map((record) => (
-                <tr key={record.id} className="hover:bg-slate-50/60 transition-colors">
-                  {/* Staff Info */}
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={record.employee_photo || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"}
-                        alt={record.employee_name}
-                        className="w-8 h-8 rounded-full object-cover border border-slate-200"
-                      />
+              {filteredList.slice(0, 15).map((record) => {
+                const empObj = employees.find(e => String(e.biometric_pin) === String(record.employee_pin) || e.id === record.employee_id);
+                const photoSrc = (empObj?.photo_url && !empObj.photo_url.includes('unsplash'))
+                  ? empObj.photo_url
+                  : (record.employee_photo && !record.employee_photo.includes('unsplash'))
+                  ? record.employee_photo
+                  : "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150";
+
+                return (
+                  <tr key={record.id} className="hover:bg-slate-50/60 transition-colors">
+                    {/* Staff Info */}
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={photoSrc}
+                          alt={record.employee_name}
+                          className="w-8 h-8 rounded-full object-cover border border-slate-200"
+                        />
                       <div>
                         <p className="font-semibold text-slate-900 leading-tight">{record.employee_name}</p>
                         <p className="text-[11px] text-slate-500 leading-tight">{record.designation}</p>
@@ -626,23 +678,13 @@ export default function DashboardPage() {
                     {record.worked_hours > 0 ? `${record.worked_hours} hrs` : '-'}
                   </td>
 
-                  {/* Late Minutes */}
-                  <td className="py-3 px-4 font-medium">
-                    {record.late_minutes > 0 ? (
-                      <span className="text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded">
-                        +{record.late_minutes} min
-                      </span>
-                    ) : (
-                      <span className="text-emerald-600 font-medium">On time</span>
-                    )}
-                  </td>
-
                   {/* Status */}
                   <td className="py-3 px-4">
                     {getStatusBadge(record.status)}
                   </td>
                 </tr>
-              ))}
+              );
+            })}
             </tbody>
           </table>
         </div>

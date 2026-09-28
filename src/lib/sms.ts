@@ -283,3 +283,28 @@ export function formatOtpMessage(otp: string, type: 'signup' | 'reset', staffNam
 export function formatMonthlyBillMessage(nepaliMonth: string, nepaliYear: number, billNumber: string): string {
   return `[Goinfi Technologies] AP1 Television: Monthly HRMS cloud platform and biometric service invoice (${billNumber}) for ${nepaliMonth} ${nepaliYear} is ready. Contact: support@goinfi.biz. Thank you!`;
 }
+
+/**
+ * Format License Expiry Alert SMS Message for Client
+ */
+export function formatLicenseExpirySmsMessage(
+  clientName: string,
+  timeRemainingLabel: string,
+  expiryDateStr: string,
+  milestone: '7_DAYS' | '3_DAYS' | '1_DAY' | 'EXPIRED' | 'TEST'
+): string {
+  const contact = '+977-9715100200';
+  if (milestone === 'EXPIRED') {
+    return `[Goinfi Labs] आदरणीय ${clientName}, तपाईंको HRMS सफ्टवेयर इजाजतपत्र (License Key) को म्याद समाप्त भएको छ र सेवा रोकिएको छ। नयाँ Key प्राप्त गरी सेवा पुनः सुचारु गर्न तुरुन्त सम्पर्क गर्नुहोस्: ${contact}।`;
+  }
+  if (milestone === '1_DAY') {
+    return `🚨 [अन्तिम सूचना] आदरणीय ${clientName}, तपाईंको HRMS सफ्टवेयर इजाजतपत्र भोलि (${expiryDateStr}) समाप्त हुँदैछ! बाँकी समय: ${timeRemainingLabel}। सेवा अवरुद्ध हुन नदिन कृपया तुरुन्त नवीकरण गर्नुहोस्। Goinfi Labs: ${contact}`;
+  }
+  if (milestone === '3_DAYS') {
+    return `⏰ [महत्वपूर्ण सूचना] आदरणीय ${clientName}, तपाईंको HRMS सफ्टवेयर इजाजतपत्रको म्याद ३ दिनमा (${expiryDateStr}) समाप्त हुँदैछ। सेवा निरन्तरताका लागि कृपया समयमै नवीकरण गर्नुहोस्। Goinfi Labs: ${contact}`;
+  }
+  if (milestone === '7_DAYS') {
+    return `⚠️ [चेतावनी] आदरणीय ${clientName}, तपाईंको HRMS सफ्टवेयर इजाजतपत्रको म्याद ७ दिन बाँकी छ (${expiryDateStr})। कृपया नवीकरण प्रक्रिया अघि बढाउनुहोस्। Goinfi Labs: ${contact}`;
+  }
+  return `[Goinfi Labs] आदरणीय ${clientName}, यो तपाईंको HRMS इजाजतपत्र (License) सूचना परीक्षण सन्देश हो। म्याद: ${expiryDateStr} (बाँकी: ${timeRemainingLabel})। सोधपुछ: ${contact}।`;
+}

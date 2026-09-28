@@ -67,8 +67,6 @@ export default function PayrollPage() {
   // Load all active employees (excluding master admin)
   const [employeesList, setEmployeesList] = useState<Employee[]>(() => {
     if (typeof window !== 'undefined') {
-      const resetDone = localStorage.getItem('goinfi_clean_reset_2026_v2');
-      if (!resetDone) return [];
       const saved = localStorage.getItem('goinfi_staff_list');
       if (saved) {
         try {
@@ -82,11 +80,27 @@ export default function PayrollPage() {
     return [];
   });
 
+  // Sync staff list from API
+  useEffect(() => {
+    fetch('/api/staff')
+      .then(res => res.json())
+      .then(d => {
+        if (d.success && Array.isArray(d.staff) && d.staff.length > 0) {
+          const clean = d.staff.filter((p: any) => String(p.biometric_pin) !== '999' && !p.is_master_admin && p.id !== 'emp-master');
+          setEmployeesList(clean);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('goinfi_staff_list', JSON.stringify(clean));
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Calculate payroll based on Accounts-defined Target Working Hours
   const calculateRecords = (targetHours: number, days: number): PayrollRecord[] => {
     return employeesList.map((emp, i) => {
-      // Base salary
-      const baseSalary = emp.base_salary || 30000;
+      // Base salary (defaults to 0 if not set)
+      const baseSalary = emp.base_salary !== undefined && emp.base_salary !== null ? Number(emp.base_salary) : 0;
       
       // Hourly Rate = Base Salary ÷ Target Monthly Hours
       const hourlyRate = targetHours > 0 ? baseSalary / targetHours : 0;

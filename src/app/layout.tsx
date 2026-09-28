@@ -21,8 +21,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "AP1 Staff & HR Portal | Goinfi HRMS",
-  description: "AP1 Television Staff Portal - Attendance, Leave, Payslips & Digital ID",
+  title: "Staff Portal",
+  applicationName: "Staff Portal",
+  description: "Staff Portal - AP1 Television Attendance, Leave, Payslips & Digital ID",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -38,7 +39,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "AP1 Staff"
+    title: "Staff Portal"
   }
 };
 
@@ -53,6 +54,14 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Staff Portal" />
+        <meta name="application-name" content="Staff Portal" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/icon-192.png" />
+        <link rel="apple-touch-icon" sizes="167x167" href="/icon-192.png" />
+        <link rel="apple-touch-icon-precomposed" href="/apple-touch-icon.png" />
+        <link rel="manifest" href="/manifest.webmanifest" />
         <script
           dangerouslySetInnerHTML={{
             __html: `

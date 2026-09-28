@@ -45,11 +45,21 @@ export const saveStoredDepartments = (depts: Department[]) => {
 
 export const initialShifts: Shift[] = [
   {
+    id: 'shift-flexible',
+    name: 'Flexible Shift (24/7 Rotational / शुद्ध इन-आउट)',
+    start_time: '00:00:00',
+    end_time: '23:59:59',
+    grace_period_minutes: 0,
+    half_day_threshold_hours: 4.0,
+    full_day_hours: 8.0,
+    is_default: true
+  },
+  {
     id: 'shift-morning',
     name: 'Morning Shift (6:00 AM - 2:00 PM)',
     start_time: '06:00:00',
     end_time: '14:00:00',
-    grace_period_minutes: 15,
+    grace_period_minutes: 0,
     half_day_threshold_hours: 4.0,
     full_day_hours: 8.0,
     is_default: false
@@ -59,27 +69,17 @@ export const initialShifts: Shift[] = [
     name: 'Day Shift (10:00 AM - 6:00 PM)',
     start_time: '10:00:00',
     end_time: '18:00:00',
-    grace_period_minutes: 15,
+    grace_period_minutes: 0,
     half_day_threshold_hours: 4.0,
     full_day_hours: 8.0,
-    is_default: true
+    is_default: false
   },
   {
     id: 'shift-evening',
     name: 'Evening Shift (2:00 PM - 10:00 PM)',
     start_time: '14:00:00',
     end_time: '22:00:00',
-    grace_period_minutes: 15,
-    half_day_threshold_hours: 4.0,
-    full_day_hours: 8.0,
-    is_default: false
-  },
-  {
-    id: 'shift-flexible',
-    name: 'Flexible Shift (No Fixed Shift / 24/7 Rotational)',
-    start_time: '00:00:00',
-    end_time: '23:59:59',
-    grace_period_minutes: 60,
+    grace_period_minutes: 0,
     half_day_threshold_hours: 4.0,
     full_day_hours: 8.0,
     is_default: false

@@ -10,7 +10,7 @@ echo.
 echo Setting up dedicated AP1 Television HRMS workstation on this computer...
 echo.
 
-set "APP_URL=https://ap1hr.goinfi.biz/login"
+set "APP_URL=https://hr.ap1hdtv.com/login"
 set "APP_NAME=AP1 Television HRMS"
 set "DESKTOP_DIR=%USERPROFILE%\Desktop"
 set "SHORTCUT_PATH=%DESKTOP_DIR%\%APP_NAME%.lnk"

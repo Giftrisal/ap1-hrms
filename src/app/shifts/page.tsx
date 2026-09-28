@@ -30,15 +30,19 @@ import {
 export default function ShiftsPage() {
   const { t, language } = useLanguage();
 
-  // 3 Exact Standard Shifts
+  // Work Shifts (Flexible Shift as Default 24/7 Pure In-Out)
   const [shifts, setShifts] = useState<Shift[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('goinfi_shifts_list');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length === 3) {
-            return parsed;
+          if (Array.isArray(parsed) && parsed.length >= 3) {
+            // Guarantee grace period is 0 for all shifts
+            return parsed.map((s: Shift) => ({
+              ...s,
+              grace_period_minutes: 0
+            }));
           }
         } catch (e) {}
       }
@@ -56,8 +60,6 @@ export default function ShiftsPage() {
   // Staff directory lookup
   const [employees, setEmployees] = useState<Employee[]>(() => {
     if (typeof window !== 'undefined') {
-      const resetDone = localStorage.getItem('goinfi_clean_reset_2026_v2');
-      if (!resetDone) return [];
       const saved = localStorage.getItem('goinfi_staff_list');
       if (saved) {
         try {
@@ -68,14 +70,25 @@ export default function ShiftsPage() {
     return [];
   });
 
+  // Sync staff list from API
+  useEffect(() => {
+    fetch('/api/staff')
+      .then(res => res.json())
+      .then(d => {
+        if (d.success && Array.isArray(d.staff) && d.staff.length > 0) {
+          const clean = d.staff.filter((p: any) => String(p.biometric_pin) !== '999' && !p.is_master_admin && p.id !== 'emp-master');
+          setEmployees(clean);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('goinfi_staff_list', JSON.stringify(clean));
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Centralized Overtime Permissions List
   const [overtimePermissions, setOvertimePermissions] = useState<OvertimePermission[]>(() => {
     if (typeof window !== 'undefined') {
-      const resetDone = localStorage.getItem('goinfi_clean_reset_2026_v2');
-      if (!resetDone) {
-        localStorage.removeItem('goinfi_overtime_permissions');
-        return [];
-      }
       const saved = localStorage.getItem('goinfi_overtime_permissions');
       if (saved) {
         try {
@@ -190,22 +203,23 @@ export default function ShiftsPage() {
           <div>
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <CalendarClock className="w-5 h-5 text-purple-600" />
-              <span>Official AP1 Television Work Shifts (३ वटा निश्चित सिफ्टहरू)</span>
+              <span>Official AP1 Television Work Shifts ({shifts.length} सिफ्टहरू)</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Strict 8-hour shift cycles covering 24/7 television broadcast operations
+              Flexible 24/7 Rotational & Standard 8-Hour Broadcast Cycles
             </p>
           </div>
           <span className="text-xs font-extrabold px-3 py-1 bg-purple-100 text-purple-800 rounded-full border border-purple-200">
-            3 Active Shifts
+            {shifts.length} Active Shifts
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {shifts.map((shift, idx) => {
-            const isMorning = shift.id.includes('morning') || idx === 0;
-            const isDay = shift.id.includes('day') || idx === 1;
-            const isEvening = shift.id.includes('evening') || idx === 2;
+            const isFlexible = shift.id.includes('flexible');
+            const isMorning = shift.id.includes('morning');
+            const isDay = shift.id.includes('day');
+            const isEvening = shift.id.includes('evening');
 
             return (
               <div 
@@ -221,12 +235,15 @@ export default function ShiftsPage() {
                 <div>
                   <div className="flex items-center gap-3 mb-3.5">
                     <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold ${
-                      isMorning 
+                      isFlexible
+                        ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                        : isMorning 
                         ? 'bg-amber-100 text-amber-700 border border-amber-200' 
                         : isDay 
                         ? 'bg-blue-100 text-blue-700 border border-blue-200' 
                         : 'bg-indigo-100 text-indigo-700 border border-indigo-200'
                     }`}>
+                      {isFlexible && <Sparkles className="w-5 h-5" />}
                       {isMorning && <Sunrise className="w-5 h-5" />}
                       {isDay && <Sun className="w-5 h-5" />}
                       {isEvening && <Moon className="w-5 h-5" />}
@@ -250,7 +267,7 @@ export default function ShiftsPage() {
                     </div>
                     <div>
                       <span className="text-slate-500 font-medium text-[11px] block">{t.gracePeriod}</span>
-                      <p className="text-xs font-bold text-amber-600 mt-0.5">{shift.grace_period_minutes} Minutes</p>
+                      <p className="text-xs font-bold text-emerald-600 mt-0.5">हटाएको (शुद्ध इन-आउट)</p>
                     </div>
                     <div>
                       <span className="text-slate-500 font-medium text-[11px] block">{t.halfDayHours}</span>

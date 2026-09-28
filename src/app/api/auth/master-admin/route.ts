@@ -110,7 +110,6 @@ export async function POST(req: NextRequest) {
         targetPhone: `+977-${MASTER_ADMIN_PHONE}`,
         channel: smsResult.channel,
         verificationToken: token,
-        devOtp: smsResult.devOtp || (process.env.NODE_ENV !== 'production' ? generatedOtp : undefined),
         expiresInSeconds: 300
       });
     }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardShell from '@/components/layout/DashboardShell';
 import { useLanguage } from '@/lib/i18n/context';
 import { initialEmployees, initialDepartments } from '@/lib/mock-data';
@@ -22,10 +22,8 @@ export default function ReportsPage() {
   const { t, language } = useLanguage();
   const [reportType, setReportType] = useState<'monthly_attendance' | 'department_matrix' | 'leave_summary'>('monthly_attendance');
 
-  const [employees] = useState<any[]>(() => {
+  const [employees, setEmployees] = useState<any[]>(() => {
     if (typeof window !== 'undefined') {
-      const resetDone = localStorage.getItem('goinfi_clean_reset_2026_v2');
-      if (!resetDone) return [];
       const saved = localStorage.getItem('goinfi_staff_list');
       if (saved) {
         try {
@@ -35,6 +33,21 @@ export default function ReportsPage() {
     }
     return [];
   });
+
+  useEffect(() => {
+    fetch('/api/staff')
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && Array.isArray(d.staff) && d.staff.length > 0) {
+          const clean = d.staff.filter((p: any) => String(p.biometric_pin) !== '999' && !p.is_master_admin && p.id !== 'emp-master');
+          setEmployees(clean);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('goinfi_staff_list', JSON.stringify(clean));
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Generate monthly attendance statistics per staff
   const staffMonthlyStats = employees.map((emp, i) => {

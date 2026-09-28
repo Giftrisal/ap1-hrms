@@ -55,14 +55,6 @@ export default function StaffPage() {
   // Load employees from localStorage with clean purge of old staff
   const [employees, setEmployees] = useState<Employee[]>(() => {
     if (typeof window !== 'undefined') {
-      const resetDone = localStorage.getItem('goinfi_clean_reset_2026_v2');
-      if (!resetDone) {
-        localStorage.removeItem('goinfi_staff_list');
-        localStorage.removeItem('goinfi_attendance_records');
-        localStorage.removeItem('goinfi_portal_user_pin');
-        localStorage.setItem('goinfi_clean_reset_2026_v2', 'true');
-        return [];
-      }
       const saved = localStorage.getItem('goinfi_staff_list');
       if (saved) {
         try {
@@ -80,7 +72,20 @@ export default function StaffPage() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDept, setSelectedDept] = useState('ALL');
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('goinfi_staff_view_mode');
+      if (saved === 'grid' || saved === 'table') return saved;
+    }
+    return 'table'; // Default to Table style as requested
+  });
+
+  const handleSetViewMode = (mode: 'grid' | 'table') => {
+    setViewMode(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('goinfi_staff_view_mode', mode);
+    }
+  };
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Employee | null>(null);
   const [idCardStaff, setIdCardStaff] = useState<Employee | null>(null);
@@ -135,25 +140,62 @@ export default function StaffPage() {
   const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
   const [approvalLoading, setApprovalLoading] = useState<string | null>(null);
 
-  // Sync staff list & pending registrations from backend API on mount
+  // Real-time live sync: staff list & pending registrations every 3 seconds
   useEffect(() => {
-    fetch('/api/staff')
-      .then(r => r.json())
-      .then(d => {
-        if (d.success) {
-          if (Array.isArray(d.staff)) {
-            const clean = d.staff.filter((p: any) => String(p.biometric_pin) !== '999' && !p.is_master_admin && p.id !== 'emp-master');
-            setEmployees(clean);
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('goinfi_staff_list', JSON.stringify(clean));
+    let prevPendingCount = 0;
+
+    const syncStaffData = () => {
+      fetch(`/api/staff?t=${Date.now()}`, { cache: 'no-store' })
+        .then(r => r.json())
+        .then(d => {
+          if (d.success) {
+            if (Array.isArray(d.staff) && d.staff.length > 0) {
+              const clean = d.staff.filter((p: any) => String(p.biometric_pin) !== '999' && !p.is_master_admin && p.id !== 'emp-master');
+              setEmployees(clean);
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('goinfi_staff_list', JSON.stringify(clean));
+              }
+            } else if (Array.isArray(d.staff) && d.staff.length === 0) {
+              const saved = typeof window !== 'undefined' ? localStorage.getItem('goinfi_staff_list') : null;
+              if (saved) {
+                try {
+                  const parsed = JSON.parse(saved);
+                  if (Array.isArray(parsed) && parsed.length > 0) {
+                    const clean = parsed.filter((p: any) => String(p.biometric_pin) !== '999' && !p.is_master_admin && p.id !== 'emp-master');
+                    if (clean.length > 0) {
+                      fetch('/api/staff', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ staff: clean })
+                      }).catch(() => {});
+                      setEmployees(clean);
+                    }
+                  }
+                } catch {}
+              }
+            }
+
+            if (Array.isArray(d.registrations)) {
+              const pending = d.registrations.filter((r: any) => r.status === 'PENDING_APPROVAL');
+              setPendingRegistrations(pending);
+              
+              // If new request just arrived in real time, notify admin
+              if (pending.length > prevPendingCount && prevPendingCount > 0) {
+                showNotice(`🔔 नयाँ स्टाफ दर्ता अनुरोध: ${pending[0].staffName} (PIN #${pending[0].pin})`);
+              }
+              prevPendingCount = pending.length;
             }
           }
-          if (Array.isArray(d.registrations)) {
-            setPendingRegistrations(d.registrations.filter((r: any) => r.status === 'PENDING_APPROVAL'));
-          }
-        }
-      })
-      .catch(err => console.warn('Could not fetch staff from server:', err));
+        })
+        .catch(err => console.warn('Could not fetch staff from server:', err));
+    };
+
+    syncStaffData();
+    const liveInterval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      syncStaffData();
+    }, 60000); // 60s interval, pauses when tab is inactive
+    return () => clearInterval(liveInterval);
   }, []);
 
   const handleApproveRegistration = async (pin: string) => {
@@ -471,7 +513,7 @@ export default function StaffPage() {
     photo_url: '',
     department_id: departments[0]?.id || 'dept-1',
     designation: '',
-    base_salary: 40000,
+    base_salary: 0,
     join_date: '',
     dob: '',
     role: 'employee',
@@ -554,7 +596,7 @@ export default function StaffPage() {
       status: 'active',
       join_date: formData.join_date || '',
       dob: formData.dob || undefined,
-      base_salary: Number(formData.base_salary) || 40000,
+      base_salary: typeof formData.base_salary === 'number' && !isNaN(formData.base_salary) ? formData.base_salary : 0,
       bank_name: formData.bank_name || 'Global IME Bank',
       bank_account_number: formData.bank_account_number || '102000000001',
       pan_number: formData.pan_number || 'PAN000001'
@@ -570,7 +612,7 @@ export default function StaffPage() {
       photo_url: '',
       department_id: departments[0]?.id || 'dept-1',
       designation: '',
-      base_salary: 40000,
+      base_salary: 0,
       join_date: '',
       dob: '',
       role: 'employee',
@@ -877,10 +919,20 @@ export default function StaffPage() {
 
         {/* View Toggle + Add Button (Tablet & Mobile Friendly with flex-wrap) */}
         <div className="flex items-center flex-wrap gap-2 w-full xl:w-auto justify-start xl:justify-end">
-          {/* View Switcher: Cards vs Table */}
+          {/* View Switcher: Table vs Cards (Table Default) */}
           <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200">
             <button
-              onClick={() => setViewMode('grid')}
+              onClick={() => handleSetViewMode('table')}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                viewMode === 'table' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+              }`}
+              title="Table View (Default)"
+            >
+              <TableIcon className="w-3.5 h-3.5" />
+              <span>Table</span>
+            </button>
+            <button
+              onClick={() => handleSetViewMode('grid')}
               className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
                 viewMode === 'grid' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'
               }`}
@@ -888,16 +940,6 @@ export default function StaffPage() {
             >
               <LayoutGrid className="w-3.5 h-3.5" />
               <span>Cards</span>
-            </button>
-            <button
-              onClick={() => setViewMode('table')}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                viewMode === 'table' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'
-              }`}
-              title="Table View"
-            >
-              <TableIcon className="w-3.5 h-3.5" />
-              <span>Table</span>
             </button>
           </div>
 
@@ -1327,8 +1369,8 @@ export default function StaffPage() {
                   <input
                     type="number"
                     required
-                    value={editingStaff.base_salary}
-                    onChange={(e) => setEditingStaff({ ...editingStaff, base_salary: Number(e.target.value) })}
+                    value={editingStaff.base_salary ?? 0}
+                    onChange={(e) => setEditingStaff({ ...editingStaff, base_salary: e.target.value === '' ? 0 : Number(e.target.value) })}
                     className="w-full px-3 py-2.5 bg-white border border-blue-400 rounded-lg font-bold text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
                   />
                   <span className="text-[10px] text-blue-700 mt-1 block font-medium">Used for monthly payslips & OT calculation</span>
@@ -1686,8 +1728,9 @@ export default function StaffPage() {
                   <label className="block font-semibold text-slate-700 mb-1">Monthly Base Salary (NPR)</label>
                   <input
                     type="number"
-                    value={formData.base_salary}
-                    onChange={(e) => setFormData({ ...formData, base_salary: Number(e.target.value) })}
+                    min="0"
+                    value={formData.base_salary ?? 0}
+                    onChange={(e) => setFormData({ ...formData, base_salary: e.target.value === '' ? 0 : Number(e.target.value) })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-bold text-sm"
                   />
                 </div>

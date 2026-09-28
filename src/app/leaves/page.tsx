@@ -33,8 +33,6 @@ export default function LeavesPage() {
   // Dynamic full staff list
   const [employees, setEmployees] = useState<Employee[]>(() => {
     if (typeof window !== 'undefined') {
-      const resetDone = localStorage.getItem('goinfi_clean_reset_2026_v2');
-      if (!resetDone) return [];
       const saved = localStorage.getItem('goinfi_staff_list');
       if (saved) {
         try {
@@ -47,6 +45,22 @@ export default function LeavesPage() {
     }
     return [];
   });
+
+  // Sync staff from API
+  useEffect(() => {
+    fetch('/api/staff')
+      .then(res => res.json())
+      .then(d => {
+        if (d.success && Array.isArray(d.staff) && d.staff.length > 0) {
+          const clean = d.staff.filter((p: any) => String(p.biometric_pin) !== '999' && !p.is_master_admin && p.id !== 'emp-master');
+          setEmployees(clean);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('goinfi_staff_list', JSON.stringify(clean));
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Leave Requests state (Clean & Persisted)
   const [requests, setRequests] = useState<LeaveRequest[]>(() => {

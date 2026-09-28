@@ -65,21 +65,7 @@ export default function Header({
     setIsSyncing(true);
     setSyncSuccess(false);
     try {
-      const res = await fetch('/api/biometric/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          logs: [
-            {
-              biometric_pin: '101',
-              punch_time: new Date().toISOString(),
-              punch_type: 0,
-              verify_type: 1
-            }
-          ],
-          device_ip: '192.168.1.201'
-        })
-      });
+      const res = await fetch('/api/biometric/sync');
       if (res.ok) {
         setSyncSuccess(true);
         setLastSyncText('Just now');

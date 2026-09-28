@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import DashboardShell from '@/components/layout/DashboardShell';
 import { useLanguage } from '@/lib/i18n/context';
 import { initialSettings } from '@/lib/mock-data';
+import LicenseStatusCard from '@/components/license/LicenseStatusCard';
 import { 
   Settings, 
   Wifi, 
@@ -70,7 +71,7 @@ export default function SettingsPage() {
         setAdminVerificationToken(data.verificationToken || '');
         setAdminMessage({
           type: 'success',
-          text: `सुरक्षा कोड (OTP) सफलतापूर्वक +977-9801239000 मा पठाइयो। ${data.devOtp ? `(कोड: ${data.devOtp})` : ''}`
+          text: 'सुरक्षा कोड (OTP) सफलतापूर्वक +977-9801239000 मा पठाइयो। कृपया मोबाइल चेक गर्नुहोस्।'
         });
         setAdminResendCountdown(60);
       } else {
@@ -187,8 +188,12 @@ export default function SettingsPage() {
       title={t.navSettings}
       subtitle="Hardware integration, ZKTeco IP configuration, Meta Cloud WhatsApp API, and company profile"
     >
-      <form onSubmit={handleSave} className="space-y-6">
-        {/* Section 1: ZKTeco Biometric Machine LAN Configuration */}
+      <div className="space-y-6">
+        {/* Section 0: License & Subscription Management */}
+        <LicenseStatusCard />
+
+        <form onSubmit={handleSave} className="space-y-6">
+          {/* Section 1: ZKTeco Biometric Machine LAN Configuration */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
             <div className="flex items-center gap-3">
@@ -415,7 +420,7 @@ export default function SettingsPage() {
                 <span>विधि २: Chrome वा Edge ब्राउजरबाट सिधै App इन्स्टल गर्नुहोस्:</span>
               </p>
               <ol className="list-decimal list-inside space-y-1 text-slate-600 pl-1 leading-relaxed">
-                <li>कम्प्युटरमा Microsoft Edge वा Google Chrome खोली <code className="px-1.5 py-0.5 bg-slate-200 rounded text-slate-800 font-mono">https://ap1hr.goinfi.biz</code> खोल्नुहोस्।</li>
+                <li>कम्प्युटरमा Microsoft Edge वा Google Chrome खोली <code className="px-1.5 py-0.5 bg-slate-200 rounded text-slate-800 font-mono">https://hr.ap1hdtv.com</code> खोल्नुहोस्।</li>
                 <li>ब्राउजरको URL (Address Bar) को दायाँ छेउमा रहेको <strong>"Install app" (कम्प्युटरमा इन्स्टल)</strong> आइकनमा क्लिक गर्नुहोस्।</li>
                 <li><strong>"Install"</strong> मा क्लिक गरेपछि यो प्रणाली Windows Taskbar र Start Menu मा सफ्टवेयरको रूपमा पिन हुन्छ।</li>
               </ol>
@@ -636,6 +641,7 @@ export default function SettingsPage() {
           </button>
         </div>
       </form>
+      </div>
     </DashboardShell>
   );
 }

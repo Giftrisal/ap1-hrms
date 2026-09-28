@@ -1,7 +1,7 @@
 @echo off
 TITLE Goinfi-HR - Switch to 24/7 Cloud Domain
 echo ==========================================================
-echo    Switching ap1hr.goinfi.biz to 24/7 Vercel Cloud Server
+echo    Switching to 24/7 Vercel Cloud Server (hr.ap1hdtv.com)
 echo ==========================================================
 
 :: Check for Administrative rights
@@ -12,7 +12,7 @@ if %errorLevel% neq 0 (
     exit /b
 )
 
-echo [1/3] Removing local 127.0.0.1 override from hosts file...
+echo [1/3] Removing local overrides from hosts file...
 powershell -Command "$file = '%windir%\system32\drivers\etc\hosts'; (Get-Content $file) | Where-Object { $_ -notmatch 'ap1hr.goinfi.biz' } | Set-Content $file"
 
 echo [2/3] Cleaning local port proxy...
@@ -23,9 +23,9 @@ ipconfig /flushdns >nul
 
 echo.
 echo ==========================================================
-echo SUCCESS! Your PC will now connect directly to the 24/7 Cloud!
-echo Opening https://ap1hr.goinfi.biz in your browser...
+echo SUCCESS! Your PC will now connect directly to hr.ap1hdtv.com!
+echo Opening https://hr.ap1hdtv.com in your browser...
 echo ==========================================================
-start https://ap1hr.goinfi.biz
+start https://hr.ap1hdtv.com
 
 pause

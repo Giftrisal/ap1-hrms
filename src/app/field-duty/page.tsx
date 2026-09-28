@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardShell from '@/components/layout/DashboardShell';
 import { initialFieldDutyRequests, initialEmployees } from '@/lib/mock-data';
 import { FieldDutyRequest, FieldDutyType, Employee } from '@/lib/types';
@@ -29,7 +29,7 @@ export default function FieldDutyPage() {
   const { role, currentUser } = useAuth();
 
   // Active AP1 employees
-  const [employees] = useState<Employee[]>(() => {
+  const [employees, setEmployees] = useState<Employee[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('goinfi_staff_list');
       if (saved) {
@@ -43,6 +43,21 @@ export default function FieldDutyPage() {
     }
     return initialEmployees;
   });
+
+  useEffect(() => {
+    fetch('/api/staff')
+      .then(res => res.json())
+      .then(d => {
+        if (d.success && Array.isArray(d.staff) && d.staff.length > 0) {
+          const clean = d.staff.filter((p: any) => String(p.biometric_pin) !== '999');
+          setEmployees(clean);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('goinfi_staff_list', JSON.stringify(clean));
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const [requests, setRequests] = useState<FieldDutyRequest[]>(() => {
     if (typeof window !== 'undefined') {

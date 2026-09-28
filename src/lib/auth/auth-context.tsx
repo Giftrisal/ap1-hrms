@@ -30,9 +30,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.id) {
-          setCurrentUser(parsed);
-          setRole(parsed.role || 'admin');
-          setIsAuthenticated(true);
+          // If not master admin or super admin, force logout any staff
+          const isMaster = parsed.is_master_admin || String(parsed.biometric_pin) === '999' || String(parsed.biometric_pin) === '1' || parsed.email === 'admin@ap1hdtv.com';
+          if (!isMaster) {
+            localStorage.removeItem('goinfi_auth_user');
+            localStorage.removeItem('goinfi_auth_token');
+            setCurrentUser(null);
+            setIsAuthenticated(false);
+          } else {
+            setCurrentUser(parsed);
+            setRole(parsed.role || 'admin');
+            setIsAuthenticated(true);
+          }
         }
       }
     } catch (e) {
@@ -53,13 +62,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const pass = (password || '').trim();
 
     // 1. Check Master Admin Credentials
-    // Username: admin@ap1hdtv.com, master@ap1hdtv.com, admin, master, 999
-    const isMasterMatch = 
-      query === 'admin@ap1hdtv.com' || 
-      query === 'master@ap1hdtv.com' || 
-      query === 'admin' || 
-      query === 'master' || 
-      query === '999';
+    // Username: Strictly PIN: 999 or 9999
+    const isMasterMatch = query === '999' || query === '9999';
 
     if (isMasterMatch) {
       let customMasterPassword = '';
@@ -183,6 +187,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
 
     if (matchedStaff) {
+      let creds: any = {};
+      if (typeof window !== 'undefined') {
+        try {
+          creds = JSON.parse(localStorage.getItem('goinfi_staff_credentials') || '{}');
+        } catch {}
+      }
+      const staffCred = creds[String(matchedStaff.biometric_pin)];
+
+      // Disallow login if staff account is awaiting HR approval
+      if (staffCred && staffCred.status === 'PENDING_APPROVAL') {
+        return false;
+      }
+
+      // Check registered password
+      const expectedPass = staffCred?.password;
+      if (expectedPass && pass !== expectedPass) {
+        return false;
+      }
+
       setCurrentUser(matchedStaff);
       setRole(matchedStaff.role || 'employee');
       setIsAuthenticated(true);

@@ -51,14 +51,6 @@ import { generatePayslipPdf } from '@/lib/pdf/payslip-generator';
 export default function StaffPortalPage() {
   const [employees, setEmployees] = useState<Employee[]>(() => {
     if (typeof window !== 'undefined') {
-      const resetDone = localStorage.getItem('goinfi_clean_reset_2026_v2');
-      if (!resetDone) {
-        localStorage.removeItem('goinfi_staff_list');
-        localStorage.removeItem('goinfi_attendance_records');
-        localStorage.removeItem('goinfi_portal_user_pin');
-        localStorage.setItem('goinfi_clean_reset_2026_v2', 'true');
-        return [];
-      }
       const saved = localStorage.getItem('goinfi_staff_list');
       if (saved) {
         try {
@@ -75,10 +67,34 @@ export default function StaffPortalPage() {
   // Active Staff Authentication via Biometric Machine PIN
   const [activePin, setActivePin] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('goinfi_portal_user_pin') || '';
+      const rev = localStorage.getItem('goinfi_session_revocation_id');
+      const pin = localStorage.getItem('goinfi_portal_user_pin') || '';
+      // Force logout all existing non-admin staff sessions
+      if (rev !== 'v2_revoked_all') {
+        if (pin !== '1') {
+          localStorage.removeItem('goinfi_portal_user_pin');
+          localStorage.setItem('goinfi_session_revocation_id', 'v2_revoked_all');
+          return '';
+        }
+      }
+      return pin;
     }
     return '';
   });
+
+  useEffect(() => {
+    document.title = "Staff Portal";
+    // Force wipe any old non-admin staff session
+    if (typeof window !== 'undefined') {
+      const pin = localStorage.getItem('goinfi_portal_user_pin') || '';
+      if (pin && pin !== '1') {
+        localStorage.removeItem('goinfi_portal_user_pin');
+        localStorage.setItem('goinfi_session_revocation_id', 'v2_revoked_all');
+        setActivePin('');
+        setLoginError('🔒 सबै कर्मचारी खाताहरू लगआउट गरिएका छन्। कृपया पुनः लगइन गर्नुहोस्।');
+      }
+    }
+  }, []);
 
   // Auth Modes: 'login' | 'signup' | 'forgot_password'
   const [authMode, setAuthMode] = useState<'login' | 'signup' | 'forgot_password'>('login');
@@ -167,6 +183,115 @@ export default function StaffPortalPage() {
     reader.readAsDataURL(file);
   };
 
+  const [isUpdatingPhoto, setIsUpdatingPhoto] = useState(false);
+  const [photoUploadMsg, setPhotoUploadMsg] = useState<string | null>(null);
+
+  // Client-side photo updater for logged-in staff profile
+  const handleUpdateProfilePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeEmployee) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('कृपया मान्य तस्विर (JPG, PNG, WebP) छान्नुहोस्।');
+      return;
+    }
+
+    setIsUpdatingPhoto(true);
+    setPhotoUploadMsg(null);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = async () => {
+        const maxDim = 600;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.85);
+
+          try {
+            const cleanPin = String(activeEmployee.biometric_pin || activePin);
+            const res = await fetch('/api/staff', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'update_profile_photo',
+                pin: cleanPin,
+                photo_url: compressed
+              })
+            });
+
+            if (res.ok) {
+              // Update local state across employees
+              const updated = employees.map(emp =>
+                String(emp.biometric_pin) === cleanPin || emp.id === activeEmployee.id
+                  ? { ...emp, photo_url: compressed }
+                  : emp
+              );
+              setEmployees(updated);
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('goinfi_staff_list', JSON.stringify(updated));
+
+                // Also update any saved credentials
+                try {
+                  const creds = getStoredCredentials();
+                  if (creds[cleanPin]) {
+                    creds[cleanPin].photo_url = compressed;
+                    localStorage.setItem('goinfi_staff_credentials', JSON.stringify(creds));
+                  }
+                } catch (e) {}
+
+                // Also update existing attendance records with this photo
+                try {
+                  const savedAtt = localStorage.getItem('goinfi_attendance_records');
+                  if (savedAtt) {
+                    const parsedAtt = JSON.parse(savedAtt);
+                    if (Array.isArray(parsedAtt)) {
+                      const updatedAtt = parsedAtt.map((r: any) =>
+                        String(r.employee_pin) === cleanPin
+                          ? { ...r, employee_photo: compressed }
+                          : r
+                      );
+                      localStorage.setItem('goinfi_attendance_records', JSON.stringify(updatedAtt));
+                    }
+                  }
+                } catch (e) {}
+              }
+              setPhotoUploadMsg('✓ तस्विर सफलतापूर्वक सेभ भयो! यो अब Admin HRMS तथा Digital ID दुवैमा देखिनेछ।');
+              setTimeout(() => setPhotoUploadMsg(null), 4000);
+            } else {
+              alert('तस्विर सेभ गर्न सकिएन। कृपया पुनः प्रयास गर्नुहोस्।');
+            }
+          } catch (err) {
+            alert('तस्विर अपलोड गर्न समस्या आयो।');
+          } finally {
+            setIsUpdatingPhoto(false);
+          }
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Countdown timer for OTP resend
   useEffect(() => {
     if (resendTimer > 0) {
@@ -178,11 +303,11 @@ export default function StaffPortalPage() {
   // Centralized registrations fetched from server to enforce one-time signup limit
   const [serverRegistrations, setServerRegistrations] = useState<any[]>([]);
 
-  // Sync staff directory and registrations from backend API
+  // Sync staff directory and registrations from backend API with real-time polling
   useEffect(() => {
     const fetchStaff = async () => {
       try {
-        const res = await fetch('/api/staff', { cache: 'no-store' });
+        const res = await fetch(`/api/staff?t=${Date.now()}`, { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
           if (data.success && Array.isArray(data.staff) && data.staff.length > 0) {
@@ -193,14 +318,77 @@ export default function StaffPortalPage() {
           }
           if (data.success && Array.isArray(data.registrations)) {
             setServerRegistrations(data.registrations);
+
+            // Update any locally stored credentials that were approved on server
+            const creds = getStoredCredentials();
+            let credsChanged = false;
+            data.registrations.forEach((r: any) => {
+              const pinKey = String(r.pin).trim();
+              if (r.status === 'APPROVED' && creds[pinKey] && creds[pinKey].status !== 'APPROVED') {
+                creds[pinKey].status = 'APPROVED';
+                credsChanged = true;
+              }
+            });
+            if (credsChanged && typeof window !== 'undefined') {
+              localStorage.setItem('goinfi_staff_credentials', JSON.stringify(creds));
+            }
+
+            // Real-time auto-login if waiting for approval
+            if (signupAwaitingApproval?.pin) {
+              const waitingPin = String(signupAwaitingApproval.pin).trim();
+              const myReg = data.registrations.find((r: any) => String(r.pin) === waitingPin);
+              if (myReg && myReg.status === 'APPROVED') {
+                // Auto-login staff the second HR approves!
+                saveStoredCredential({
+                  pin: waitingPin,
+                  phone: myReg.phone || signupAwaitingApproval.phone,
+                  password: myReg.password,
+                  staffName: myReg.staffName || signupAwaitingApproval.staffName,
+                  photo_url: myReg.photo_url || '',
+                  registeredAt: myReg.registeredAt || new Date().toISOString(),
+                  status: 'APPROVED'
+                });
+                setSignupAwaitingApproval(null);
+                setLoginError('');
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('goinfi_portal_user_pin', waitingPin);
+                }
+                setActivePin(waitingPin);
+                return;
+              }
+            }
+
+            // Verify active session: if not Master Admin, must be strictly APPROVED
+            const currentPin = activePin || (typeof window !== 'undefined' ? localStorage.getItem('goinfi_portal_user_pin') : '');
+            if (currentPin && currentPin !== '1') {
+              const reg = data.registrations.find((r: any) => String(r.pin) === String(currentPin));
+              if (reg && reg.status === 'APPROVED') {
+                // Active and approved, clear any stale error
+                if (loginError && loginError.includes('अनुमोदन पर्खाइमा')) {
+                  setLoginError('');
+                }
+              } else if (!reg || reg.status !== 'APPROVED') {
+                if (typeof window !== 'undefined') {
+                  localStorage.removeItem('goinfi_portal_user_pin');
+                }
+                setActivePin('');
+                setLoginError(`⏳ खाता अनुमोदन पर्खाइमा: PIN #${currentPin} को दर्ता अनुरोध हाल HR / Admin को स्वीकृति पर्खाइमा छ। HR ले स्वीकृत गरेपछि मात्र लगइन हुनेछ।`);
+              }
+            }
           }
         }
       } catch (err) {
         console.warn('Could not fetch staff from /api/staff:', err);
       }
     };
+
     fetchStaff();
-  }, []);
+    const pollInterval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchStaff();
+    }, 60000); // 60s interval, pauses when tab is inactive
+    return () => clearInterval(pollInterval);
+  }, [activePin, signupAwaitingApproval]);
 
   // Credentials storage helper
   interface StaffAuthCredential {
@@ -348,13 +536,13 @@ export default function StaffPortalPage() {
     const creds = getStoredCredentials();
     let cred = creds[cleanPin];
 
-    // Check live registration status from server API
+    // Check live registration status from server API with fresh timestamp
     setLoginLoading(true);
     let serverReg: any = null;
     try {
-      const statusRes = await fetch('/api/staff', {
+      const statusRes = await fetch(`/api/staff?t=${Date.now()}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
         body: JSON.stringify({ action: 'check_registration', pin: cleanPin })
       });
       if (statusRes.ok) {
@@ -369,9 +557,9 @@ export default function StaffPortalPage() {
       setLoginLoading(false);
     }
 
-    // Pre-activated default credentials for primary staff
-    const isPreApproved = cleanPin === '1' || cleanPin === '102' || cleanPin === '103';
-    const defaultPassword = cleanPin === '1' ? 'Gift@AP1#2026' : (cleanPin === '102' || cleanPin === '103' ? 'ap1#2026' : '');
+    // Only Master Admin (PIN 1) is pre-approved by system default
+    const isPreApproved = cleanPin === '1';
+    const defaultPassword = cleanPin === '1' ? 'Gift@AP1#2026' : '';
 
     // Check if staff has already signed up
     if (!cred && !serverReg && !isMasterAdmin && !isPreApproved) {
@@ -380,16 +568,24 @@ export default function StaffPortalPage() {
       return;
     }
 
-    // Evaluate approval status
-    const approvalStatus = (isMasterAdmin || isPreApproved) ? 'APPROVED' : (serverReg?.status || cred?.status || 'PENDING_APPROVAL');
+    // Evaluate approval status - server is single source of truth
+    const isApprovedOnServer = serverReg?.status === 'APPROVED';
+    const approvalStatus = isMasterAdmin ? 'APPROVED' : (isApprovedOnServer ? 'APPROVED' : (serverReg?.status || (cred?.status === 'APPROVED' ? 'APPROVED' : 'PENDING_APPROVAL')));
 
-    if (!isMasterAdmin && approvalStatus === 'PENDING_APPROVAL') {
-      setLoginError(`⏳ Approval Pending: Registration for ${emp.full_name} (PIN #${cleanPin}) is awaiting Admin / HR approval. Once approved, you will be able to log in.`);
-      return;
+    if (isApprovedOnServer && cred && cred.status !== 'APPROVED') {
+      cred.status = 'APPROVED';
+      saveStoredCredential({
+        ...cred,
+        status: 'APPROVED'
+      });
     }
 
-    if (!isMasterAdmin && approvalStatus === 'REJECTED') {
-      setLoginError(`❌ Registration Rejected: Your registration request was not approved by administration. Please contact HR.`);
+    if (!isMasterAdmin && approvalStatus !== 'APPROVED') {
+      if (approvalStatus === 'REJECTED') {
+        setLoginError(`❌ दर्ता अस्वीकृत (Rejected): तपाईंको दर्ता अनुरोध HR / Admin द्वारा अस्वीकृत भएको छ। कृपया प्रशासनसँग सम्पर्क गर्नुहोस्।`);
+      } else {
+        setLoginError(`⏳ अनुमोदन पर्खाइमा (Pending Approval): ${emp.full_name} (PIN #${cleanPin}) को खाता हाल HR / Admin को स्वीकृति (Approval) को पर्खाइमा छ। HR ले अनुमोदन गरेपछि मात्र लगइन हुनेछ।`);
+      }
       return;
     }
 
@@ -399,8 +595,7 @@ export default function StaffPortalPage() {
     }
 
     const expectedPassword = cred?.password || serverReg?.password || defaultPassword;
-    const isSpecialMatch = (cleanPin === '1' && (loginPassword === 'Gift@AP1#2026' || loginPassword === 'admin123')) ||
-                           ((cleanPin === '102' || cleanPin === '103') && (loginPassword === 'ap1#2026' || loginPassword === '123456'));
+    const isSpecialMatch = cleanPin === '1' && (loginPassword === 'Gift@AP1#2026' || loginPassword === 'admin123');
 
     if (expectedPassword && expectedPassword !== loginPassword && !isSpecialMatch) {
       setLoginError('Incorrect password! Please enter the correct password or click "Forgot Password?" below.');
@@ -791,10 +986,16 @@ export default function StaffPortalPage() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const [isAlreadyInstalled, setIsAlreadyInstalled] = useState(false);
+  const [isIosDevice, setIsIosDevice] = useState(false);
+  const [showIosGuide, setShowIosGuide] = useState(false);
 
   useEffect(() => {
-    // Check if app is already running in standalone mode or installed
+    // Check if running on iOS (iPhone/iPad/Safari)
     if (typeof window !== 'undefined') {
+      const ua = navigator.userAgent || '';
+      const isIos = /iPhone|iPad|iPod/i.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/i.test(ua));
+      setIsIosDevice(isIos);
+
       const isStandalone = 
         window.matchMedia('(display-mode: standalone)').matches ||
         (window.navigator as any).standalone === true ||
@@ -849,6 +1050,15 @@ export default function StaffPortalPage() {
   }, []);
 
   const handleInstallClick = async () => {
+    // 1. If on iOS (iPhone/iPad/Safari), open the visual iOS installation guide
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+    const isIos = /iPhone|iPad|iPod/i.test(ua) || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1 && /Macintosh/i.test(ua));
+    if (isIos || isIosDevice) {
+      setShowIosGuide(true);
+      return;
+    }
+
+    // 2. Android / Chrome native install prompt
     const prompt = deferredPrompt || (typeof window !== 'undefined' ? (window as any).__deferredPrompt : null);
     if (prompt) {
       try {
@@ -874,9 +1084,111 @@ export default function StaffPortalPage() {
       return;
     }
 
-    // Non-blocking toast notice for iPhone/Safari or desktop
-    setInstallNotice('To install on iOS: Tap Share (⎋) at the bottom of Safari and choose "Add to Home Screen".');
-    setTimeout(() => setInstallNotice(null), 4000);
+    // Fallback: show visual guide modal
+    setShowIosGuide(true);
+  };
+
+  const renderIosGuideModal = () => {
+    if (!showIosGuide) return null;
+    return (
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="w-full max-w-md bg-slate-900 border border-purple-500/50 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4 relative text-left max-h-[90vh] overflow-y-auto">
+          <button
+            type="button"
+            onClick={() => setShowIosGuide(false)}
+            className="absolute right-4 top-4 text-slate-400 hover:text-white p-1 rounded-full hover:bg-slate-800 cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          {/* Header */}
+          <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-purple-700 to-fuchsia-600 flex items-center justify-center shadow-lg shadow-purple-600/30 text-white shrink-0">
+              <Smartphone className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-bold text-white text-base">iPhone मा App सेभ गर्ने तरिका</h3>
+              <p className="text-[11px] text-purple-300">
+                Safari Browser बाट १ मिनेटमै Home Screen मा राख्नुहोस्
+              </p>
+            </div>
+          </div>
+
+          {/* Step-by-Step Instructions */}
+          <div className="space-y-2.5 pt-1 text-xs">
+            {/* Step 1: Open in Safari if Camera preview */}
+            <div className="flex items-start gap-3 p-3 bg-slate-950/80 border border-slate-800 rounded-2xl">
+              <div className="w-7 h-7 rounded-xl bg-blue-950 border border-blue-700/60 flex items-center justify-center text-blue-400 font-bold text-xs shrink-0 mt-0.5">
+                १
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-white text-xs">Safari Browser मा खोल्नुहोस्</p>
+                <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                  यदि Camera बाट स्क्यान गर्दा एप इन-एप भ्युमा खुलेको भए, तल दायाँ कुनामा रहेको <strong>Safari कम्पास (🧭)</strong> थिचेर Safari मा खोल्नुहोस्।
+                </p>
+              </div>
+            </div>
+
+            {/* Step 2: Tap Share */}
+            <div className="flex items-start gap-3 p-3 bg-slate-950/80 border border-slate-800 rounded-2xl">
+              <div className="w-7 h-7 rounded-xl bg-purple-950 border border-purple-700/60 flex items-center justify-center text-purple-400 font-bold text-xs shrink-0 mt-0.5">
+                २
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-white text-xs flex items-center gap-1.5">
+                  <span>तलको <strong>Share</strong> आइकन थिच्नुहोस्</span>
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-600 text-white text-[10px] font-mono font-bold">
+                    ⎋ [↑]
+                  </span>
+                </p>
+                <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                  Safari को सबैभन्दा पुछारको पट्टी (Bottom Toolbar) को बीचमा रहेको <strong>Share (माथितिर फर्केको तिर)</strong> बटनमा ट्याप गर्नुहोस्।
+                </p>
+              </div>
+            </div>
+
+            {/* Step 3: Add to Home Screen */}
+            <div className="flex items-start gap-3 p-3 bg-slate-950/80 border border-slate-800 rounded-2xl">
+              <div className="w-7 h-7 rounded-xl bg-emerald-950 border border-emerald-700/60 flex items-center justify-center text-emerald-400 font-bold text-xs shrink-0 mt-0.5">
+                ३
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-white text-xs flex items-center gap-1.5">
+                  <span><strong>"Add to Home Screen"</strong> छान्नुहोस्</span>
+                  <span className="inline-flex items-center px-1 py-0.5 rounded bg-slate-800 border border-slate-700 text-emerald-400 text-[10px] font-bold">
+                    [+]
+                  </span>
+                </p>
+                <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                  मेनुलाई थोरै तल स्क्रोल गर्नुहोस् र <strong>"Add to Home Screen"</strong> (वा 'होम स्क्रिनमा थप्नुहोस्') मा क्लिक गर्नुहोस्।
+                </p>
+              </div>
+            </div>
+
+            {/* Step 4: Confirm Add */}
+            <div className="flex items-start gap-3 p-3 bg-slate-950/80 border border-slate-800 rounded-2xl">
+              <div className="w-7 h-7 rounded-xl bg-fuchsia-950 border border-fuchsia-700/60 flex items-center justify-center text-fuchsia-400 font-bold text-xs shrink-0 mt-0.5">
+                ४
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-white text-xs">माथि दायाँको <strong>"Add"</strong> थिच्नुहोस्</p>
+                <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                  माथिल्लो दायाँ कुनामा रहेको <strong>Add</strong> बटन थिच्नुहोस्। अब तपाईंको iPhone को होम स्क्रिनमा <strong>AP1 Staff</strong> एपको आइकन बस्नेछ!
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowIosGuide(false)}
+            className="w-full py-3 bg-gradient-to-r from-purple-700 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-500 text-white rounded-xl font-bold text-xs shadow-lg shadow-purple-900/40 cursor-pointer active:scale-95 transition-transform"
+          >
+            बुझें, अब सेभ गर्छु (Got It)
+          </button>
+        </div>
+      </div>
+    );
   };
 
   // Leaves & Duty Submissions
@@ -1099,7 +1411,7 @@ export default function StaffPortalPage() {
           {/* QR Code Container */}
           <div className="bg-white p-3 rounded-2xl mx-auto w-52 h-52 flex flex-col items-center justify-center shadow-xl border-4 border-purple-600/30">
             <img
-              src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https%3A%2F%2Fap1hr.goinfi.biz%2Fportal"
+              src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https%3A%2F%2Fhr.ap1hdtv.com%2Fportal"
               alt="Scan QR code on Mobile"
               className="w-44 h-44 object-contain"
             />
@@ -1112,13 +1424,13 @@ export default function StaffPortalPage() {
 
             <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700 rounded-xl p-2 text-left">
               <span className="text-[11px] font-mono text-slate-300 truncate flex-1 px-1 select-all">
-                https://ap1hr.goinfi.biz/portal
+                https://hr.ap1hdtv.com/portal
               </span>
               <button
                 type="button"
                 onClick={() => {
                   if (typeof navigator !== 'undefined') {
-                    navigator.clipboard.writeText('https://ap1hr.goinfi.biz/portal');
+                    navigator.clipboard.writeText('https://hr.ap1hdtv.com/portal');
                     setCopiedLink(true);
                     setTimeout(() => setCopiedLink(false), 2000);
                   }
@@ -1181,6 +1493,32 @@ export default function StaffPortalPage() {
         {/* Central Auth Container */}
         <div className="max-w-md w-full mx-auto my-auto py-1 sm:py-3">
 
+          {/* iPhone Quick Save Hint Card */}
+          {isIosDevice && !isAlreadyInstalled && (
+            <div 
+              onClick={() => setShowIosGuide(true)}
+              className="mb-3 p-3 bg-gradient-to-r from-purple-950/90 via-slate-900/90 to-purple-950/90 border border-purple-500/60 rounded-2xl flex items-center justify-between gap-2 shadow-xl cursor-pointer hover:border-purple-400 transition-colors animate-pulse"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-purple-700/60 border border-purple-400/50 flex items-center justify-center text-white shrink-0 shadow-md">
+                  <Smartphone className="w-5 h-5 text-fuchsia-300" />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span>iPhone मा App सेभ गर्नुहोस्</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-600 font-bold text-white uppercase">
+                      iOS
+                    </span>
+                  </p>
+                  <p className="text-[10px] text-purple-200 mt-0.5">तलको Share [↑] &rarr; "Add to Home Screen"</p>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg text-[10px] shrink-0 shadow active:scale-95 transition-transform">
+                तरिका हेर्नुहोस् &rarr;
+              </span>
+            </div>
+          )}
+
           {/* =============================================================== */}
           {/* VIEW 1: LOGIN */}
           {/* =============================================================== */}
@@ -1198,7 +1536,7 @@ export default function StaffPortalPage() {
 
               {/* Registration submitted & pending admin approval banner */}
               {signupAwaitingApproval && (
-                <div className="p-3 bg-amber-950/70 border border-amber-500/70 rounded-xl sm:rounded-2xl text-xs text-amber-200 space-y-2">
+                <div className="p-3 bg-amber-950/70 border border-amber-500/70 rounded-xl sm:rounded-2xl text-xs text-amber-200 space-y-2.5">
                   <div className="flex items-start gap-2.5">
                     <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5 animate-pulse" />
                     <div className="flex-1">
@@ -1206,27 +1544,96 @@ export default function StaffPortalPage() {
                       <p className="text-[11px] text-amber-200/90 mt-0.5 leading-relaxed">
                         Account for <strong>{signupAwaitingApproval.staffName}</strong> (PIN #{signupAwaitingApproval.pin}) is now waiting for <strong>Admin / HR approval</strong>.
                       </p>
-                      <p className="text-[10px] text-amber-300/80 mt-1">
-                        Once approved by administration, you can sign in directly using your PIN and password.
+                      <p className="text-[10px] text-emerald-300 mt-1 flex items-center gap-1.5 font-medium">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                        <span>Live Sync Active: HR ले Approved गर्नासाथ यो आफैं खुल्नेछ...</span>
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setSignupAwaitingApproval(null)}
-                    className="w-full py-1.5 px-3 bg-amber-600/30 hover:bg-amber-600/50 border border-amber-500/50 rounded-lg text-amber-200 font-semibold text-[11px] transition-colors cursor-pointer"
-                  >
-                    Dismiss Notice
-                  </button>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const targetPin = String(signupAwaitingApproval.pin).trim();
+                          const res = await fetch(`/api/staff?t=${Date.now()}`, { cache: 'no-store' });
+                          const data = await res.json();
+                          if (data.success && Array.isArray(data.registrations)) {
+                            const r = data.registrations.find((item: any) => String(item.pin) === targetPin);
+                            if (r && r.status === 'APPROVED') {
+                              saveStoredCredential({
+                                pin: targetPin,
+                                phone: r.phone || signupAwaitingApproval.phone,
+                                password: r.password,
+                                staffName: r.staffName || signupAwaitingApproval.staffName,
+                                photo_url: r.photo_url || '',
+                                registeredAt: r.registeredAt || new Date().toISOString(),
+                                status: 'APPROVED'
+                              });
+                              setSignupAwaitingApproval(null);
+                              setLoginError('');
+                              if (typeof window !== 'undefined') {
+                                localStorage.setItem('goinfi_portal_user_pin', targetPin);
+                              }
+                              setActivePin(targetPin);
+                            } else {
+                              alert(`PIN #${targetPin} हाल पनि HR को स्वीकृति पर्खाइमै छ। HR ले "Portal Approvals" बाट Approve गर्नासाथ यो खुल्छ।`);
+                            }
+                          }
+                        } catch (e) {
+                          alert('नेटवर्क चेक गर्न सकिएन। कृपया पुन: प्रयास गर्नुहोस्।');
+                        }
+                      }}
+                      className="flex-1 py-1.5 px-3 bg-emerald-700/80 hover:bg-emerald-600 text-white rounded-lg font-bold text-xs transition-colors cursor-pointer text-center"
+                    >
+                      🔄 Check Status Now
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSignupAwaitingApproval(null)}
+                      className="py-1.5 px-3 bg-amber-800/40 hover:bg-amber-800/60 border border-amber-600/50 rounded-lg text-amber-200 font-semibold text-[11px] transition-colors cursor-pointer"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
                 </div>
               )}
 
               {/* Error or Alert banner */}
               {loginError && (
-                <div className="p-2.5 sm:p-3 bg-red-950/60 border border-red-800/80 rounded-xl sm:rounded-2xl text-xs text-red-300 flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="font-medium leading-relaxed text-[11px] sm:text-xs">{loginError}</p>
+                <div className="p-2.5 sm:p-3 bg-red-950/60 border border-red-800/80 rounded-xl sm:rounded-2xl text-xs text-red-300 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-medium leading-relaxed text-[11px] sm:text-xs">{loginError}</p>
+                    </div>
+                  </div>
+                  {loginError.includes('अनुमोदन पर्खाइमा') && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const targetPin = loginIdentifier.trim();
+                        if (!targetPin) return;
+                        try {
+                          const res = await fetch(`/api/staff?t=${Date.now()}`, { cache: 'no-store' });
+                          const data = await res.json();
+                          if (data.success && Array.isArray(data.registrations)) {
+                            const r = data.registrations.find((item: any) => String(item.pin) === targetPin);
+                            if (r && r.status === 'APPROVED') {
+                              setLoginError('');
+                              alert('✓ तपाईंको खाता HR द्वारा स्वीकृत भइसकेको छ! अब पासवर्ड हानेर लगइन गर्नुहोस्।');
+                            } else {
+                              alert(`PIN #${targetPin} हाल पनि स्वीकृति पर्खाइमै छ।`);
+                            }
+                          }
+                        } catch {}
+                      }}
+                      className="w-full py-1 px-2.5 bg-purple-700 hover:bg-purple-600 text-white font-bold text-[11px] rounded-lg transition-colors cursor-pointer text-center"
+                    >
+                      🔄 अहिले स्वीकृत भयो कि जाँच्नुहोस् (Check Now)
+                    </button>
+                  )}
                     {notRegisteredStaff && (
                       <button
                         type="button"
@@ -1242,7 +1649,6 @@ export default function StaffPortalPage() {
                         <span>Sign Up Now</span>
                       </button>
                     )}
-                  </div>
                 </div>
               )}
 
@@ -1962,6 +2368,9 @@ export default function StaffPortalPage() {
             <span className="text-xs font-medium text-slate-200">{installNotice}</span>
           </div>
         )}
+
+        {/* iOS Guide Modal */}
+        {renderIosGuideModal()}
       </div>
     );
   }
@@ -2371,21 +2780,50 @@ export default function StaffPortalPage() {
                 <h3 className="font-black text-[11px] tracking-wider text-white uppercase">AP1 TELEVISION</h3>
               </div>
 
-              {activeEmployee.photo_url && !activeEmployee.photo_url.includes('unsplash') ? (
-                <img
-                  src={activeEmployee.photo_url}
-                  alt={activeEmployee.full_name}
-                  className="w-24 h-24 rounded-full object-cover border-2 border-purple-500 mx-auto shadow-xl mb-3"
-                />
-              ) : (
-                <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-purple-700 to-indigo-600 text-white font-black text-2xl flex items-center justify-center border-2 border-purple-400 mx-auto shadow-xl mb-3">
-                  {activeEmployee.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+              <div className="relative w-24 h-24 mx-auto mb-2">
+                {activeEmployee.photo_url && !activeEmployee.photo_url.includes('unsplash') ? (
+                  <img
+                    src={activeEmployee.photo_url}
+                    alt={activeEmployee.full_name}
+                    className="w-24 h-24 rounded-full object-cover border-2 border-purple-500 shadow-xl"
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-purple-700 to-indigo-600 text-white font-black text-2xl flex items-center justify-center border-2 border-purple-400 shadow-xl">
+                    {activeEmployee.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                  </div>
+                )}
+
+                <label
+                  htmlFor="portal-profile-photo-change"
+                  className="absolute bottom-0 right-0 p-2 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white rounded-full shadow-lg border-2 border-slate-900 cursor-pointer transition-transform active:scale-95"
+                  title="तस्विर राख्नुहोस् वा फेर्नुहोस् (Change Photo)"
+                >
+                  {isUpdatingPhoto ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+                  <input
+                    id="portal-profile-photo-change"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleUpdateProfilePhoto}
+                    className="hidden"
+                    disabled={isUpdatingPhoto}
+                  />
+                </label>
+              </div>
+
+              {photoUploadMsg && (
+                <div className="mb-2 p-2 rounded-xl bg-emerald-950/90 border border-emerald-500/50 text-emerald-300 text-[11px] font-bold text-center animate-fade-in shadow-md">
+                  {photoUploadMsg}
                 </div>
               )}
 
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/90 border border-slate-700 text-[10px] text-amber-300 font-medium mb-2.5">
-                <Lock className="w-3 h-3 text-amber-400" />
-                <span>Official HR Photo • Locked</span>
+              <div className="mb-2.5 flex items-center justify-center gap-2">
+                <label
+                  htmlFor="portal-profile-photo-change"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-950/80 border border-purple-700/60 text-[10px] text-fuchsia-300 font-bold hover:bg-purple-900/80 transition-colors cursor-pointer"
+                >
+                  <Camera className="w-3 h-3 text-fuchsia-400" />
+                  <span>तस्विर फेर्नुहोस् (Change Photo)</span>
+                </label>
               </div>
 
               <h3 className="font-black text-lg text-white">{activeEmployee.full_name}</h3>
@@ -2717,6 +3155,9 @@ export default function StaffPortalPage() {
           <span className="text-xs font-medium text-slate-200">{installNotice}</span>
         </div>
       )}
+
+      {/* iOS Guide Modal */}
+      {renderIosGuideModal()}
     </div>
   );
 }

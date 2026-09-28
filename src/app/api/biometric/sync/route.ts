@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { loadPunches, savePunches } from '@/lib/biometricStore';
 
-// In-memory / cache store for live punch stream so changes reflect instantly
-let cachedLogs: any[] = [];
-let lastSyncTime: string | null = null;
-let lastDeviceIp: string | null = null;
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,39 +19,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Payload must contain a `logs` array' }, { status: 400 });
     }
 
-    lastSyncTime = new Date().toISOString();
-    lastDeviceIp = device_ip || '192.168.1.201';
+    const syncTime = new Date().toISOString();
+    const deviceIp = device_ip || '192.168.1.201';
 
-    // Process and enrich punch logs
+    // Process and enrich punch logs (Pure In / Out system - no late penalties or grace periods)
     const processed = logs.map(log => {
-      const punchDate = new Date(log.punch_time);
-      const hours = punchDate.getHours();
-      const minutes = punchDate.getMinutes();
-
-      // Simple calculation against standard 9:00 AM shift
-      const isMorning = hours < 13;
-      const scheduledMinutes = 9 * 60; // 9:00 AM
-      const punchMinutes = hours * 60 + minutes;
-      const lateMins = isMorning && punchMinutes > (scheduledMinutes + 15) 
-        ? punchMinutes - scheduledMinutes 
-        : 0;
-
       return {
         ...log,
-        processed_at: lastSyncTime,
-        late_minutes: lateMins,
-        is_late: lateMins > 0
+        processed_at: syncTime,
+        late_minutes: 0,
+        is_late: false
       };
     });
 
-    cachedLogs = [...processed, ...cachedLogs].slice(0, 500);
+    const current = await loadPunches();
+    
+    // Deduplicate by biometric_pin + punch_time
+    const existingKeys = new Set(current.logs.map(l => `${l.user_id || l.biometric_pin}_${l.punch_time}`));
+    const newUnique = processed.filter(l => !existingKeys.has(`${l.user_id || l.biometric_pin}_${l.punch_time}`));
+
+    const merged = [...newUnique, ...current.logs].slice(0, 500);
+    await savePunches(merged, syncTime, deviceIp);
 
     return NextResponse.json({
       success: true,
-      message: 'Biometric punches processed successfully',
+      message: 'Biometric punches processed and persisted to cloud successfully',
       processed_count: logs.length,
-      device_ip: lastDeviceIp,
-      synced_at: lastSyncTime
+      new_unique_count: newUnique.length,
+      device_ip: deviceIp,
+      synced_at: syncTime
     });
   } catch (error) {
     console.error('Biometric Sync API Error:', error);
@@ -65,21 +59,21 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
+  const current = await loadPunches();
   return NextResponse.json({
     status: 'online',
-    last_sync: lastSyncTime || new Date().toISOString(),
-    device_ip: lastDeviceIp || '192.168.1.201',
+    last_sync: current.lastSyncTime || new Date().toISOString(),
+    device_ip: current.lastDeviceIp || '192.168.1.201',
     port: 4370,
-    cached_logs_count: cachedLogs.length,
-    recent_logs: cachedLogs.slice(0, 20)
+    cached_logs_count: current.logs.length,
+    recent_logs: current.logs.slice(0, 50)
   });
 }
 
 export async function DELETE() {
-  cachedLogs = [];
-  lastSyncTime = null;
+  await savePunches([], new Date().toISOString(), '192.168.1.201');
   return NextResponse.json({
     success: true,
-    message: 'All cached biometric logs cleared.'
+    message: 'All biometric punches cleared.'
   });
 }
