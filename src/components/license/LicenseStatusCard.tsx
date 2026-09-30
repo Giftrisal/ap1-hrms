@@ -277,7 +277,7 @@ export default function LicenseStatusCard() {
           )}
 
           <p className="text-[11px] text-slate-400 mt-2">
-            नयाँ लाइसेन्स की का लागि <strong>Goinfi Labs</strong> (+977-9715100200 | support@goinfi.biz) मा सम्पर्क गर्नुहोस्।
+            नयाँ लाइसेन्स की का लागि <strong>Goinfi Labs</strong> (+977-9715300300 | support@goinfi.biz) मा सम्पर्क गर्नुहोस्।
           </p>
         </div>
       )}

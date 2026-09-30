@@ -293,7 +293,7 @@ export function formatLicenseExpirySmsMessage(
   expiryDateStr: string,
   milestone: '7_DAYS' | '3_DAYS' | '1_DAY' | 'EXPIRED' | 'TEST'
 ): string {
-  const contact = '+977-9715100200';
+  const contact = '+977-9715300300';
   if (milestone === 'EXPIRED') {
     return `[Goinfi Labs] आदरणीय ${clientName}, तपाईंको HRMS सफ्टवेयर इजाजतपत्र (License Key) को म्याद समाप्त भएको छ र सेवा रोकिएको छ। नयाँ Key प्राप्त गरी सेवा पुनः सुचारु गर्न तुरुन्त सम्पर्क गर्नुहोस्: ${contact}।`;
   }

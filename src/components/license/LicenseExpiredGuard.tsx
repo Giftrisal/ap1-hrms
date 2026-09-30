@@ -147,7 +147,7 @@ export default function LicenseExpiredGuard({ children, forceDemo = false, onClo
         <div className="mt-6 pt-4 border-t border-slate-800 text-[11px] text-slate-400 space-y-1.5">
           <p className="font-semibold text-slate-300">Technical Support & Renewal:</p>
           <div className="flex items-center justify-center gap-4 text-slate-400">
-            <span className="flex items-center gap-1"><Phone className="w-3 h-3 text-red-400" /> +977-9715100200</span>
+            <span className="flex items-center gap-1"><Phone className="w-3 h-3 text-red-400" /> +977-9715300300</span>
             <span className="flex items-center gap-1"><Mail className="w-3 h-3 text-red-400" /> support@goinfi.biz</span>
           </div>
           <p className="text-[10px] text-slate-500 pt-1">Goinfi Technologies Pvt. Ltd. • All Rights Reserved</p>
