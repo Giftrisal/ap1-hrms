@@ -32,6 +32,7 @@ export interface Employee {
   pan_number?: string;
   emergency_contact?: string;
   is_master_admin?: boolean;
+  weekly_off_day?: string; // "Sunday" | "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday"
   created_at?: string;
 }
 

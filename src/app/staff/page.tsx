@@ -520,7 +520,8 @@ export default function StaffPage() {
     status: 'active',
     bank_name: 'Global IME Bank',
     bank_account_number: '102000000001',
-    pan_number: 'PAN000001'
+    pan_number: 'PAN000001',
+    weekly_off_day: 'Saturday'
   });
 
   const handleOpenEdit = (emp: Employee) => {
@@ -536,6 +537,7 @@ export default function StaffPage() {
       ...emp,
       shift_id: emp.shift_id || 'shift-day',
       shift_name: emp.shift_name || shifts.find(s => s.id === emp.shift_id)?.name || 'Day Shift (10:00 AM - 6:00 PM)',
+      weekly_off_day: emp.weekly_off_day || 'Saturday',
       join_date: isAutoOrToday ? '' : emp.join_date,
       dob: emp.dob || ''
     });
@@ -591,6 +593,7 @@ export default function StaffPage() {
       department_name: dept?.name || 'Operations & Broadcasting',
       shift_id: formData.shift_id || selectedShift?.id || 'shift-day',
       shift_name: selectedShift?.name || 'Day Shift (10:00 AM - 6:00 PM)',
+      weekly_off_day: formData.weekly_off_day || 'Saturday',
       designation: formData.designation || 'Staff',
       role: formData.role || 'employee',
       status: 'active',
@@ -619,7 +622,8 @@ export default function StaffPage() {
       status: 'active',
       bank_name: 'Global IME Bank',
       bank_account_number: '102000000001',
-      pan_number: 'PAN000001'
+      pan_number: 'PAN000001',
+      weekly_off_day: 'Saturday'
     });
 
     // Auto-broadcast welcome introduction email if enabled!
@@ -1190,6 +1194,7 @@ export default function StaffPage() {
                   <th className="py-3 px-4">Department</th>
                   <th className="py-3 px-4">Designation</th>
                   <th className="py-3 px-4">Assigned Shift</th>
+                  <th className="py-3 px-4">साप्ताहिक बिदा (Week-Off)</th>
                   <th className="py-3 px-4">Join Date & DOB</th>
                   <th className="py-3 px-4">Base Salary</th>
                   <th className="py-3 px-4 text-center">Actions</th>
@@ -1234,6 +1239,13 @@ export default function StaffPage() {
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-800 border border-slate-200">
                         <Clock className="w-3 h-3 text-blue-600 shrink-0" />
                         <span>{emp.shift_name || 'Day Shift'}</span>
+                      </span>
+                    </td>
+
+                    <td className="py-3 px-4">
+                      <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        <Calendar className="w-3 h-3 text-indigo-600 shrink-0" />
+                        <span>{emp.weekly_off_day ? (emp.weekly_off_day === 'Sunday' ? 'आइतबार' : emp.weekly_off_day === 'Saturday' ? 'शनिबार' : emp.weekly_off_day) : 'शनिबार'}</span>
                       </span>
                     </td>
 
@@ -1459,6 +1471,24 @@ export default function StaffPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    साप्ताहिक बिदा (Assigned Weekly Off) *
+                  </label>
+                  <select
+                    value={editingStaff.weekly_off_day || 'Saturday'}
+                    onChange={(e) => setEditingStaff({ ...editingStaff, weekly_off_day: e.target.value })}
+                    className="w-full px-3 py-2 bg-indigo-50/70 border border-indigo-200 rounded-lg focus:outline-none focus:border-indigo-500 font-bold text-indigo-900"
+                  >
+                    <option value="Saturday">शनिबार (Saturday - Default)</option>
+                    <option value="Sunday">आइतबार (Sunday)</option>
+                    <option value="Monday">सोमबार (Monday)</option>
+                    <option value="Tuesday">मंगलबार (Tuesday)</option>
+                    <option value="Wednesday">बुधबार (Wednesday)</option>
+                    <option value="Thursday">बिहीबार (Thursday)</option>
+                    <option value="Friday">शुक्रबार (Friday)</option>
+                  </select>
+                </div>
+                <div>
                   <label className="block font-semibold text-slate-700 mb-1">System Access Role</label>
                   <select
                     value={editingStaff.role}
@@ -1470,6 +1500,9 @@ export default function StaffPage() {
                     <option value="admin">Administrator</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Work Email Address</label>
                   <input
@@ -1479,9 +1512,6 @@ export default function StaffPage() {
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none"
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Phone Number</label>
                   <input
@@ -1491,6 +1521,9 @@ export default function StaffPage() {
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
                     Date of Joining
@@ -1502,9 +1535,6 @@ export default function StaffPage() {
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-medium text-slate-800"
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
                     Date of Birth
@@ -1747,6 +1777,24 @@ export default function StaffPage() {
                     <option value="employee">Employee</option>
                     <option value="hr">HR Manager</option>
                     <option value="admin">Administrator</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    साप्ताहिक बिदा (Assigned Weekly Off) *
+                  </label>
+                  <select
+                    value={formData.weekly_off_day || 'Saturday'}
+                    onChange={(e) => setFormData({ ...formData, weekly_off_day: e.target.value })}
+                    className="w-full px-3 py-2 bg-indigo-50/70 border border-indigo-200 rounded-lg focus:outline-none focus:border-indigo-500 font-bold text-indigo-900"
+                  >
+                    <option value="Saturday">शनिबार (Saturday - Default)</option>
+                    <option value="Sunday">आइतबार (Sunday)</option>
+                    <option value="Monday">सोमबार (Monday)</option>
+                    <option value="Tuesday">मंगलबार (Tuesday)</option>
+                    <option value="Wednesday">बुधबार (Wednesday)</option>
+                    <option value="Thursday">बिहीबार (Thursday)</option>
+                    <option value="Friday">शुक्रबार (Friday)</option>
                   </select>
                 </div>
               </div>

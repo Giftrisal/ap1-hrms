@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import DashboardShell from '@/components/layout/DashboardShell';
 import { useLanguage } from '@/lib/i18n/context';
 import { useAuth } from '@/lib/auth/auth-context';
-import { DailyAttendance, Employee } from '@/lib/types';
+import { DailyAttendance, Employee, AttendanceStatus } from '@/lib/types';
 import { getNepaliDate } from '@/lib/nepali-date';
 import { 
   Clock, 
@@ -55,6 +55,183 @@ export function extractDateStr(dateOrTime?: string | null): string {
   if (cleaned.includes('T')) return cleaned.split('T')[0];
   if (cleaned.includes(' ')) return cleaned.split(' ')[0];
   return cleaned.slice(0, 10);
+}
+
+export const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+export const NEPALI_DAY_NAMES: Record<string, string> = {
+  Sunday: 'आइतबार (Sunday)',
+  Monday: 'सोमबार (Monday)',
+  Tuesday: 'मंगलबार (Tuesday)',
+  Wednesday: 'बुधबार (Wednesday)',
+  Thursday: 'बिहीबार (Thursday)',
+  Friday: 'शुक्रबार (Friday)',
+  Saturday: 'शनिबार (Saturday)'
+};
+
+export function getWeekDates(dateStr: string): string[] {
+  // Returns [Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday] for the week containing dateStr
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDay(); // 0 is Sunday, 6 is Saturday
+  const sunday = new Date(d);
+  sunday.setDate(d.getDate() - day);
+  
+  const dates: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const dayDate = new Date(sunday);
+    dayDate.setDate(sunday.getDate() + i);
+    const yyyy = dayDate.getFullYear();
+    const mm = String(dayDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(dayDate.getDate()).padStart(2, '0');
+    dates.push(`${yyyy}-${mm}-${dd}`);
+  }
+  return dates;
+}
+
+export interface ResolvedDayStatus {
+  status: AttendanceStatus;
+  isWeekOff: boolean;
+  isSwapped: boolean;
+  isHolidayWork: boolean;
+  holidayStatus?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+  remarks: string;
+}
+
+export function resolveStaffWeekStatus(
+  emp: Employee,
+  targetDate: string,
+  allRecords: DailyAttendance[]
+): ResolvedDayStatus {
+  const weekDates = getWeekDates(targetDate);
+  const assignedDay = emp.weekly_off_day || 'Saturday';
+  const assignedDayIdx = DAY_NAMES.indexOf(assignedDay as any) >= 0 ? DAY_NAMES.indexOf(assignedDay as any) : 6;
+  const assignedOffDate = weekDates[assignedDayIdx];
+
+  // Helper to check if employee worked/punched on date D
+  const hasWorkedOn = (d: string) => {
+    return allRecords.some(r => 
+      (r.employee_id === emp.id || (emp.biometric_pin && String(r.employee_pin).trim() === String(emp.biometric_pin).trim())) &&
+      (extractDateStr(r.date) || extractDateStr(r.in_time)) === d &&
+      Boolean(r.in_time || r.status === 'PRESENT' || r.status === 'LATE' || r.status === 'HALF_DAY')
+    );
+  };
+
+  // Target record if exists
+  const targetRecord = allRecords.find(r => 
+    (r.employee_id === emp.id || (emp.biometric_pin && String(r.employee_pin).trim() === String(emp.biometric_pin).trim())) &&
+    (extractDateStr(r.date) || extractDateStr(r.in_time)) === targetDate
+  );
+
+  const workedOnAssignedOff = hasWorkedOn(assignedOffDate);
+  const workedOnTarget = hasWorkedOn(targetDate);
+
+  // SCENARIO 1: Staff did NOT work on assigned off-day (Normal Routine)
+  if (!workedOnAssignedOff) {
+    if (targetDate === assignedOffDate) {
+      return {
+        status: 'WEEK_OFF',
+        isWeekOff: true,
+        isSwapped: false,
+        isHolidayWork: false,
+        remarks: `तोकिएको साप्ताहिक बिदा (${NEPALI_DAY_NAMES[assignedDay] || assignedDay})`
+      };
+    }
+    if (workedOnTarget) {
+      return {
+        status: targetRecord?.status || 'PRESENT',
+        isWeekOff: false,
+        isSwapped: false,
+        isHolidayWork: false,
+        remarks: targetRecord?.remarks || 'Biometric'
+      };
+    }
+    if (targetRecord?.status === 'ON_LEAVE' || targetRecord?.status === 'HALF_DAY') {
+      return {
+        status: targetRecord.status,
+        isWeekOff: false,
+        isSwapped: false,
+        isHolidayWork: false,
+        remarks: targetRecord.remarks || 'बिदामा'
+      };
+    }
+    return {
+      status: 'ABSENT',
+      isWeekOff: false,
+      isSwapped: false,
+      isHolidayWork: false,
+      remarks: 'हाजिरी नभएको (Absent)'
+    };
+  }
+
+  // SCENARIO 2: Staff DID work on assigned off-day! (Dynamic Auto-Swap Scenario)
+  // They are owed 1 day off in this week.
+  // Find all unworked days in this week (excluding assignedOffDate)
+  const unworkedDays = weekDates.filter(d => d !== assignedOffDate && !hasWorkedOn(d));
+
+  if (unworkedDays.length > 0) {
+    // The FIRST unworked day becomes their auto-swapped week-off!
+    const swappedOffDate = unworkedDays[0];
+    const assignedNpName = NEPALI_DAY_NAMES[assignedDay]?.split(' ')[0] || assignedDay;
+
+    if (targetDate === swappedOffDate) {
+      return {
+        status: 'WEEK_OFF',
+        isWeekOff: true,
+        isSwapped: true,
+        isHolidayWork: false,
+        remarks: `${assignedNpName} काम गरेको सट्टामा आज स्वतः साप्ताहिक बिदा (Auto Swapped Week-Off)`
+      };
+    }
+
+    if (targetDate === assignedOffDate) {
+      return {
+        status: targetRecord?.status || 'PRESENT',
+        isWeekOff: false,
+        isSwapped: false,
+        isHolidayWork: false,
+        remarks: 'सट्टा बिदा मिलाइएको नियमित ड्युटी (Compensated Shift)'
+      };
+    }
+
+    if (unworkedDays.indexOf(targetDate) > 0) {
+      // Subsequent unworked days after the 1st swapped week-off are absent
+      return {
+        status: targetRecord?.status === 'ON_LEAVE' ? 'ON_LEAVE' : 'ABSENT',
+        isWeekOff: false,
+        isSwapped: false,
+        isHolidayWork: false,
+        remarks: targetRecord?.status === 'ON_LEAVE' ? (targetRecord.remarks || 'बिदामा') : 'हाजिरी नभएको (Absent)'
+      };
+    }
+
+    // Worked on targetDate
+    return {
+      status: targetRecord?.status || 'PRESENT',
+      isWeekOff: false,
+      isSwapped: false,
+      isHolidayWork: false,
+      remarks: targetRecord?.remarks || 'Biometric'
+    };
+  }
+
+  // SCENARIO 3: Worked all 7 days of the week! (Non-stop duty, zero days off)
+  if (targetDate === assignedOffDate) {
+    return {
+      status: targetRecord?.status || 'PRESENT',
+      isWeekOff: true,
+      isSwapped: false,
+      isHolidayWork: true,
+      holidayStatus: targetRecord?.holiday_work_status || 'PENDING_APPROVAL',
+      remarks: 'साप्ताहिक बिदामा अतिरिक्त काम (7 Days Duty - Approval Required)'
+    };
+  }
+
+  return {
+    status: targetRecord?.status || 'PRESENT',
+    isWeekOff: false,
+    isSwapped: false,
+    isHolidayWork: false,
+    remarks: targetRecord?.remarks || 'Biometric'
+  };
 }
 
 export default function AttendancePage() {
@@ -173,6 +350,60 @@ export default function AttendancePage() {
   // Assign Rotational Week-Off Modal
   const [showWeekOffModal, setShowWeekOffModal] = useState<boolean>(false);
   const [weekOffStaffId, setWeekOffStaffId] = useState<string>('');
+
+  // Week-Off Roster Management Modal
+  const [showRosterModal, setShowRosterModal] = useState<boolean>(false);
+  const [rosterStaffList, setRosterStaffList] = useState<{ id: string; name: string; pin: string; dept: string; offDay: string }[]>([]);
+  const [rosterSearch, setRosterSearch] = useState<string>('');
+  const [isSavingRoster, setIsSavingRoster] = useState<boolean>(false);
+
+  const openRosterModal = () => {
+    setRosterStaffList(
+      staffList.map(s => ({
+        id: s.id,
+        name: s.full_name,
+        pin: s.biometric_pin || '-',
+        dept: s.department_name || 'AP1 Television',
+        offDay: s.weekly_off_day || 'Saturday'
+      }))
+    );
+    setRosterSearch('');
+    setShowRosterModal(true);
+  };
+
+  const handleSaveRoster = async () => {
+    setIsSavingRoster(true);
+    try {
+      const updatedStaffList = staffList.map(s => {
+        const item = rosterStaffList.find(r => r.id === s.id);
+        return item ? { ...s, weekly_off_day: item.offDay } : s;
+      });
+
+      // 1. Sync to API & Supabase
+      await fetch('/api/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ staff: updatedStaffList })
+      });
+
+      // 2. Update local state & localStorage
+      setStaffList(updatedStaffList);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('goinfi_staff_list', JSON.stringify(updatedStaffList));
+      }
+
+      setShowRosterModal(false);
+      alert('साप्ताहिक बिदा तालिका (Weekly Off Roster) सफलतापूर्वक सुरक्षित गरियो!');
+    } catch (e: any) {
+      alert(`त्रुटि: ${e?.message || 'रोस्टर सेभ हुन सकेन।'}`);
+    } finally {
+      setIsSavingRoster(false);
+    }
+  };
+
+  const handleBulkSetOffDay = (offDay: string) => {
+    setRosterStaffList(prev => prev.map(item => ({ ...item, offDay })));
+  };
 
   // Save records to state + localStorage
   const saveRecordsList = (newList: DailyAttendance[]) => {
@@ -624,17 +855,90 @@ export default function AttendancePage() {
     setWeekOffStaffId('');
   };
 
-  // Derived filtered records for table - STRICTLY filtered by selectedDate
-  const filteredRecords = useMemo(() => {
-    return records.filter(r => {
-      // 1. Strict Date match: ONLY show records belonging to the selected date
+  // 1. Fully evaluated daily attendance list combining staffList & records with Auto Week-Off Engine
+  const dailyEvaluatedList = useMemo(() => {
+    // Map existing records for selectedDate by employee_id or PIN
+    const dateRecordsMap = new Map<string, DailyAttendance>();
+    records.forEach(r => {
       const recDate = extractDateStr(r.date) || extractDateStr(r.in_time);
-      if (recDate !== selectedDate) return false;
+      if (recDate === selectedDate) {
+        if (r.employee_id) dateRecordsMap.set(r.employee_id, r);
+        if (r.employee_pin) dateRecordsMap.set(`pin-${String(r.employee_pin).trim()}`, r);
+      }
+    });
 
-      // 2. Department match
+    const evaluated: DailyAttendance[] = staffList.map(emp => {
+      const existing = dateRecordsMap.get(emp.id) || (emp.biometric_pin ? dateRecordsMap.get(`pin-${String(emp.biometric_pin).trim()}`) : undefined);
+      const resolved = resolveStaffWeekStatus(emp, selectedDate, records);
+
+      if (existing) {
+        let isHolidayWork = existing.is_holiday_work ?? resolved.isHolidayWork;
+        let holidayStatus = existing.holiday_work_status ?? resolved.holidayStatus;
+        let remarks = existing.remarks;
+
+        if (resolved.isHolidayWork && !existing.is_holiday_work) {
+          isHolidayWork = true;
+          holidayStatus = existing.holiday_work_status || 'PENDING_APPROVAL';
+          remarks = resolved.remarks;
+        } else if (resolved.isSwapped && existing.status === 'WEEK_OFF') {
+          remarks = resolved.remarks;
+        }
+
+        return {
+          ...existing,
+          employee_name: emp.full_name || existing.employee_name,
+          department_name: emp.department_name || existing.department_name,
+          designation: emp.designation || existing.designation,
+          employee_photo: emp.photo_url || existing.employee_photo,
+          is_holiday_work: isHolidayWork,
+          holiday_work_status: holidayStatus,
+          remarks: remarks || existing.remarks
+        };
+      }
+
+      // Synthesized record for unpunched staff on selectedDate
+      return {
+        id: `auto-${emp.id}-${selectedDate}`,
+        employee_id: emp.id,
+        employee_name: emp.full_name,
+        employee_pin: emp.biometric_pin || '-',
+        employee_photo: emp.photo_url,
+        department_name: emp.department_name || 'AP1 Television',
+        designation: emp.designation || 'Staff',
+        date: selectedDate,
+        status: resolved.status,
+        late_minutes: 0,
+        early_exit_minutes: 0,
+        overtime_minutes: 0,
+        worked_hours: 0,
+        source: 'auto_system',
+        is_holiday_work: resolved.isHolidayWork,
+        holiday_work_status: resolved.holidayStatus,
+        remarks: resolved.remarks
+      };
+    });
+
+    // Also include unassigned punches or punches from staff not in staffList
+    records.forEach(r => {
+      const recDate = extractDateStr(r.date) || extractDateStr(r.in_time);
+      if (recDate === selectedDate) {
+        const isAlreadyIncluded = staffList.some(s => s.id === r.employee_id || (s.biometric_pin && String(s.biometric_pin).trim() === String(r.employee_pin).trim()));
+        if (!isAlreadyIncluded) {
+          evaluated.push(r);
+        }
+      }
+    });
+
+    return evaluated;
+  }, [staffList, records, selectedDate]);
+
+  // Derived filtered records for table - STRICTLY filtered by selectedDate & active filters
+  const filteredRecords = useMemo(() => {
+    return dailyEvaluatedList.filter(r => {
+      // 1. Department match
       if (departmentFilter !== 'ALL' && r.department_name !== departmentFilter) return false;
 
-      // 3. Status filter
+      // 2. Status filter
       if (statusFilter === 'IN_OFFICE') {
         if (!r.in_time || r.out_time) return false;
       } else if (statusFilter === 'COMPLETED') {
@@ -647,7 +951,7 @@ export default function AttendancePage() {
         if (r.status !== statusFilter) return false;
       }
 
-      // 4. Search query
+      // 3. Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesName = r.employee_name?.toLowerCase().includes(q) ?? false;
@@ -658,21 +962,17 @@ export default function AttendancePage() {
 
       return true;
     });
-  }, [records, selectedDate, departmentFilter, statusFilter, searchQuery]);
+  }, [dailyEvaluatedList, departmentFilter, statusFilter, searchQuery]);
 
   // KPI Metrics for selected date
-  const dateRecords = useMemo(() => {
-    return records.filter(r => (extractDateStr(r.date) || extractDateStr(r.in_time)) === selectedDate);
-  }, [records, selectedDate]);
-
-  const kpiTotal = Math.max(staffList.length, dateRecords.length);
-  const kpiPresent = dateRecords.filter(r => r.status === 'PRESENT' || r.in_time).length;
-  const kpiInOffice = dateRecords.filter(r => r.in_time && !r.out_time).length;
-  const kpiCompleted = dateRecords.filter(r => r.in_time && r.out_time).length;
-  const kpiWeekOff = dateRecords.filter(r => r.status === 'WEEK_OFF' || r.status === 'WEEKEND').length;
-  const kpiOnLeave = dateRecords.filter(r => r.status === 'ON_LEAVE' || r.status === 'HALF_DAY').length;
-  const kpiHolidayPending = dateRecords.filter(r => r.holiday_work_status === 'PENDING_APPROVAL').length;
-  const kpiAbsent = Math.max(0, kpiTotal - (kpiPresent + kpiOnLeave + kpiWeekOff));
+  const kpiTotal = dailyEvaluatedList.length;
+  const kpiPresent = dailyEvaluatedList.filter(r => r.status === 'PRESENT' || r.in_time).length;
+  const kpiInOffice = dailyEvaluatedList.filter(r => r.in_time && !r.out_time).length;
+  const kpiCompleted = dailyEvaluatedList.filter(r => r.in_time && r.out_time).length;
+  const kpiWeekOff = dailyEvaluatedList.filter(r => r.status === 'WEEK_OFF' || r.status === 'WEEKEND').length;
+  const kpiOnLeave = dailyEvaluatedList.filter(r => r.status === 'ON_LEAVE' || r.status === 'HALF_DAY').length;
+  const kpiHolidayPending = dailyEvaluatedList.filter(r => r.holiday_work_status === 'PENDING_APPROVAL').length;
+  const kpiAbsent = dailyEvaluatedList.filter(r => r.status === 'ABSENT').length;
 
   // Departments List
   const uniqueDepartments = useMemo(() => {
@@ -1070,6 +1370,15 @@ export default function AttendancePage() {
             {/* Manual Punch Button */}
             {(role === 'admin' || role === 'hr') && (
               <>
+                <button
+                  onClick={openRosterModal}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white transition-all shadow-xs cursor-pointer"
+                  title="सबै कर्मचारीको साप्ताहिक बिदा तालिका (Week-Off Roster Management)"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>साप्ताहिक बिदा तालिका (Roster)</span>
+                </button>
+
                 <button
                   onClick={() => setShowWeekOffModal(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-xs cursor-pointer"
@@ -1742,6 +2051,138 @@ export default function AttendancePage() {
                       </>
                     ) : (
                       <span>सेभ गरी जोड्नुहोस्</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* 6.3. MODAL: WEEK-OFF ROSTER MANAGEMENT (ASSIGN WEEK-OFF TO STAFF) */}
+        {/* ================================================================= */}
+        {showRosterModal && (
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+            <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-purple-100 text-purple-700 rounded-lg">
+                    <Calendar className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-sm">
+                      साप्ताहिक बिदा तालिका (Weekly Off Roster)
+                    </h3>
+                    <p className="text-[11px] text-slate-500">
+                      प्रत्येक कर्मचारीको हप्ताको १ दिन बिदा तोक्नुहोस्। बिदाको दिन काम गरेमा सिस्टमले स्वतः अर्को नआएको दिनलाई बिदा मान्नेछ।
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setShowRosterModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Quick Actions & Search Bar */}
+              <div className="py-3 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 shrink-0">
+                <div className="relative w-full sm:w-64">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="कर्मचारी खोज्नुहोस्..."
+                    value={rosterSearch}
+                    onChange={(e) => setRosterSearch(e.target.value)}
+                    className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+
+                <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
+                  <span className="text-[11px] font-bold text-slate-500">एकमुष्ठ तोक्नुहोस्:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleBulkSetOffDay('Saturday')}
+                    className="px-2 py-1 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-200 cursor-pointer"
+                  >
+                    सबै शनिबार
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBulkSetOffDay('Sunday')}
+                    className="px-2 py-1 text-[10px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded border border-indigo-200 cursor-pointer"
+                  >
+                    सबै आइतबार
+                  </button>
+                </div>
+              </div>
+
+              {/* Roster Staff List */}
+              <div className="flex-1 overflow-y-auto divide-y divide-slate-100 my-2 pr-1">
+                {rosterStaffList
+                  .filter(item => {
+                    const q = rosterSearch.toLowerCase().trim();
+                    if (!q) return true;
+                    return item.name.toLowerCase().includes(q) || item.pin.includes(q) || item.dept.toLowerCase().includes(q);
+                  })
+                  .map((item, idx) => (
+                    <div key={item.id} className="py-2.5 flex items-center justify-between gap-3 text-xs hover:bg-slate-50/70 px-2 rounded-lg">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-6 text-[11px] font-bold text-slate-400">{idx + 1}.</span>
+                        <div>
+                          <p className="font-bold text-slate-900">{item.name}</p>
+                          <p className="text-[11px] text-slate-500">PIN #{item.pin} • {item.dept}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={item.offDay}
+                          onChange={(e) => {
+                            const newDay = e.target.value;
+                            setRosterStaffList(prev => prev.map(r => r.id === item.id ? { ...r, offDay: newDay } : r));
+                          }}
+                          className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-indigo-900 focus:outline-none focus:border-purple-500 cursor-pointer"
+                        >
+                          <option value="Saturday">शनिबार (Saturday)</option>
+                          <option value="Sunday">आइतबार (Sunday)</option>
+                          <option value="Monday">सोमबार (Monday)</option>
+                          <option value="Tuesday">मंगलबार (Tuesday)</option>
+                          <option value="Wednesday">बुधबार (Wednesday)</option>
+                          <option value="Thursday">बिहीबार (Thursday)</option>
+                          <option value="Friday">शुक्रबार (Friday)</option>
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+
+              {/* Footer */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between shrink-0">
+                <span className="text-[11px] text-slate-500">
+                  कुल {rosterStaffList.length} जना कर्मचारी
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowRosterModal(false)}
+                    disabled={isSavingRoster}
+                    className="px-4 py-2 rounded-lg font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs cursor-pointer"
+                  >
+                    रद्द गर्नुहोस्
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveRoster}
+                    disabled={isSavingRoster}
+                    className="px-4 py-2 rounded-lg font-bold bg-purple-600 hover:bg-purple-700 text-white text-xs shadow-xs cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {isSavingRoster ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                        <span>सेभ गर्दैछ...</span>
+                      </>
+                    ) : (
+                      <span>रोस्टर सुरक्षित गर्नुहोस् (Save Roster)</span>
                     )}
                   </button>
                 </div>
