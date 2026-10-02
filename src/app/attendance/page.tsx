@@ -15,6 +15,7 @@ import {
   Edit3, 
   CheckCircle2, 
   AlertCircle, 
+  AlertTriangle,
   X, 
   PlusCircle,
   FileSpreadsheet,
@@ -169,6 +170,10 @@ export default function AttendancePage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
 
+  // Assign Rotational Week-Off Modal
+  const [showWeekOffModal, setShowWeekOffModal] = useState<boolean>(false);
+  const [weekOffStaffId, setWeekOffStaffId] = useState<string>('');
+
   // Save records to state + localStorage
   const saveRecordsList = (newList: DailyAttendance[]) => {
     setRecords(newList);
@@ -288,7 +293,12 @@ export default function AttendancePage() {
                 }
               }
 
-              if (existing.in_time !== newIn || existing.out_time !== newOut || existing.employee_name !== empName || existing.worked_hours !== workedHours) {
+              const wasWeekOff = existing.status === 'WEEK_OFF' || existing.status === 'WEEKEND' || Boolean(existing.is_holiday_work);
+              const holidayStatus = wasWeekOff 
+                ? (existing.holiday_work_status || 'PENDING_APPROVAL')
+                : existing.holiday_work_status;
+
+              if (existing.in_time !== newIn || existing.out_time !== newOut || existing.employee_name !== empName || existing.worked_hours !== workedHours || (wasWeekOff && !existing.is_holiday_work)) {
                 updated[existingIdx] = {
                   ...existing,
                   employee_name: empName,
@@ -298,9 +308,13 @@ export default function AttendancePage() {
                   in_time: newIn,
                   out_time: newOut,
                   status: 'PRESENT',
+                  is_holiday_work: wasWeekOff ? true : existing.is_holiday_work,
+                  holiday_work_status: holidayStatus,
                   late_minutes: 0,
                   worked_hours: workedHours,
-                  remarks: matchedEmp ? 'ZKTeco Live Machine' : '⚠️ अनरजिस्टर्ड PIN'
+                  remarks: wasWeekOff
+                    ? (holidayStatus === 'APPROVED' ? 'बिदामा काम स्वीकृत (Approved Overtime)' : '⚠️ बिदाको दिन काम (Admin Approval Pending)')
+                    : (matchedEmp ? 'ZKTeco Live Machine' : '⚠️ अनरजिस्टर्ड PIN')
                 };
                 hasChanges = true;
               }
@@ -532,6 +546,84 @@ export default function AttendancePage() {
     alert('हाजिरी विवरण सफलतापूर्वक सच्याइयो!');
   };
 
+  // 1-Click Approve / Reject Holiday & Week-Off Duty
+  const handleApproveHolidayWork = (recordId: string, approve: boolean) => {
+    const updated = records.map(r => {
+      if (r.id === recordId) {
+        return {
+          ...r,
+          is_holiday_work: true,
+          holiday_work_status: (approve ? 'APPROVED' : 'REJECTED') as any,
+          approved_by: 'Master Admin',
+          approved_at: new Date().toISOString(),
+          remarks: approve 
+            ? `${r.remarks || ''} [बिदामा काम स्वीकृत - Approved Overtime]`.trim() 
+            : `${r.remarks || ''} [बिदामा काम अस्वीकृत - Rejected]`.trim()
+        };
+      }
+      return r;
+    });
+    saveRecordsList(updated);
+    alert(approve ? 'बिदाको दिन काम गरेको हाजिरी सफलतापूर्वक स्वीकृत (Approved) भयो!' : 'बिदाको दिनको हाजिरी अस्वीकृत (Rejected) गरियो।');
+  };
+
+  // 1-Click Quick Mark Rotational Week-Off for any staff
+  const handleQuickMarkWeekOff = (emp: { id: string; full_name: string; biometric_pin?: string; photo_url?: string; department_name?: string; designation?: string; }) => {
+    const existingIndex = records.findIndex(r => 
+      (r.employee_id === emp.id || (emp.biometric_pin && String(r.employee_pin) === String(emp.biometric_pin))) && 
+      (extractDateStr(r.date) || extractDateStr(r.in_time)) === selectedDate
+    );
+    let updated: DailyAttendance[];
+    if (existingIndex >= 0) {
+      updated = records.map((r, i) => i === existingIndex ? {
+        ...r,
+        status: 'WEEK_OFF' as any,
+        is_holiday_work: false,
+        holiday_work_status: undefined,
+        worked_hours: 0,
+        remarks: 'रोटेसनल साप्ताहिक बिदा (Rotational Week-Off)'
+      } : r);
+    } else {
+      const newRec: DailyAttendance = {
+        id: `weekoff-${emp.id}-${selectedDate}-${Date.now()}`,
+        employee_id: emp.id,
+        employee_name: emp.full_name,
+        employee_pin: emp.biometric_pin || '0',
+        employee_photo: emp.photo_url,
+        department_name: emp.department_name || 'AP1 Television',
+        designation: emp.designation || 'Staff',
+        date: selectedDate,
+        status: 'WEEK_OFF' as any,
+        late_minutes: 0,
+        early_exit_minutes: 0,
+        overtime_minutes: 0,
+        worked_hours: 0,
+        source: 'manual',
+        remarks: 'रोटेसनल साप्ताहिक बिदा (Rotational Week-Off)'
+      };
+      updated = [newRec, ...records];
+    }
+    saveRecordsList(updated);
+    alert(`${emp.full_name} को मिति ${selectedDate} मा साप्ताहिक बिदा (Week-Off) सफलतापूर्वक मार्क भयो!`);
+  };
+
+  // Assign Rotational Week-Off via Modal Form
+  const handleAssignWeekOffSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!weekOffStaffId) {
+      alert('कृपया कर्मचारी छान्नुहोस् (Please select an employee)');
+      return;
+    }
+    const staff = staffList.find(s => s.id === weekOffStaffId);
+    if (!staff) {
+      alert('कर्मचारी फेला परेन।');
+      return;
+    }
+    handleQuickMarkWeekOff(staff);
+    setShowWeekOffModal(false);
+    setWeekOffStaffId('');
+  };
+
   // Derived filtered records for table - STRICTLY filtered by selectedDate
   const filteredRecords = useMemo(() => {
     return records.filter(r => {
@@ -547,6 +639,10 @@ export default function AttendancePage() {
         if (!r.in_time || r.out_time) return false;
       } else if (statusFilter === 'COMPLETED') {
         if (!r.in_time || !r.out_time) return false;
+      } else if (statusFilter === 'WEEK_OFF') {
+        if (r.status !== 'WEEK_OFF' && r.status !== 'WEEKEND') return false;
+      } else if (statusFilter === 'HOLIDAY_PENDING') {
+        if (r.holiday_work_status !== 'PENDING_APPROVAL') return false;
       } else if (statusFilter !== 'ALL') {
         if (r.status !== statusFilter) return false;
       }
@@ -573,8 +669,10 @@ export default function AttendancePage() {
   const kpiPresent = dateRecords.filter(r => r.status === 'PRESENT' || r.in_time).length;
   const kpiInOffice = dateRecords.filter(r => r.in_time && !r.out_time).length;
   const kpiCompleted = dateRecords.filter(r => r.in_time && r.out_time).length;
+  const kpiWeekOff = dateRecords.filter(r => r.status === 'WEEK_OFF' || r.status === 'WEEKEND').length;
   const kpiOnLeave = dateRecords.filter(r => r.status === 'ON_LEAVE' || r.status === 'HALF_DAY').length;
-  const kpiAbsent = Math.max(0, kpiTotal - (kpiPresent + kpiOnLeave));
+  const kpiHolidayPending = dateRecords.filter(r => r.holiday_work_status === 'PENDING_APPROVAL').length;
+  const kpiAbsent = Math.max(0, kpiTotal - (kpiPresent + kpiOnLeave + kpiWeekOff));
 
   // Departments List
   const uniqueDepartments = useMemo(() => {
@@ -742,6 +840,7 @@ export default function AttendancePage() {
       dept: string;
       desig: string;
       presentDays: number;
+      weekOffDays: number;
       lateDays: number;
       totalLateMinutes: number;
       leaveDays: number;
@@ -756,6 +855,7 @@ export default function AttendancePage() {
         dept: s.department_name || 'AP1 Television',
         desig: s.designation || 'Staff',
         presentDays: 0,
+        weekOffDays: 0,
         lateDays: 0,
         totalLateMinutes: 0,
         leaveDays: 0,
@@ -773,6 +873,7 @@ export default function AttendancePage() {
           dept: r.department_name || 'AP1 Television',
           desig: r.designation || 'Staff',
           presentDays: 0,
+          weekOffDays: 0,
           lateDays: 0,
           totalLateMinutes: 0,
           leaveDays: 0,
@@ -787,10 +888,12 @@ export default function AttendancePage() {
         entry.presentDays += 1;
         entry.lateDays += 1;
         entry.totalLateMinutes += (r.late_minutes || 0);
+      } else if (r.status === 'WEEK_OFF' || r.status === 'WEEKEND') {
+        entry.weekOffDays += 1;
       } else if (r.status === 'ON_LEAVE' || r.status === 'HALF_DAY') {
         entry.leaveDays += 1;
       }
-      entry.workedHours += (r.worked_hours || 8);
+      entry.workedHours += (r.worked_hours || (r.status === 'WEEK_OFF' ? 0 : 8));
     });
 
     return Array.from(map.values());
@@ -803,12 +906,12 @@ export default function AttendancePage() {
       ['MONTHLY ATTENDANCE & PAYROLL SUMMARY REPORT'],
       [`Month: ${monthlyYearMonth}`, `Generated At: ${new Date().toLocaleString()}`],
       [],
-      ['S.N.', 'PIN', 'Staff Name', 'Department', 'Designation', 'Present Days', 'Late Days', 'Total Late (Mins)', 'Leave Days', 'Worked Hours', 'Attendance Rate %']
+      ['S.N.', 'PIN', 'Staff Name', 'Department', 'Designation', 'Present Days', 'Week-Off Days', 'Late Days', 'Total Late (Mins)', 'Leave Days', 'Worked Hours', 'Attendance Rate %']
     ];
 
     summary.forEach((item, idx) => {
       const workingDaysEstimate = 26;
-      const rate = Math.min(100, Math.round((item.presentDays / workingDaysEstimate) * 100));
+      const rate = Math.min(100, Math.round(((item.presentDays + item.weekOffDays) / 30) * 100));
       rows.push([
         String(idx + 1),
         item.pin,
@@ -816,6 +919,7 @@ export default function AttendancePage() {
         item.dept,
         item.desig,
         String(item.presentDays),
+        String(item.weekOffDays),
         String(item.lateDays),
         String(item.totalLateMinutes),
         String(item.leaveDays),
@@ -827,7 +931,7 @@ export default function AttendancePage() {
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws['!cols'] = [
       { wch: 6 }, { wch: 10 }, { wch: 24 }, { wch: 22 }, { wch: 20 },
-      { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 12 }, { wch: 14 }, { wch: 18 }
+      { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 12 }, { wch: 14 }, { wch: 18 }
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Monthly Summary');
@@ -853,14 +957,14 @@ export default function AttendancePage() {
     doc.text(`Total Staff Evaluated: ${summary.length}`, 220, 18);
 
     const tableBody = summary.map((s, i) => {
-      const workingDaysEstimate = 26;
-      const rate = Math.min(100, Math.round((s.presentDays / workingDaysEstimate) * 100));
+      const rate = Math.min(100, Math.round(((s.presentDays + s.weekOffDays) / 30) * 100));
       return [
         String(i + 1),
         `#${s.pin}`,
         s.name,
         s.dept,
         String(s.presentDays),
+        String(s.weekOffDays),
         String(s.lateDays),
         `${s.totalLateMinutes}m`,
         String(s.leaveDays),
@@ -871,13 +975,13 @@ export default function AttendancePage() {
 
     autoTable(doc, {
       startY: 32,
-      head: [['S.N.', 'PIN', 'Employee Name', 'Department', 'Present Days', 'Late Days', 'Late (Mins)', 'Leaves', 'Hours Worked', 'Attendance %']],
+      head: [['S.N.', 'PIN', 'Employee Name', 'Department', 'Present', 'Week-Off', 'Late Days', 'Late (Mins)', 'Leaves', 'Hours Worked', 'Attendance %']],
       body: tableBody,
       theme: 'grid',
       styles: { fontSize: 8, cellPadding: 2.5 },
       headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' },
       didParseCell: (data) => {
-        if (data.column.index === 9 && data.section === 'body') {
+        if (data.column.index === 10 && data.section === 'body') {
           const num = parseInt(String(data.cell.raw), 10);
           if (num >= 90) {
             data.cell.styles.textColor = [16, 185, 129];
@@ -965,13 +1069,24 @@ export default function AttendancePage() {
 
             {/* Manual Punch Button */}
             {(role === 'admin' || role === 'hr') && (
-              <button
-                onClick={() => setShowManualModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-xs cursor-pointer"
-              >
-                <PlusCircle className="w-3.5 h-3.5" />
-                <span>+ नयाँ हाजिरी थप्नुहोस्</span>
-              </button>
+              <>
+                <button
+                  onClick={() => setShowWeekOffModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-xs cursor-pointer"
+                  title="रोटेसनल साप्ताहिक बिदा तोक्नुहोस् (Assign Rotational Week-Off)"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>+ साप्ताहिक बिदा (Week-Off)</span>
+                </button>
+
+                <button
+                  onClick={() => setShowManualModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-xs cursor-pointer"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>+ नयाँ हाजिरी थप्नुहोस्</span>
+                </button>
+              </>
             )}
 
             {/* Print Sheet */}
@@ -1025,7 +1140,7 @@ export default function AttendancePage() {
         {/* ================================================================= */}
         {/* 3. INTERACTIVE KPI METRIC CARDS (CLICKABLE FILTER)                */}
         {/* ================================================================= */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {/* Total Staff */}
           <div
             onClick={() => setStatusFilter('ALL')}
@@ -1097,6 +1212,23 @@ export default function AttendancePage() {
             <p className="text-[11px] text-blue-600 mt-0.5">पञ्च आउट भइसकेका</p>
           </div>
 
+          {/* Rotational Week-Off */}
+          <div
+            onClick={() => setStatusFilter(statusFilter === 'WEEK_OFF' ? 'ALL' : 'WEEK_OFF')}
+            className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
+              statusFilter === 'WEEK_OFF'
+                ? 'bg-indigo-50/80 border-indigo-500 shadow-sm ring-1 ring-indigo-400'
+                : 'bg-white border-slate-200 hover:border-slate-300 shadow-xs'
+            }`}
+          >
+            <div className="flex items-center justify-between text-indigo-600 text-xs font-semibold">
+              <span>साप्ताहिक बिदा</span>
+              <Calendar className="w-4 h-4 text-indigo-600" />
+            </div>
+            <p className="text-2xl font-black text-indigo-900 mt-1">{kpiWeekOff}</p>
+            <p className="text-[11px] text-indigo-600 mt-0.5">रोटेसनल अफ (Week-Off)</p>
+          </div>
+
           {/* Absent / Leave */}
           <div
             onClick={() => setStatusFilter('ABSENT')}
@@ -1111,9 +1243,27 @@ export default function AttendancePage() {
               <UserX className="w-4 h-4 text-rose-600" />
             </div>
             <p className="text-2xl font-black text-rose-900 mt-1">{kpiAbsent}</p>
-            <p className="text-[11px] text-rose-600 mt-0.5">आज हाजिरी नभएका</p>
+            <p className="text-[11px] text-rose-600 mt-0.5">हाजिरी नभएका (गयल)</p>
           </div>
         </div>
+
+        {/* Holiday / Week-Off Work Approval Alert Banner */}
+        {kpiHolidayPending > 0 && (
+          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between gap-3 text-amber-900 text-xs font-bold animate-pulse">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                सूचना: {kpiHolidayPending} जना कर्मचारीले आज बिदा / Week-Off को दिन मेशिनमा हाजिरी गर्नुभएको छ। प्रशासक (Admin) ले अनुमोदन गर्न बाँकी छ।
+              </span>
+            </div>
+            <button
+              onClick={() => setStatusFilter('HOLIDAY_PENDING')}
+              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold cursor-pointer"
+            >
+              अनुमोदन सूची हेर्नुहोस् (Review)
+            </button>
+          </div>
+        )}
 
         {/* ================================================================= */}
         {/* 4. FILTER BAR: DUAL DATE, DEPARTMENTS & EXPORT OPTIONS           */}
@@ -1261,6 +1411,8 @@ export default function AttendancePage() {
                 <option value="ALL">सबै स्थिति (All Status)</option>
                 <option value="IN_OFFICE">🏢 अहिले अफिसमा (Currently In Office)</option>
                 <option value="PRESENT">✅ उपस्थित (Present)</option>
+                <option value="WEEK_OFF">🌴 साप्ताहिक बिदा (Rotational Week-Off)</option>
+                <option value="HOLIDAY_PENDING">⚠️ बिदामा काम (Approval Pending)</option>
                 <option value="LATE">⚠️ ढिलो (Late)</option>
                 <option value="HALF_DAY">🌓 हाफ डे (Half Day)</option>
                 <option value="ABSENT">❌ अनुपस्थित (Absent)</option>
@@ -1376,26 +1528,90 @@ export default function AttendancePage() {
                         )}
                       </td>
 
-                      {/* Status Colored Badge */}
+                      {/* Status Colored Badge & Holiday Work Approval Status */}
                       <td className="py-3 px-4">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                          r.status === 'PRESENT'
-                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                            : r.status === 'LATE'
-                            ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                            : r.status === 'HALF_DAY'
-                            ? 'bg-orange-100 text-orange-800 border border-orange-300'
-                            : r.status === 'ON_LEAVE'
-                            ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                            : 'bg-rose-100 text-rose-800 border border-rose-300'
-                        }`}>
-                          {r.status}
-                        </span>
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                            r.status === 'PRESENT'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : r.status === 'WEEK_OFF' || r.status === 'WEEKEND'
+                              ? 'bg-indigo-100 text-indigo-800 border border-indigo-300'
+                              : r.status === 'LATE'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                              : r.status === 'HALF_DAY'
+                              ? 'bg-orange-100 text-orange-800 border border-orange-300'
+                              : r.status === 'ON_LEAVE'
+                              ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                              : 'bg-rose-100 text-rose-800 border border-rose-300'
+                          }`}>
+                            {r.status === 'WEEK_OFF' ? '🌴 WEEK_OFF' : r.status}
+                          </span>
+
+                          {/* Approval Status Badge for Holiday / Week-Off Work */}
+                          {r.holiday_work_status === 'PENDING_APPROVAL' && (
+                            <div className="flex items-center gap-1.5 mt-1 bg-amber-50 p-1 rounded-lg border border-amber-300">
+                              <span className="text-[10px] font-bold text-amber-900 animate-pulse">
+                                ⚠️ बिदामा काम (स्वीकृति बाँकी)
+                              </span>
+                              {(role === 'admin' || role === 'hr') && (
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleApproveHolidayWork(r.id, true)}
+                                    className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer"
+                                    title="Approve Holiday Work"
+                                  >
+                                    ✓ Approve
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleApproveHolidayWork(r.id, false)}
+                                    className="px-1.5 py-0.5 bg-rose-600 hover:bg-rose-700 text-white rounded text-[10px] font-bold cursor-pointer"
+                                    title="Reject"
+                                  >
+                                    ✕ Reject
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {r.holiday_work_status === 'APPROVED' && (
+                            <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                              ✓ बिदामा काम स्वीकृत
+                            </span>
+                          )}
+
+                          {r.holiday_work_status === 'REJECTED' && (
+                            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                              ✕ बिदामा काम अस्वीकृत
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Actions */}
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {/* Quick 1-Click Week-Off Button */}
+                          {(role === 'admin' || role === 'hr') && r.status !== 'WEEK_OFF' && (
+                            <button
+                              type="button"
+                              onClick={() => handleQuickMarkWeekOff({
+                                id: r.employee_id,
+                                full_name: r.employee_name || 'Staff',
+                                biometric_pin: r.employee_pin,
+                                photo_url: r.employee_photo,
+                                department_name: r.department_name,
+                                designation: r.designation
+                              })}
+                              className="px-2 py-1 text-[11px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md transition-colors cursor-pointer flex items-center gap-1"
+                              title="आजको दिन यो कर्मचारीलाई साप्ताहिक बिदा (Week-Off) मार्क गर्नुहोस्"
+                            >
+                              <span>🌴</span>
+                              <span className="hidden sm:inline">Week-Off</span>
+                            </button>
+                          )}
                           {isUnassigned && (
                             <button
                               onClick={() => openAssignPinModal(r.employee_pin || '')}
@@ -1535,6 +1751,76 @@ export default function AttendancePage() {
         )}
 
         {/* ================================================================= */}
+        {/* 6.5. MODAL: ASSIGN ROTATIONAL WEEK-OFF TO STAFF                    */}
+        {/* ================================================================= */}
+        {showWeekOffModal && (
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-indigo-100 text-indigo-700 rounded-lg">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-sm">
+                      साप्ताहिक बिदा तोक्नुहोस् (Assign Week-Off)
+                    </h3>
+                    <p className="text-[11px] text-slate-500">
+                      रोटेसनल सिफ्ट अनुसार कर्मचारीको साप्ताहिक बिदा मार्क गर्नुहोस्
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setShowWeekOffModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAssignWeekOffSubmit} className="space-y-4 mt-4 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">कर्मचारी छान्नुहोस्</label>
+                  <select
+                    value={weekOffStaffId}
+                    onChange={(e) => setWeekOffStaffId(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 font-medium"
+                  >
+                    <option value="">-- कर्मचारी छान्नुहोस् --</option>
+                    {staffList.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.full_name} ({s.designation}) - PIN #{s.biometric_pin}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-200 text-indigo-900 space-y-1">
+                  <p className="font-bold">मिति: {selectedDate} {bsDate ? `(${bsDate.formattedNp})` : ''}</p>
+                  <p className="text-[11px] text-indigo-700">
+                    साप्ताहिक बिदा (Week-Off) मार्क गरेपछि यो दिन तलब नकाटिने गरी (Paid Leave) सुरक्षित हुनेछ। यदि उक्त दिन कर्मचारी आएर औंठा हान्नुभयो भने Admin ले अतिरिक्त ड्युटी (Overtime) स्वीकृति दिन सक्नुहुनेछ।
+                  </p>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowWeekOffModal(false)}
+                    className="px-4 py-2 rounded-lg font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700"
+                  >
+                    रद्द गर्नुहोस्
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-lg font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs cursor-pointer"
+                  >
+                    साप्ताहिक बिदा सुरक्षित गर्नुहोस्
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================================= */}
         {/* 7. MODAL: MANUAL PUNCH ENTRY                                      */}
         {/* ================================================================= */}
         {showManualModal && (
@@ -1595,10 +1881,11 @@ export default function AttendancePage() {
                       onChange={(e) => setManualForm({ ...manualForm, status: e.target.value })}
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none"
                     >
-                      <option value="PRESENT">PRESENT</option>
-                      <option value="LATE">LATE</option>
-                      <option value="HALF_DAY">HALF_DAY</option>
-                      <option value="ON_LEAVE">ON_LEAVE</option>
+                      <option value="PRESENT">PRESENT (उपस्थित)</option>
+                      <option value="WEEK_OFF">WEEK_OFF (साप्ताहिक बिदा)</option>
+                      <option value="LATE">LATE (ढिलो)</option>
+                      <option value="HALF_DAY">HALF_DAY (हाफ डे)</option>
+                      <option value="ON_LEAVE">ON_LEAVE (बिदामा)</option>
                     </select>
                   </div>
                 </div>
@@ -1753,14 +2040,54 @@ export default function AttendancePage() {
                   <select
                     value={editRecord.status}
                     onChange={(e) => setEditRecord({ ...editRecord, status: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 font-medium"
                   >
-                    <option value="PRESENT">PRESENT</option>
-                    <option value="LATE">LATE</option>
-                    <option value="HALF_DAY">HALF_DAY</option>
-                    <option value="ABSENT">ABSENT</option>
-                    <option value="ON_LEAVE">ON_LEAVE</option>
+                    <option value="PRESENT">PRESENT (उपस्थित)</option>
+                    <option value="WEEK_OFF">WEEK_OFF (साप्ताहिक बिदा)</option>
+                    <option value="LATE">LATE (ढिलो)</option>
+                    <option value="HALF_DAY">HALF_DAY (हाफ डे)</option>
+                    <option value="ABSENT">ABSENT (अनुपस्थित)</option>
+                    <option value="ON_LEAVE">ON_LEAVE (बिदामा)</option>
                   </select>
+                </div>
+
+                {/* Holiday / Week-Off Work Approval Section */}
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="edit_is_holiday_work"
+                      checked={Boolean(editRecord.is_holiday_work)}
+                      onChange={(e) => setEditRecord({
+                        ...editRecord,
+                        is_holiday_work: e.target.checked,
+                        holiday_work_status: e.target.checked ? (editRecord.holiday_work_status || 'PENDING_APPROVAL') : undefined
+                      })}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+                    />
+                    <label htmlFor="edit_is_holiday_work" className="font-bold text-slate-800 text-xs cursor-pointer">
+                      बिदाको दिन काम गरेको ड्युटी (Holiday / Week-Off Work)
+                    </label>
+                  </div>
+                  {editRecord.is_holiday_work && (
+                    <div className="pt-2 border-t border-amber-200/60 flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold text-amber-900">स्वीकृति स्थिति (Approval Status):</span>
+                      <select
+                        value={editRecord.holiday_work_status || 'PENDING_APPROVAL'}
+                        onChange={(e) => setEditRecord({
+                          ...editRecord,
+                          holiday_work_status: e.target.value as any,
+                          approved_by: e.target.value === 'APPROVED' ? 'Master Admin' : undefined,
+                          approved_at: e.target.value === 'APPROVED' ? new Date().toISOString() : undefined
+                        })}
+                        className="px-2 py-1 bg-white border border-amber-300 rounded text-xs font-bold text-slate-800"
+                      >
+                        <option value="PENDING_APPROVAL">⚠️ PENDING_APPROVAL (स्वीकृति बाँकी)</option>
+                        <option value="APPROVED">✅ APPROVED (स्वीकृत)</option>
+                        <option value="REJECTED">❌ REJECTED (अस्वीकृत)</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">

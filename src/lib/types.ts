@@ -7,7 +7,8 @@ export type AttendanceStatus =
   | 'ABSENT' 
   | 'ON_LEAVE' 
   | 'HOLIDAY' 
-  | 'WEEKEND';
+  | 'WEEKEND'
+  | 'WEEK_OFF';
 
 export interface Employee {
   id: string;
@@ -71,6 +72,10 @@ export interface DailyAttendance {
   worked_hours: number;
   remarks?: string;
   source: string;
+  is_holiday_work?: boolean;
+  holiday_work_status?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+  approved_by?: string;
+  approved_at?: string;
 }
 
 export interface BiometricLog {

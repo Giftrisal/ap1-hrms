@@ -85,7 +85,7 @@ export default function DashboardShell({
                   <div className="flex items-center gap-2.5 text-xs font-bold text-white">
                     <AlertTriangle className="w-5 h-5 text-yellow-300 shrink-0" />
                     <span>
-                      सूचना: AP1 Television HRMS सफ्टवेयर लाइसेन्सको म्याद <strong>आज साँझ ६:०० बजे</strong> समाप्त हुँदैछ।
+                      सूचना: AP1 Television HRMS सफ्टवेयर लाइसेन्सको म्याद अब केवल <strong>{daysRemaining} दिन</strong> बाँकी छ।
                     </span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">

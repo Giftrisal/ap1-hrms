@@ -161,7 +161,7 @@ export default function LicenseStatusCard() {
         <div className="mt-4 p-3.5 bg-red-600 border border-red-700 rounded-xl flex items-center gap-3 text-white text-xs font-semibold shadow-md">
           <AlertTriangle className="w-5 h-5 text-yellow-300 shrink-0 animate-bounce" />
           <div>
-            <span className="font-bold">चेतावनी:</span> सफ्टवेयर लाइसेन्सको म्याद <strong>आज साँझ ६:०० बजे</strong> समाप्त हुँदैछ। सेवा अवरुद्ध हुन नदिन कृपया समयमै नवीकरण गर्नुहोस्।
+            <span className="font-bold">चेतावनी:</span> तपाईंको लाइसेन्सको म्याद अब <strong>{timeRemainingLabel}</strong> मात्र बाँकी छ। सेवा अवरुद्ध हुन नदिन कृपया समयमै नवीकरण गर्नुहोस्।
           </div>
         </div>
       )}
