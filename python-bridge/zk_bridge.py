@@ -152,6 +152,9 @@ def pull_and_sync_attendance(ip, port, api_url, api_secret):
                     "device_ip": ip
                 })
 
+            # Sort newest punches first so today's punches are always at the top of the payload
+            payload.sort(key=lambda x: x.get("punch_time", ""), reverse=True)
+
             # Offline Queue check: merge any previously failed offline punches
             offline_cache_file = os.path.join(os.path.dirname(__file__), "offline_queue.json")
             if os.path.exists(offline_cache_file):
