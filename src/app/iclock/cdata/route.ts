@@ -100,7 +100,9 @@ export async function POST(req: NextRequest) {
           l => !existingKeys.has(`${l.user_id || l.biometric_pin}_${l.punch_time}`)
         );
 
-        const merged = [...uniqueNew, ...current.logs].slice(0, 500);
+        const merged = [...uniqueNew, ...current.logs]
+          .sort((a, b) => (b.punch_time || '').localeCompare(a.punch_time || ''))
+          .slice(0, 1000);
         await savePunches(merged, syncTime, `ADMS-Cloud (${sn})`);
 
         return new NextResponse(`OK: ${newPunches.length}`, {

@@ -78,7 +78,10 @@ export async function loadPunches(): Promise<{ logs: any[]; lastSyncTime: string
 
     if (!error && data?.content?.[0]) {
       const payload = data.content[0];
-      const logs = Array.isArray(payload.logs) ? payload.logs : [];
+      const rawLogs = Array.isArray(payload.logs) ? payload.logs : [];
+      const logs = rawLogs.sort((a: any, b: any) => 
+        (b.punch_time || '').localeCompare(a.punch_time || '')
+      );
       memoryPunchesCache = {
         logs,
         lastSyncTime: payload.lastSyncTime || null,
@@ -87,7 +90,7 @@ export async function loadPunches(): Promise<{ logs: any[]; lastSyncTime: string
       };
 
       try {
-        fs.writeFileSync(getTmpCachePath(), JSON.stringify(payload, null, 2), 'utf-8');
+        fs.writeFileSync(getTmpCachePath(), JSON.stringify({ ...payload, logs }, null, 2), 'utf-8');
       } catch {}
 
       return memoryPunchesCache;
@@ -100,6 +103,9 @@ export async function loadPunches(): Promise<{ logs: any[]; lastSyncTime: string
     if (fs.existsSync(p)) {
       const parsed = JSON.parse(fs.readFileSync(p, 'utf-8'));
       if (parsed && Array.isArray(parsed.logs)) {
+        parsed.logs.sort((a: any, b: any) => 
+          (b.punch_time || '').localeCompare(a.punch_time || '')
+        );
         return parsed;
       }
     }
@@ -109,15 +115,19 @@ export async function loadPunches(): Promise<{ logs: any[]; lastSyncTime: string
 }
 
 export async function savePunches(logs: any[], lastSyncTime: string, lastDeviceIp: string): Promise<void> {
+  const sorted = [...logs].sort((a: any, b: any) => 
+    (b.punch_time || '').localeCompare(a.punch_time || '')
+  );
+
   memoryPunchesCache = {
-    logs,
+    logs: sorted,
     lastSyncTime,
     lastDeviceIp,
     lastFetched: Date.now()
   };
 
   const payload = {
-    logs: logs.slice(0, 500),
+    logs: sorted.slice(0, 1000),
     lastSyncTime,
     lastDeviceIp,
     updatedAt: new Date().toISOString()

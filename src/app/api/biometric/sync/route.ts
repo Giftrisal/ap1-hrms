@@ -38,7 +38,9 @@ export async function POST(req: NextRequest) {
     const existingKeys = new Set(current.logs.map(l => `${l.user_id || l.biometric_pin}_${l.punch_time}`));
     const newUnique = processed.filter(l => !existingKeys.has(`${l.user_id || l.biometric_pin}_${l.punch_time}`));
 
-    const merged = [...newUnique, ...current.logs].slice(0, 500);
+    const merged = [...newUnique, ...current.logs]
+      .sort((a, b) => (b.punch_time || '').localeCompare(a.punch_time || ''))
+      .slice(0, 1000);
     await savePunches(merged, syncTime, deviceIp);
 
     return NextResponse.json({
@@ -60,13 +62,17 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   const current = await loadPunches();
+  const sortedLogs = [...current.logs].sort((a, b) => 
+    (b.punch_time || '').localeCompare(a.punch_time || '')
+  );
+
   return NextResponse.json({
     status: 'online',
     last_sync: current.lastSyncTime || new Date().toISOString(),
     device_ip: current.lastDeviceIp || '192.168.1.201',
     port: 4370,
     cached_logs_count: current.logs.length,
-    recent_logs: current.logs.slice(0, 50)
+    recent_logs: sortedLogs.slice(0, 500)
   });
 }
 
