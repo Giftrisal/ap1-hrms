@@ -465,17 +465,20 @@ export default function AttendancePage() {
           let updated = [...prev];
           let hasChanges = false;
 
-          // Auto-purge any orphaned biometric logs for today that do not exist on the server
-          const validKeys = new Set(data.recent_logs.map((l: any) => `${String(l.user_id || l.biometric_pin || '').trim()}_${extractDateStr(l.punch_time)}`));
-          const purged = updated.filter(r => {
-            if (r.id?.startsWith('zk-') && (extractDateStr(r.date) || extractDateStr(r.in_time)) === getLocalDateStr()) {
-              return validKeys.has(`${String(r.employee_pin).trim()}_${getLocalDateStr()}`);
+          // Only purge if server actually returned valid biometric logs for today
+          const todayLogsInServer = data.recent_logs.filter((l: any) => extractDateStr(l.punch_time) === getLocalDateStr());
+          if (todayLogsInServer.length > 0) {
+            const validKeys = new Set(data.recent_logs.map((l: any) => `${String(l.user_id || l.biometric_pin || '').trim()}_${extractDateStr(l.punch_time)}`));
+            const purged = updated.filter(r => {
+              if (r.id?.startsWith('zk-') && (extractDateStr(r.date) || extractDateStr(r.in_time)) === getLocalDateStr()) {
+                return validKeys.has(`${String(r.employee_pin).trim()}_${getLocalDateStr()}`);
+              }
+              return true;
+            });
+            if (purged.length !== updated.length) {
+              updated = purged;
+              hasChanges = true;
             }
-            return true;
-          });
-          if (purged.length !== updated.length) {
-            updated = purged;
-            hasChanges = true;
           }
 
           for (const log of data.recent_logs) {
