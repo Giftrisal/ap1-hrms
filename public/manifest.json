@@ -1,7 +1,7 @@
 {
-  "name": "Staff Portal",
-  "short_name": "Staff Portal",
-  "description": "AP1 Television Corporate HRMS & Mobile Staff Portal",
+  "name": "AP1 HRMS",
+  "short_name": "AP1 HRMS",
+  "description": "AP1 Television Corporate HRMS & Biometric Attendance Portal",
   "start_url": "/portal",
   "scope": "/",
   "id": "/portal",
