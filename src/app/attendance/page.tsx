@@ -252,8 +252,10 @@ export default function AttendancePage() {
               if (d === '2026-09-25' && String(r.employee_pin).trim() === '101') return false;
               return true;
             });
-            localStorage.setItem('goinfi_attendance_records', JSON.stringify(cleaned));
-            return cleaned.map((r: any) => {
+            try {
+              localStorage.setItem('goinfi_attendance_records', JSON.stringify(cleaned.slice(0, 200)));
+            } catch (e) {}
+            return cleaned.slice(0, 200).map((r: any) => {
               let rec = { ...r };
               if (!rec.out_time || rec.in_time === rec.out_time) {
                 rec.worked_hours = 0;
@@ -389,7 +391,13 @@ export default function AttendancePage() {
       // 2. Update local state & localStorage
       setStaffList(updatedStaffList);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('goinfi_staff_list', JSON.stringify(updatedStaffList));
+        try {
+          const sanitized = updatedStaffList.map((s: any) => ({
+            ...s,
+            photo_url: s.photo_url?.startsWith('data:') ? undefined : s.photo_url
+          }));
+          localStorage.setItem('goinfi_staff_list', JSON.stringify(sanitized));
+        } catch (e) {}
       }
 
       setShowRosterModal(false);
@@ -409,7 +417,9 @@ export default function AttendancePage() {
   const saveRecordsList = (newList: DailyAttendance[]) => {
     setRecords(newList);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('goinfi_attendance_records', JSON.stringify(newList));
+      try {
+        localStorage.setItem('goinfi_attendance_records', JSON.stringify(newList.slice(0, 200)));
+      } catch (e) {}
     }
   };
 
@@ -421,7 +431,13 @@ export default function AttendancePage() {
       if (data.success && Array.isArray(data.staff)) {
         setStaffList(data.staff);
         if (typeof window !== 'undefined') {
-          localStorage.setItem('goinfi_staff_list', JSON.stringify(data.staff));
+          try {
+            const sanitized = data.staff.map((s: any) => ({
+              ...s,
+              photo_url: s.photo_url?.startsWith('data:') ? undefined : s.photo_url
+            }));
+            localStorage.setItem('goinfi_staff_list', JSON.stringify(sanitized));
+          } catch (e) {}
         }
       }
     } catch (err) {}
@@ -538,7 +554,7 @@ export default function AttendancePage() {
                   employee_name: empName,
                   department_name: deptName,
                   designation: designation,
-                  employee_photo: photo || existing.employee_photo,
+                  employee_photo: (photo && !photo.startsWith('data:')) ? photo : existing.employee_photo,
                   in_time: newIn,
                   out_time: newOut,
                   status: 'PRESENT',
@@ -561,7 +577,7 @@ export default function AttendancePage() {
                 employee_pin: pin,
                 department_name: deptName,
                 designation: designation,
-                employee_photo: photo,
+                employee_photo: (photo && !photo.startsWith('data:')) ? photo : undefined,
                 date: punchDate,
                 in_time: log.punch_time,
                 out_time: isOutPunch ? log.punch_time : undefined,
@@ -579,7 +595,9 @@ export default function AttendancePage() {
           }
 
           if (hasChanges && typeof window !== 'undefined') {
-            localStorage.setItem('goinfi_attendance_records', JSON.stringify(updated));
+            try {
+              localStorage.setItem('goinfi_attendance_records', JSON.stringify(updated.slice(0, 200)));
+            } catch (e) {}
           }
           return updated;
         });
@@ -674,7 +692,13 @@ export default function AttendancePage() {
       });
       setStaffList(updatedStaffList);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('goinfi_staff_list', JSON.stringify(updatedStaffList));
+        try {
+          const sanitized = updatedStaffList.map((s: any) => ({
+            ...s,
+            photo_url: s.photo_url?.startsWith('data:') ? undefined : s.photo_url
+          }));
+          localStorage.setItem('goinfi_staff_list', JSON.stringify(sanitized));
+        } catch (e) {}
       }
 
       // 4. Update current attendance records matching this pin
