@@ -93,7 +93,7 @@ export const masterAdminUser: Employee = {
   biometric_pin: "999",
   full_name: "Master Administrator",
   email: "admin@ap1hdtv.com",
-  phone: "9800000000",
+  phone: "9715400400",
   photo_url: "",
   department_id: "dept-1",
   department_name: "Executive Management",

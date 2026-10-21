@@ -6,7 +6,7 @@ import path from 'path';
 
 export const dynamic = 'force-dynamic';
 
-const MASTER_ADMIN_PHONE = '9801239000';
+const MASTER_ADMIN_PHONE = process.env.MASTER_ADMIN_PHONE || '9715400400';
 // Only secure default master passwords (insecure 'admin', 'admin123' removed)
 const DEFAULT_PASSWORDS = [
   'AP1#Master@2026!',

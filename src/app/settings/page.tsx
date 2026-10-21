@@ -36,7 +36,7 @@ export default function SettingsPage() {
   const [connectionMessage, setConnectionMessage] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
 
-  // Master Admin Password Change (Protected via OTP to 9801239000)
+  // Master Admin Password Change (Protected via OTP to 9715400400)
   const [adminOtpSent, setAdminOtpSent] = useState(false);
   const [adminOtpSending, setAdminOtpSending] = useState(false);
   const [adminOtp, setAdminOtp] = useState('');
@@ -44,6 +44,7 @@ export default function SettingsPage() {
   const [adminConfirmPassword, setAdminConfirmPassword] = useState('');
   const [adminShowPass, setAdminShowPass] = useState(false);
   const [adminVerificationToken, setAdminVerificationToken] = useState('');
+  const [adminTargetPhone, setAdminTargetPhone] = useState('9715400400');
   const [adminUpdating, setAdminUpdating] = useState(false);
   const [adminMessage, setAdminMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [adminResendCountdown, setAdminResendCountdown] = useState(0);
@@ -69,9 +70,10 @@ export default function SettingsPage() {
       if (data.success) {
         setAdminOtpSent(true);
         setAdminVerificationToken(data.verificationToken || '');
+        if (data.targetPhone) setAdminTargetPhone(data.targetPhone);
         setAdminMessage({
           type: 'success',
-          text: 'सुरक्षा कोड (OTP) सफलतापूर्वक +977-9801239000 मा पठाइयो। कृपया मोबाइल चेक गर्नुहोस्।'
+          text: `सुरक्षा कोड (OTP) सफलतापूर्वक ${data.targetPhone || '+977-9715400400'} मा पठाइयो। कृपया मोबाइल चेक गर्नुहोस्।`
         });
         setAdminResendCountdown(60);
       } else {
@@ -89,7 +91,7 @@ export default function SettingsPage() {
     setAdminMessage(null);
 
     if (!adminOtp || adminOtp.trim().length < 6) {
-      setAdminMessage({ type: 'error', text: 'कृपया 9801239000 मा प्राप्त भएको ६-अंकको OTP कोड हाल्नुहोस्।' });
+      setAdminMessage({ type: 'error', text: 'कृपया 9715400400 मा प्राप्त भएको ६-अंकको OTP कोड हाल्नुहोस्।' });
       return;
     }
 
@@ -428,7 +430,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Section: Master Admin Security & Password Change (OTP to 9801239000) */}
+        {/* Section: Master Admin Security & Password Change (OTP to 9715400400) */}
         <div className="bg-white border border-purple-200 p-6 rounded-2xl shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-purple-100">
             <div className="flex items-center gap-3">
@@ -441,7 +443,7 @@ export default function SettingsPage() {
                   <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-extrabold border border-purple-200">2FA OTP Secured</span>
                 </h4>
                 <p className="text-xs text-slate-500">
-                  सुरक्षाका लागि Master Admin को पासवर्ड परिवर्तन गर्दा OTP कोड सिधै मोबाइल नम्बर <span className="font-mono font-bold text-purple-700">+977-9801239000</span> मा जानेछ।
+                  सुरक्षाका लागि Master Admin को पासवर्ड परिवर्तन गर्दा OTP कोड सिधै मोबाइल नम्बर <span className="font-mono font-bold text-purple-700">+977-9715400400</span> मा जानेछ।
                 </p>
               </div>
             </div>
@@ -454,7 +456,7 @@ export default function SettingsPage() {
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 text-white rounded-xl font-bold text-xs transition-all shadow-xs self-start sm:self-auto cursor-pointer disabled:opacity-60"
               >
                 <Smartphone className={`w-4 h-4 ${adminOtpSending ? 'animate-pulse' : ''}`} />
-                <span>{adminOtpSending ? 'OTP पठाउँदै...' : 'OTP कोड पठाउनुहोस् (9801239000)'}</span>
+                <span>{adminOtpSending ? 'OTP पठाउँदै...' : 'OTP कोड पठाउनुहोस् (9715400400)'}</span>
               </button>
             ) : (
               <button
@@ -492,7 +494,7 @@ export default function SettingsPage() {
                 {/* OTP Input */}
                 <div>
                   <label className="block font-bold text-slate-700 text-xs mb-1">
-                    ६-अंकको OTP कोड (9801239000 मा आएको) *
+                    ६-अंकको OTP कोड (9715400400 मा आएको) *
                   </label>
                   <div className="relative">
                     <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -506,7 +508,7 @@ export default function SettingsPage() {
                     />
                   </div>
                   <span className="text-[10px] text-slate-500 mt-1 block">
-                    सिस्टमले +977-9801239000 मा OTP पठाएको छ।
+                    सिस्टमले +977-9715400400 मा OTP पठाएको छ।
                   </span>
                 </div>
 
