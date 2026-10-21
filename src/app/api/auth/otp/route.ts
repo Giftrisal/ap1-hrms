@@ -1,22 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendGoinfiSms, formatOtpMessage, normalizePhoneNumber } from '@/lib/sms';
+import { createSignedOtpToken, verifySignedOtpToken, checkRateLimit } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
-
-interface StoredOtp {
-  pin: string;
-  phone: string;
-  code: string;
-  expiresAt: number;
-}
-
-// In-memory OTP storage map (key: `${pin}_${phone}`)
-const otpStore = new Map<string, StoredOtp>();
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { action, pin, phone, code, staffName, type, gatewayConfig } = body;
+    const { action, pin, phone, code, staffName, type, gatewayConfig, verificationToken } = body;
 
     const cleanPin = (pin || '').toString().trim();
     const cleanPhone = normalizePhoneNumber(phone || '');
@@ -28,8 +19,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const storeKey = `${cleanPin}_${cleanPhone}`;
-
     // ACTION: SEND OTP
     if (action === 'send') {
       if (!cleanPhone || cleanPhone.length < 9) {
@@ -39,16 +28,17 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      // Rate limit check: max 4 attempts per phone number per 10 mins
+      const rateCheck = checkRateLimit(`otp_${cleanPhone}`, 4, 10 * 60 * 1000);
+      if (!rateCheck.allowed) {
+        return NextResponse.json(
+          { success: false, error: `Too many OTP requests. Please wait ${rateCheck.retryAfter || 60} seconds before retrying.` },
+          { status: 429 }
+        );
+      }
+
       // Generate secure 6-digit OTP code
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
-
-      otpStore.set(storeKey, {
-        pin: cleanPin,
-        phone: cleanPhone,
-        code: generatedOtp,
-        expiresAt,
-      });
 
       const messageText = formatOtpMessage(
         generatedOtp,
@@ -58,20 +48,18 @@ export async function POST(req: NextRequest) {
 
       const smsResult = await sendGoinfiSms(cleanPhone, messageText, generatedOtp, gatewayConfig);
 
-      const verificationToken = Buffer.from(
-        JSON.stringify({
-          pin: cleanPin,
-          phone: cleanPhone,
-          code: generatedOtp,
-          exp: expiresAt,
-        })
-      ).toString('base64');
+      // Secure HMAC token (NEVER leaks plaintext OTP code)
+      const token = createSignedOtpToken(
+        { pin: cleanPin, phone: cleanPhone },
+        generatedOtp,
+        300
+      );
 
       return NextResponse.json({
         success: true,
         message: `Verification OTP code dispatched for mobile number +977-${cleanPhone}.`,
         channel: smsResult.channel,
-        verificationToken,
+        verificationToken: token,
         expiresInSeconds: 300,
       });
     }
@@ -79,55 +67,29 @@ export async function POST(req: NextRequest) {
     // ACTION: VERIFY OTP
     if (action === 'verify') {
       const inputCode = (code || '').toString().trim();
-      const token = body.verificationToken;
 
-      if (!inputCode) {
+      if (!inputCode || inputCode.length !== 6) {
         return NextResponse.json(
-          { success: false, error: 'Please enter the 6-digit OTP code.' },
+          { success: false, error: 'Please enter a valid 6-digit OTP code.' },
           { status: 400 }
         );
       }
 
-      let expectedOtp: string | null = null;
-      let expiresAt: number = 0;
-
-      const record = otpStore.get(storeKey);
-      if (record) {
-        expectedOtp = record.code;
-        expiresAt = record.expiresAt;
-      } else if (token) {
-        // Fallback for serverless container recycling
-        try {
-          const decoded = JSON.parse(Buffer.from(token, 'base64').toString('utf-8'));
-          if (decoded.pin === cleanPin && decoded.phone === cleanPhone) {
-            expectedOtp = decoded.code;
-            expiresAt = decoded.exp;
-          }
-        } catch {}
-      }
-
-      // Allow master code '123456' for immediate admin/testing bypass or match exact generated OTP
-      const isMasterCode = inputCode === '123456';
-      const isMatched = expectedOtp && expectedOtp === inputCode;
-
-      if (!isMatched && !isMasterCode) {
+      if (!verificationToken) {
         return NextResponse.json(
-          { success: false, error: 'Incorrect or invalid OTP code! Please enter the correct 6-digit code.' },
+          { success: false, error: 'Verification token missing. Please request a new OTP.' },
           { status: 400 }
         );
       }
 
-      // Check expiration if not master code
-      if (!isMasterCode && expiresAt && Date.now() > expiresAt) {
-        otpStore.delete(storeKey);
+      // Cryptographic verification
+      const verifyResult = verifySignedOtpToken(verificationToken, inputCode);
+      if (!verifyResult.valid) {
         return NextResponse.json(
-          { success: false, error: 'The OTP code has expired. Please request a new OTP code.' },
+          { success: false, error: verifyResult.error || 'Incorrect or invalid OTP code.' },
           { status: 400 }
         );
       }
-
-      // Valid OTP: delete from store so it can't be reused
-      otpStore.delete(storeKey);
 
       return NextResponse.json({
         success: true,

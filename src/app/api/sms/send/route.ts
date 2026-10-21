@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendGoinfiSms, normalizePhoneNumber } from '@/lib/sms';
+import { isAuthorizedAdmin, checkRateLimit } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,8 +13,18 @@ export interface SmsRecipient {
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. Rate limit SMS dispatch to prevent gateway exhaustion
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'ip';
+    const rateCheck = checkRateLimit(`sms_dispatch_${ip}`, 10, 60 * 1000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Rate limit exceeded. Please wait a minute before sending more messages.' },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
-    const { type = 'individual', recipients = [], message = '', title = 'Notice', gatewayConfig } = body;
+    const { recipients = [], message = '', gatewayConfig } = body;
 
     const trimmedMsg = (message || '').trim();
     if (!trimmedMsg) {
@@ -27,6 +38,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Please select at least one recipient.' },
         { status: 400 }
+      );
+    }
+
+    // Limit recipients per call to prevent abuse
+    if (recipients.length > 50 && !isAuthorizedAdmin(req)) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Batch broadcast requires administrator privileges' },
+        { status: 403 }
       );
     }
 

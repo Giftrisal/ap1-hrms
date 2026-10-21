@@ -5,11 +5,12 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
-    const authHeader = req.headers.get('x-biometric-secret');
+    const authHeader = req.headers.get('x-biometric-secret') || req.headers.get('x-admin-key');
     const expectedSecret = process.env.BIOMETRIC_API_SECRET || 'goinfi_secure_zk_secret_2026';
 
-    if (authHeader && authHeader !== expectedSecret) {
-      return NextResponse.json({ error: 'Unauthorized: Invalid biometric secret key' }, { status: 401 });
+    // Strictly enforce secret header authentication
+    if (!authHeader || authHeader !== expectedSecret) {
+      return NextResponse.json({ error: 'Unauthorized: Missing or invalid biometric secret key' }, { status: 401 });
     }
 
     const body = await req.json();
@@ -20,9 +21,9 @@ export async function POST(req: NextRequest) {
     }
 
     const syncTime = new Date().toISOString();
-    const deviceIp = device_ip || '192.168.1.201';
+    const deviceIp = device_ip || '10.1.2.216';
 
-    // Process and enrich punch logs (Pure In / Out system - no late penalties or grace periods)
+    // Process and enrich punch logs (Pure In / Out system)
     const processed = logs.map(log => {
       return {
         ...log,
@@ -69,15 +70,27 @@ export async function GET() {
   return NextResponse.json({
     status: 'online',
     last_sync: current.lastSyncTime || new Date().toISOString(),
-    device_ip: current.lastDeviceIp || '192.168.1.201',
+    device_ip: current.lastDeviceIp || '10.1.2.216',
     port: 4370,
     cached_logs_count: current.logs.length,
     recent_logs: sortedLogs.slice(0, 500)
+  }, {
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
+    }
   });
 }
 
-export async function DELETE() {
-  await savePunches([], new Date().toISOString(), '192.168.1.201');
+export async function DELETE(req: NextRequest) {
+  const authHeader = req.headers.get('x-biometric-secret') || req.headers.get('x-admin-key');
+  const expectedSecret = process.env.BIOMETRIC_API_SECRET || 'goinfi_secure_zk_secret_2026';
+
+  // Strictly enforce admin authentication to clear logs
+  if (!authHeader || authHeader !== expectedSecret) {
+    return NextResponse.json({ error: 'Unauthorized: Admin authentication required to clear logs' }, { status: 401 });
+  }
+
+  await savePunches([], new Date().toISOString(), '10.1.2.216');
   return NextResponse.json({
     success: true,
     message: 'All biometric punches cleared.'

@@ -96,12 +96,23 @@ export async function GET() {
   const { staff, registrations } = await loadStaffDirectory();
   const pendingCount = registrations.filter(r => r.status === 'PENDING_APPROVAL').length;
   
+  // SECURITY FIX: Never leak staff passwords or credentials in public GET response!
+  const sanitizedRegistrations = registrations.map((r: any) => {
+    const { password, ...safe } = r;
+    return safe;
+  });
+
+  const sanitizedStaff = staff.map((s: any) => {
+    const { password, ...safe } = s;
+    return safe;
+  });
+
   return NextResponse.json(
     {
       success: true,
-      count: staff.length,
-      staff,
-      registrations,
+      count: sanitizedStaff.length,
+      staff: sanitizedStaff,
+      registrations: sanitizedRegistrations,
       pending_count: pendingCount
     },
     {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendGoinfiSms, normalizePhoneNumber } from '@/lib/sms';
+import { createSignedOtpToken, verifySignedOtpToken, checkRateLimit } from '@/lib/security';
 import fs from 'fs';
 import path from 'path';
 
@@ -52,7 +53,6 @@ export async function POST(req: NextRequest) {
         targetPhone = MASTER_ADMIN_PHONE;
         accountName = 'Master Admin';
       } else {
-        // Check in clientStaff if provided
         let matchedStaff: any = null;
         if (Array.isArray(clientStaff)) {
           matchedStaff = clientStaff.find((s: any) => 
@@ -81,23 +81,28 @@ export async function POST(req: NextRequest) {
         }, { status: 400 });
       }
 
+      // Rate limit check: max 3 requests per 10 mins
+      const rateCheck = checkRateLimit(`reset_${targetPhone}`, 3, 10 * 60 * 1000);
+      if (!rateCheck.allowed) {
+        return NextResponse.json({
+          success: false,
+          error: `अत्यधिक अनुरोध! कृपया ${rateCheck.retryAfter || 60} सेकेन्ड पर्खनुहोस्।`
+        }, { status: 429 });
+      }
+
       // Generate 6-digit OTP
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = Date.now() + 5 * 60 * 1000; // 5 mins
 
       const messageText = `[AP1 Television HRMS] Your password reset OTP code is ${generatedOtp}. Valid for 5 minutes. Do not share with anyone. AP1 Network.`;
 
-      const smsResult = await sendGoinfiSms(targetPhone, messageText, generatedOtp);
+      await sendGoinfiSms(targetPhone, messageText, generatedOtp);
 
-      const token = Buffer.from(
-        JSON.stringify({
-          identifier: query,
-          phone: targetPhone,
-          code: generatedOtp,
-          isMaster,
-          exp: expiresAt
-        })
-      ).toString('base64');
+      // Secure signed token (NEVER leaks OTP)
+      const token = createSignedOtpToken({
+        identifier: query,
+        phone: targetPhone,
+        isMaster
+      }, generatedOtp, 300);
 
       // Mask phone for display: e.g. 98****9000
       let masked = targetPhone;
@@ -121,45 +126,37 @@ export async function POST(req: NextRequest) {
       const inputCode = (otp || '').toString().trim();
       const newPass = (newPassword || '').toString().trim();
 
-      if (!inputCode) {
+      if (!inputCode || inputCode.length !== 6) {
         return NextResponse.json({ 
           success: false, 
           error: 'कृपया ६-अंकको OTP कोड प्रविष्टि गर्नुहोस्।' 
         }, { status: 400 });
       }
 
-      if (!newPass || newPass.length < 5) {
+      if (!newPass || newPass.length < 6) {
         return NextResponse.json({ 
           success: false, 
-          error: 'नयाँ पासवर्ड कम्तीमा ५ क्यारेक्टरको हुनुपर्छ।' 
+          error: 'नयाँ पासवर्ड कम्तीमा ६ क्यारेक्टरको हुनुपर्छ।' 
         }, { status: 400 });
       }
 
-      let tokenData: any = null;
-      if (verificationToken) {
-        try {
-          tokenData = JSON.parse(Buffer.from(verificationToken, 'base64').toString('utf-8'));
-        } catch {}
-      }
-
-      const isMasterBypass = inputCode === '123456';
-      const isMatched = tokenData && tokenData.code === inputCode;
-
-      if (!isMatched && !isMasterBypass) {
+      if (!verificationToken) {
         return NextResponse.json({ 
           success: false, 
-          error: 'गलत वा अमान्य OTP कोड! कृपया दर्ता भएको मोबाइलमा आएको सही कोड प्रविष्टि गर्नुहोस्।' 
+          error: 'प्रमाणीकरण टोकन फेला परेन। कृपया नयाँ कोड पठाउनुहोस्।' 
         }, { status: 400 });
       }
 
-      if (!isMasterBypass && tokenData?.exp && Date.now() > tokenData.exp) {
+      // Cryptographic verification (NO 123456 bypass!)
+      const verifyResult = verifySignedOtpToken(verificationToken, inputCode);
+      if (!verifyResult.valid) {
         return NextResponse.json({ 
           success: false, 
-          error: 'OTP कोडको समय समाप्त भयो। कृपया नयाँ कोड पठाउनुहोस्।' 
+          error: verifyResult.error || 'गलत वा अमान्य OTP कोड! कृपया दर्ता भएको मोबाइलमा आएको सही कोड प्रविष्टि गर्नुहोस्।' 
         }, { status: 400 });
       }
 
-      const isMaster = tokenData?.isMaster || query === '999' || query === '9999' || query === 'admin';
+      const isMaster = verifyResult.payload?.isMaster || query === '999' || query === '9999' || query === 'admin';
 
       if (isMaster) {
         saveMasterPassword(newPass);
@@ -169,8 +166,7 @@ export async function POST(req: NextRequest) {
         success: true,
         message: 'पासवर्ड सफलतापूर्वक परिवर्तन भयो! अब नयाँ पासवर्डबाट लगइन गर्न सक्नुहुन्छ।',
         isMaster,
-        identifier: tokenData?.identifier || query,
-        newPassword: newPass
+        identifier: verifyResult.payload?.identifier || query
       });
     }
 

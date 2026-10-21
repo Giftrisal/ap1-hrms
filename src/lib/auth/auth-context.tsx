@@ -79,10 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'AP1#Master2026',
         'AP1@Master2026',
         'AP1Master#2026',
-        'ap1#master@2026!',
-        'admin123',
-        'admin',
-        'Admin@123'
+        'ap1#master@2026!'
       ].filter(Boolean);
 
       if (pass && strongMasterPasswords.includes(pass)) {
@@ -102,9 +99,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // 2. Check Gift (HRMS Manager)
-    const isGiftMatch = query === 'gift@ap1hdtv.com' || query === 'gift@ap1tv.com' || query === 'gift' || query === 'gift risal' || query.includes('gift') || query === '1' || query === 'station' || query === 'hrms';
+    const isGiftMatch = query === 'gift@ap1hdtv.com' || query === 'gift@ap1tv.com' || query === 'gift' || query === 'gift risal' || query === '1' || query === 'station' || query === 'hrms';
     if (isGiftMatch) {
-      const validGiftPasswords = ['Gift@AP1#2026', 'admin123', 'gift123', 'ap1#2026', 'admin', '123456'];
+      const validGiftPasswords = ['Gift@AP1#2026', 'ap1#2026', 'gift123'];
       if (pass && validGiftPasswords.includes(pass)) {
         const user: Employee = {
           id: "emp-1",
@@ -136,7 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 3. Check HR Manager
     const isHrMatch = query === 'hr@ap1hdtv.com' || query === 'hr' || query === 'pooja';
     if (isHrMatch) {
-      const validHrPasswords = ['HR@AP1#2026', 'hr123', 'admin123', 'admin'];
+      const validHrPasswords = ['HR@AP1#2026', 'hr123'];
       if (pass && validHrPasswords.includes(pass)) {
         const user: Employee = {
           id: "emp-hr-1",
