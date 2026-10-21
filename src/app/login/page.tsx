@@ -180,7 +180,7 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, router]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -196,7 +196,27 @@ export default function LoginPage() {
 
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    try {
+      const query = identifier.trim().toLowerCase();
+      const isMasterQuery = query === '999' || query === '9999' || query === 'admin' || query === 'admin@ap1hdtv.com';
+
+      if (isMasterQuery) {
+        // Verify with server cloud database so custom changed passwords work across all devices
+        try {
+          const verifyRes = await fetch('/api/auth/master-admin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'verify_login', password: password.trim() })
+          });
+          const verifyData = await verifyRes.json();
+          if (verifyData.success && verifyData.isValid) {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('goinfi_master_admin_password', password.trim());
+            }
+          }
+        } catch {}
+      }
+
       const success = login(identifier, password);
       if (success) {
         router.push('/dashboard');
@@ -204,7 +224,10 @@ export default function LoginPage() {
         setError('गलत विवरण (Invalid credentials)। कृपया Email/Username र सुरक्षित पासवर्ड पुनः जाँच्नुहोस्।');
         setIsSubmitting(false);
       }
-    }, 400);
+    } catch {
+      setError('लगइन प्रक्रियामा त्रुटि भयो। कृपया पुनः प्रयास गर्नुहोस्।');
+      setIsSubmitting(false);
+    }
   };
 
 

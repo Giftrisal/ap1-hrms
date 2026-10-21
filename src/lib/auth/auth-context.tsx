@@ -62,8 +62,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const pass = (password || '').trim();
 
     // 1. Check Master Admin Credentials
-    // Username: Strictly PIN: 999 or 9999
-    const isMasterMatch = query === '999' || query === '9999';
+    // Username: PIN 999, 9999, or admin
+    const isMasterMatch = query === '999' || query === '9999' || query === 'admin' || query === 'admin@ap1hdtv.com';
 
     if (isMasterMatch) {
       let customMasterPassword = '';

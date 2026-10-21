@@ -49,3 +49,5 @@ next-env.d.ts
 
 __pycache__/
 *.pyc
+
+public/installers/AP1_Television_HRMS_Setup.exe

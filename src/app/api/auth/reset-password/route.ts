@@ -1,31 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendGoinfiSms, normalizePhoneNumber } from '@/lib/sms';
 import { createSignedOtpToken, verifySignedOtpToken, checkRateLimit } from '@/lib/security';
-import fs from 'fs';
-import path from 'path';
+import { saveMasterPassword } from '@/lib/masterPasswordStore';
 
 export const dynamic = 'force-dynamic';
 
 const MASTER_ADMIN_PHONE = process.env.MASTER_ADMIN_PHONE || '9715400400';
-
-function getStoragePath(): string | null {
-  try {
-    const tmpDir = process.env.TEMP || process.env.TMP || '/tmp';
-    if (fs.existsSync(/*turbopackIgnore: true*/ tmpDir)) {
-      return path.join(tmpDir, 'ap1_master_admin_pass.json');
-    }
-  } catch {}
-  return null;
-}
-
-function saveMasterPassword(pwd: string) {
-  try {
-    const p = getStoragePath();
-    if (p) {
-      fs.writeFileSync(p, JSON.stringify({ password: pwd, updatedAt: new Date().toISOString() }), 'utf-8');
-    }
-  } catch {}
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -159,7 +139,7 @@ export async function POST(req: NextRequest) {
       const isMaster = verifyResult.payload?.isMaster || query === '999' || query === '9999' || query === 'admin';
 
       if (isMaster) {
-        saveMasterPassword(newPass);
+        await saveMasterPassword(newPass);
       }
 
       return NextResponse.json({
