@@ -98,8 +98,12 @@ export default function DashboardPage() {
           
           setAttendanceList((prev) => {
             let updated = [...prev];
-            for (const log of data.recent_logs) {
-              const pin = String(log.user_id || log.biometric_pin || '');
+            const chronLogs = [...data.recent_logs].sort((a: any, b: any) => 
+              (a.punch_time || '').localeCompare(b.punch_time || '')
+            );
+
+            for (const log of chronLogs) {
+              const pin = String(log.user_id || log.biometric_pin || '').trim();
               if (!pin) continue;
 
               // Strictly ignore past days' punches for today's live dashboard
@@ -120,9 +124,28 @@ export default function DashboardPage() {
               const empName = matchedEmp.full_name;
               const deptName = matchedEmp.department_name || 'AP1 Media / Operations';
               const designation = matchedEmp.designation || 'Staff Member';
+              const punchTime = log.punch_time;
 
               const idx = updated.findIndex((a) => a.employee_pin === pin && (a.date === todayStr || !a.date));
               if (idx !== -1) {
+                let newIn = updated[idx].in_time;
+                let newOut = updated[idx].out_time;
+
+                if (!newIn || punchTime < newIn) {
+                  if (newIn && !newOut) newOut = newIn;
+                  newIn = punchTime;
+                } else if (punchTime > newIn) {
+                  if (!newOut || punchTime > newOut) newOut = punchTime;
+                }
+
+                let workedHours = updated[idx].worked_hours || 0;
+                if (newIn && newOut && newIn !== newOut) {
+                  const diffMs = new Date(newOut).getTime() - new Date(newIn).getTime();
+                  if (diffMs > 0) {
+                    workedHours = Math.round((diffMs / 3600000) * 10) / 10;
+                  }
+                }
+
                 updated[idx] = {
                   ...updated[idx],
                   employee_name: empName,
@@ -130,11 +153,14 @@ export default function DashboardPage() {
                   designation: designation,
                   status: 'PRESENT',
                   date: todayStr,
-                  in_time: log.punch_time,
+                  in_time: newIn,
+                  out_time: newOut,
+                  worked_hours: workedHours,
                   late_minutes: 0,
                   remarks: 'Live Biometric Machine Punch'
                 };
               } else {
+                const isOutPunch = log.punch_type === 'Check-Out' || log.punch_type === 1;
                 updated.unshift({
                   id: `live-${pin}-${Date.now()}`,
                   employee_id: matchedEmp.id,
@@ -143,13 +169,13 @@ export default function DashboardPage() {
                   department_name: deptName,
                   designation: designation,
                   date: todayStr,
-                  in_time: log.punch_time,
-                  out_time: undefined,
+                  in_time: punchTime,
+                  out_time: isOutPunch ? punchTime : undefined,
                   status: 'PRESENT',
                   late_minutes: 0,
                   early_exit_minutes: 0,
                   overtime_minutes: 0,
-                  worked_hours: 8,
+                  worked_hours: 0,
                   source: 'biometric',
                   remarks: 'Live Biometric Machine Punch'
                 });
