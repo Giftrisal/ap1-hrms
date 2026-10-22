@@ -544,13 +544,13 @@ export default function AttendancePage() {
                   const inPart = r.in_time.includes('T') ? r.in_time.split('T')[1] : r.in_time.split(' ')[1];
                   inHour = parseInt(inPart.split(':')[0], 10);
                 } catch (e) {}
-                const diffHours = (new Date(punchTime).getTime() - new Date(r.in_time).getTime()) / 3600000;
+                const diffHours = (new Date(punchTime).getTime() - new Date(r.in_time || 0).getTime()) / 3600000;
                 return inHour >= 14 && diffHours > 1 && diffHours <= 18 && (!r.out_time || r.out_time === r.in_time);
               });
 
               if (prevNightIdx !== -1) {
                 const prevRec = updated[prevNightIdx];
-                const diffMs = new Date(punchTime).getTime() - new Date(prevRec.in_time).getTime();
+                const diffMs = new Date(punchTime).getTime() - new Date(prevRec.in_time || 0).getTime();
                 const workedHours = Math.round((diffMs / 3600000) * 10) / 10;
                 updated[prevNightIdx] = {
                   ...prevRec,
