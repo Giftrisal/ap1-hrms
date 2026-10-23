@@ -112,33 +112,6 @@ export default function DashboardPage() {
                 continue;
               }
 
-              // Check if this morning punch is actually a night-shift checkout from yesterday
-              let punchHour = 0;
-              try {
-                const dtPart = log.punch_time.includes('T') ? log.punch_time.split('T')[1] : log.punch_time.split(' ')[1];
-                punchHour = parseInt(dtPart.split(':')[0], 10);
-              } catch (e) {}
-
-              if (punchHour <= 14) {
-                const hadYesterdayEveningPunch = chronLogs.some(prevLog => {
-                  const prevPin = String(prevLog.user_id || prevLog.biometric_pin || '').trim();
-                  if (prevPin !== pin) return false;
-                  const prevDate = prevLog.punch_time ? prevLog.punch_time.split('T')[0].split(' ')[0] : '';
-                  if (!prevDate || prevDate >= punchDate) return false;
-                  let prevHour = 0;
-                  try {
-                    const prevPart = prevLog.punch_time.includes('T') ? prevLog.punch_time.split('T')[1] : prevLog.punch_time.split(' ')[1];
-                    prevHour = parseInt(prevPart.split(':')[0], 10);
-                  } catch (e) {}
-                  const diffHours = (new Date(log.punch_time).getTime() - new Date(prevLog.punch_time).getTime()) / 3600000;
-                  return prevHour >= 14 && diffHours > 1 && diffHours <= 18;
-                });
-                if (hadYesterdayEveningPunch) {
-                  // This was a checkout for yesterday's shift, skip registering as new check-in today
-                  continue;
-                }
-              }
-
               const matchedEmp = employees.find(
                 e => String(e.biometric_pin) === pin || String(e.id) === pin || String(e.id) === `emp-${pin}`
               );

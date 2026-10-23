@@ -523,52 +523,8 @@ export default function AttendancePage() {
             const punchTime = log.punch_time;
             const punchDate = extractDateStr(punchTime) || getLocalDateStr();
 
-            // 1. NIGHT SHIFT (CROSS-MIDNIGHT) CHECKOUT RECOGNITION:
-            // If an employee punched in yesterday evening (>= 14:00) with no checkout,
-            // and punches out early this morning (< 11:00 AM, within 16 hrs of in-time):
-            let isNightCheckout = false;
-            let punchHour = 0;
-            try {
-              const dtPart = punchTime.includes('T') ? punchTime.split('T')[1] : punchTime.split(' ')[1];
-              punchHour = parseInt(dtPart.split(':')[0], 10);
-            } catch (e) {}
-
-            if (punchHour <= 14) {
-              const prevNightIdx = updated.findIndex((r) => {
-                if (String(r.employee_pin) !== pin) return false;
-                const rDate = extractDateStr(r.date) || extractDateStr(r.in_time);
-                if (!rDate || rDate >= punchDate) return false;
-                if (!r.in_time) return false;
-                let inHour = 0;
-                try {
-                  const inPart = r.in_time.includes('T') ? r.in_time.split('T')[1] : r.in_time.split(' ')[1];
-                  inHour = parseInt(inPart.split(':')[0], 10);
-                } catch (e) {}
-                const diffHours = (new Date(punchTime).getTime() - new Date(r.in_time || 0).getTime()) / 3600000;
-                return inHour >= 14 && diffHours > 1 && diffHours <= 18 && (!r.out_time || r.out_time === r.in_time);
-              });
-
-              if (prevNightIdx !== -1) {
-                const prevRec = updated[prevNightIdx];
-                const diffMs = new Date(punchTime).getTime() - new Date(prevRec.in_time || 0).getTime();
-                const workedHours = Math.round((diffMs / 3600000) * 10) / 10;
-                updated[prevNightIdx] = {
-                  ...prevRec,
-                  out_time: punchTime,
-                  worked_hours: workedHours,
-                  status: 'PRESENT',
-                  remarks: 'नाइट सिफ्ट (Night Shift - Overtime/Cross-Day)'
-                };
-                hasChanges = true;
-                isNightCheckout = true;
-              }
-            }
-
-            if (isNightCheckout) {
-              continue;
-            }
-
-            // 2. SAME-DAY PUNCH PAIRING:
+            // PURE SAME-DAY PUNCH PAIRING (NO NIGHT SHIFT / ZERO CROSS-DAY PAIRING):
+            // Every punch strictly belongs to punchDate. Earliest = In, Latest = Out.
             const existingIdx = updated.findIndex(
               (r) => String(r.employee_pin) === pin && (extractDateStr(r.date) || extractDateStr(r.in_time)) === punchDate
             );
