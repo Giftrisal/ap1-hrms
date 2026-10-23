@@ -246,14 +246,19 @@ export default function AttendancePage() {
         try {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
-            // Auto-correct & purge only orphaned test punch for PIN 101 on 2026-09-25
+            // Auto-correct & strictly purge corrupted cross-day pairing records
             const cleaned = parsed.filter((r: any) => {
-              const d = extractDateStr(r.date || r.in_time);
+              const d = extractDateStr(r.date);
+              const inD = extractDateStr(r.in_time);
+              const outD = extractDateStr(r.out_time);
               if (d === '2026-09-25' && String(r.employee_pin).trim() === '101') return false;
+              // Strictly remove any record where in_time or out_time belongs to a different date
+              if (inD && d && inD !== d) return false;
+              if (outD && d && outD !== d) return false;
               return true;
             });
             try {
-              localStorage.setItem('goinfi_attendance_records', JSON.stringify(cleaned.slice(0, 200)));
+              localStorage.setItem('goinfi_attendance_records', JSON.stringify(cleaned.slice(0, 500)));
             } catch (e) {}
             return cleaned.slice(0, 200).map((r: any) => {
               let rec = { ...r };
@@ -481,6 +486,20 @@ export default function AttendancePage() {
           let updated = [...prev];
           let hasChanges = false;
 
+          // Strictly purge any corrupted cross-day pairing records
+          const purgedCrossDay = updated.filter(r => {
+            const d = extractDateStr(r.date);
+            const inD = extractDateStr(r.in_time);
+            const outD = extractDateStr(r.out_time);
+            if (inD && d && inD !== d) return false;
+            if (outD && d && outD !== d) return false;
+            return true;
+          });
+          if (purgedCrossDay.length !== updated.length) {
+            updated = purgedCrossDay;
+            hasChanges = true;
+          }
+
           // Only purge if server actually returned valid biometric logs for today
           const todayLogsInServer = data.recent_logs.filter((l: any) => extractDateStr(l.punch_time) === getLocalDateStr());
           if (todayLogsInServer.length > 0) {
@@ -533,6 +552,10 @@ export default function AttendancePage() {
               const existing = updated[existingIdx];
               let newIn = existing.in_time;
               let newOut = existing.out_time;
+
+              // Strictly ensure in_time and out_time belong to punchDate
+              if (newIn && extractDateStr(newIn) !== punchDate) newIn = punchTime;
+              if (newOut && extractDateStr(newOut) !== punchDate) newOut = undefined;
 
               // Earliest punch is ALWAYS in_time
               // Latest punch (if later than in_time) is ALWAYS out_time
@@ -902,19 +925,53 @@ export default function AttendancePage() {
     records.forEach(r => {
       const recDate = extractDateStr(r.date) || extractDateStr(r.in_time);
       if (recDate === selectedDate) {
+        // Enforce that r.in_time and r.out_time strictly match selectedDate!
+        let rawIn = (r.in_time && extractDateStr(r.in_time) === selectedDate) ? r.in_time : undefined;
+        let rawOut = (r.out_time && extractDateStr(r.out_time) === selectedDate) ? r.out_time : undefined;
+
+        // If in_time belonged to a different date but out_time was on selectedDate, out_time becomes in_time!
+        if (!rawIn && rawOut) {
+          rawIn = rawOut;
+          rawOut = undefined;
+        }
+
         const mergeIntoMap = (key: string) => {
           const prev = dateRecordsMap.get(key);
           if (!prev) {
-            dateRecordsMap.set(key, r);
+            let workedHours = 0;
+            if (rawIn && rawOut && rawIn !== rawOut) {
+              const diff = new Date(rawOut).getTime() - new Date(rawIn).getTime();
+              if (diff > 0) workedHours = Math.round((diff / 3600000) * 10) / 10;
+            }
+            dateRecordsMap.set(key, {
+              ...r,
+              date: selectedDate,
+              in_time: rawIn,
+              out_time: rawOut,
+              worked_hours: workedHours,
+              status: rawIn ? 'PRESENT' : (r.status || 'ABSENT')
+            });
           } else {
-            const mergedIn = (!prev.in_time || (r.in_time && r.in_time < prev.in_time)) ? r.in_time : prev.in_time;
-            const mergedOut = (r.out_time && (!prev.out_time || r.out_time > prev.out_time)) ? r.out_time : prev.out_time;
+            const prevIn = (prev.in_time && extractDateStr(prev.in_time) === selectedDate) ? prev.in_time : undefined;
+            const prevOut = (prev.out_time && extractDateStr(prev.out_time) === selectedDate) ? prev.out_time : undefined;
+
+            let mergedIn = prevIn;
+            if (!mergedIn || (rawIn && rawIn < mergedIn)) {
+              mergedIn = rawIn || prevIn;
+            }
+
+            let mergedOut = prevOut;
+            if (rawOut && (!mergedOut || rawOut > mergedOut)) {
+              mergedOut = rawOut;
+            }
+
             let diffMs = (mergedIn && mergedOut && mergedIn !== mergedOut) ? (new Date(mergedOut).getTime() - new Date(mergedIn).getTime()) : 0;
-            let workedHours = diffMs > 0 ? Math.round((diffMs / 3600000) * 10) / 10 : (prev.worked_hours || r.worked_hours || 0);
+            let workedHours = diffMs > 0 ? Math.round((diffMs / 3600000) * 10) / 10 : 0;
 
             dateRecordsMap.set(key, {
               ...prev,
               ...r,
+              date: selectedDate,
               in_time: mergedIn,
               out_time: mergedOut,
               worked_hours: workedHours,

@@ -131,6 +131,9 @@ export default function DashboardPage() {
                 let newIn = updated[idx].in_time;
                 let newOut = updated[idx].out_time;
 
+                if (newIn && newIn.split('T')[0].split(' ')[0] !== todayStr) newIn = punchTime;
+                if (newOut && newOut.split('T')[0].split(' ')[0] !== todayStr) newOut = undefined;
+
                 if (!newIn || punchTime < newIn) {
                   if (newIn && !newOut) newOut = newIn;
                   newIn = punchTime;
