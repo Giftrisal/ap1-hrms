@@ -533,7 +533,7 @@ export default function AttendancePage() {
               punchHour = parseInt(dtPart.split(':')[0], 10);
             } catch (e) {}
 
-            if (punchHour < 11) {
+            if (punchHour <= 14) {
               const prevNightIdx = updated.findIndex((r) => {
                 if (String(r.employee_pin) !== pin) return false;
                 const rDate = extractDateStr(r.date) || extractDateStr(r.in_time);
@@ -946,8 +946,30 @@ export default function AttendancePage() {
     records.forEach(r => {
       const recDate = extractDateStr(r.date) || extractDateStr(r.in_time);
       if (recDate === selectedDate) {
-        if (r.employee_id) dateRecordsMap.set(r.employee_id, r);
-        if (r.employee_pin) dateRecordsMap.set(`pin-${String(r.employee_pin).trim()}`, r);
+        const mergeIntoMap = (key: string) => {
+          const prev = dateRecordsMap.get(key);
+          if (!prev) {
+            dateRecordsMap.set(key, r);
+          } else {
+            const mergedIn = (!prev.in_time || (r.in_time && r.in_time < prev.in_time)) ? r.in_time : prev.in_time;
+            const mergedOut = (r.out_time && (!prev.out_time || r.out_time > prev.out_time)) ? r.out_time : prev.out_time;
+            let diffMs = (mergedIn && mergedOut && mergedIn !== mergedOut) ? (new Date(mergedOut).getTime() - new Date(mergedIn).getTime()) : 0;
+            let workedHours = diffMs > 0 ? Math.round((diffMs / 3600000) * 10) / 10 : (prev.worked_hours || r.worked_hours || 0);
+
+            dateRecordsMap.set(key, {
+              ...prev,
+              ...r,
+              in_time: mergedIn,
+              out_time: mergedOut,
+              worked_hours: workedHours,
+              status: (mergedIn ? 'PRESENT' : (prev.status || r.status)),
+              remarks: prev.remarks || r.remarks
+            });
+          }
+        };
+
+        if (r.employee_id) mergeIntoMap(r.employee_id);
+        if (r.employee_pin) mergeIntoMap(`pin-${String(r.employee_pin).trim()}`);
       }
     });
 
