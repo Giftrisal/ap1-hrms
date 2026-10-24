@@ -95,17 +95,48 @@ async function saveStaffDirectory(staff: any[], registrations: any[]): Promise<v
 export async function GET() {
   const { staff, registrations } = await loadStaffDirectory();
   const pendingCount = registrations.filter(r => r.status === 'PENDING_APPROVAL').length;
-  
+
+  // Build high-priority map of photos uploaded by staff from mobile app registrations
+  const regPhotoMap = new Map<string, string>();
+  registrations.forEach((r: any) => {
+    if (r.pin && r.photo_url) {
+      const p = String(r.pin).trim();
+      regPhotoMap.set(p, r.photo_url);
+      if (p === '1' || p === '100') {
+        regPhotoMap.set('1', r.photo_url);
+        regPhotoMap.set('100', r.photo_url);
+      }
+    }
+  });
+
   // SECURITY FIX: Never leak staff passwords or credentials in public GET response!
   const sanitizedRegistrations = registrations.map((r: any) => {
     const { password, ...safe } = r;
     return safe;
   });
 
+  let hasMergedNewPhotos = false;
   const sanitizedStaff = staff.map((s: any) => {
+    const pin = String(s.biometric_pin || s.id || '').replace('emp-', '').trim();
+    const photoFromReg = regPhotoMap.get(pin);
+    const effectivePhoto = s.photo_url || photoFromReg || '';
+
+    if (!s.photo_url && effectivePhoto) {
+      s.photo_url = effectivePhoto;
+      hasMergedNewPhotos = true;
+    }
+
     const { password, ...safe } = s;
-    return safe;
+    return {
+      ...safe,
+      photo_url: effectivePhoto
+    };
   });
+
+  // If missing photos were merged into the staff array, update cache so it remains permanently synced
+  if (hasMergedNewPhotos) {
+    saveStaffDirectory(staff, registrations).catch(() => {});
+  }
 
   return NextResponse.json(
     {
@@ -343,8 +374,15 @@ export async function POST(req: NextRequest) {
 
       let updated = false;
 
-      // Update in staff directory
-      const empIdx = staff.findIndex(e => String(e.biometric_pin) === cleanPin || String(e.id) === cleanPin || e.id === `emp-${cleanPin}`);
+      // Update in staff directory with flexible PIN and ID matching
+      const empIdx = staff.findIndex(e => {
+        const sPin = String(e.biometric_pin || '').trim();
+        const sId = String(e.id || '').replace('emp-', '').trim();
+        return sPin === cleanPin || sId === cleanPin || e.id === `emp-${cleanPin}` ||
+          (cleanPin === '1' && (sPin === '100' || e.full_name?.toLowerCase().includes('gift'))) ||
+          (cleanPin === '100' && (sPin === '1' || e.full_name?.toLowerCase().includes('gift')));
+      });
+
       if (empIdx !== -1) {
         staff[empIdx] = {
           ...staff[empIdx],
@@ -354,7 +392,13 @@ export async function POST(req: NextRequest) {
       }
 
       // Update in registrations
-      const regIdx = registrations.findIndex(r => String(r.pin) === cleanPin);
+      const regIdx = registrations.findIndex(r => {
+        const rPin = String(r.pin).trim();
+        return rPin === cleanPin ||
+          (cleanPin === '1' && rPin === '100') ||
+          (cleanPin === '100' && rPin === '1');
+      });
+
       if (regIdx !== -1) {
         registrations[regIdx] = {
           ...registrations[regIdx],
@@ -375,9 +419,27 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 6. Direct full staff list update
+    // 6. Direct full staff list update (Preserve existing mobile-uploaded photos)
     if (Array.isArray(body.staff)) {
-      staff = body.staff;
+      // Build a map of existing photos from current staff and registrations
+      const existingPhotos = new Map<string, string>();
+      staff.forEach(s => {
+        if (s.biometric_pin && s.photo_url) existingPhotos.set(String(s.biometric_pin).trim(), s.photo_url);
+      });
+      registrations.forEach(r => {
+        if (r.pin && r.photo_url) existingPhotos.set(String(r.pin).trim(), r.photo_url);
+      });
+
+      // Merge: if incoming staff has empty photo_url but existing has a photo, preserve it!
+      staff = body.staff.map((newS: any) => {
+        const pin = String(newS.biometric_pin || '').trim();
+        const photo = newS.photo_url || existingPhotos.get(pin) || (pin === '100' ? existingPhotos.get('1') : (pin === '1' ? existingPhotos.get('100') : undefined)) || '';
+        return {
+          ...newS,
+          photo_url: photo
+        };
+      });
+
       await saveStaffDirectory(staff, registrations);
       return NextResponse.json({
         success: true,
