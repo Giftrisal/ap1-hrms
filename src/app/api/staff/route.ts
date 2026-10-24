@@ -16,6 +16,13 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
 const SUPABASE_STAFF_CONFIG_ID = 'goinfi-system-ap1-staff-list';
 
 function getTmpCachePath(): string {
+  try {
+    const dataDir = path.join(process.cwd(), 'data');
+    if (!fs.existsSync(dataDir)) {
+      try { fs.mkdirSync(dataDir, { recursive: true }); } catch {}
+    }
+    return path.join(dataDir, 'ap1_staff_cache_v3.json');
+  } catch {}
   const tmpDir = process.env.TEMP || process.env.TMP || '/tmp';
   return path.join(tmpDir, 'ap1_staff_cache_v3.json');
 }
@@ -29,7 +36,21 @@ async function loadStaffDirectory(forceRefresh = false): Promise<{ staff: any[];
     return { staff: memoryStaffCache.staff, registrations: memoryStaffCache.registrations };
   }
 
-  // 1. Fetch from Supabase Master Cloud Database
+  // 1. Primary: Load from persistent local file cache
+  try {
+    const p = getTmpCachePath();
+    const fallbackP = '/tmp/ap1_staff_cache_v3.json';
+    const filePath = fs.existsSync(p) ? p : (fs.existsSync(fallbackP) ? fallbackP : null);
+    if (filePath) {
+      const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      if (content && Array.isArray(content.staff)) {
+        memoryStaffCache = { staff: content.staff, registrations: content.registrations || [], lastFetched: now };
+        return { staff: content.staff, registrations: content.registrations || [] };
+      }
+    }
+  } catch {}
+
+  // 2. Fetch from Supabase Master Cloud Database
   try {
     const { data, error } = await supabase
       .from('articles')
@@ -52,10 +73,10 @@ async function loadStaffDirectory(forceRefresh = false): Promise<{ staff: any[];
       return { staff, registrations };
     }
   } catch (err) {
-    console.warn('[Staff API] Supabase read failed:', err);
+    console.warn('[Staff API] Supabase read note:', err);
   }
 
-  // 2. Fallback to local tmp cache
+  // 3. Fallback
   try {
     const p = getTmpCachePath();
     if (fs.existsSync(p)) {
@@ -73,7 +94,18 @@ async function loadStaffDirectory(forceRefresh = false): Promise<{ staff: any[];
 async function saveStaffDirectory(staff: any[], registrations: any[]): Promise<void> {
   memoryStaffCache = { staff, registrations, lastFetched: Date.now() };
 
-  // 1. Save to Supabase Cloud Database (Instant synchronization across all computers)
+  // 1. Save to persistent local file
+  try {
+    const raw = JSON.stringify({ staff, registrations }, null, 2);
+    fs.writeFileSync(getTmpCachePath(), raw, 'utf-8');
+    try {
+      fs.writeFileSync('/tmp/ap1_staff_cache_v3.json', raw, 'utf-8');
+    } catch {}
+  } catch (err) {
+    console.error('[Staff API] Local save error:', err);
+  }
+
+  // 2. Save to Supabase Cloud Database (Instant synchronization across all computers)
   try {
     await supabase.from('articles').upsert({
       id: SUPABASE_STAFF_CONFIG_ID,
@@ -85,11 +117,6 @@ async function saveStaffDirectory(staff: any[], registrations: any[]): Promise<v
   } catch (err) {
     console.error('[Staff API] Supabase save error:', err);
   }
-
-  // 2. Save to local tmp cache
-  try {
-    fs.writeFileSync(getTmpCachePath(), JSON.stringify({ staff, registrations }, null, 2), 'utf-8');
-  } catch {}
 }
 
 export async function GET() {
