@@ -1114,9 +1114,10 @@ export default function StaffPortalPage() {
     rawOutTime: string | null;
     totalDutyHours: number;
     totalDutyFormatted: string;
-    status: 'PRESENT' | 'LATE' | 'IN_OFFICE' | 'HALF_DAY' | 'WEEK_OFF' | 'WEEK_OFF_WORK' | 'ABSENT' | 'UPCOMING';
+    status: 'DUTY_MET' | 'DUTY_SHORT' | 'IN_OFFICE' | 'HALF_DAY' | 'WEEK_OFF' | 'WEEK_OFF_WORK' | 'ABSENT' | 'UPCOMING';
     isToday: boolean;
-    isLate: boolean;
+    dutyMet: boolean;
+    shortfallHours: number;
     punchesCount: number;
   }
 
@@ -1124,7 +1125,7 @@ export default function StaffPortalPage() {
     hasPunched: boolean;
     inTime: string | null;
     outTime: string | null;
-    status: 'PRESENT' | 'LATE' | 'NOT_PUNCHED';
+    status: 'DUTY_MET' | 'DUTY_SHORT' | 'IN_OFFICE' | 'NOT_PUNCHED';
     shift: string;
     totalPunchesToday: number;
     totalDutyFormatted?: string;
@@ -1226,18 +1227,9 @@ export default function StaffPortalPage() {
             let outTimeStr: string | null = null;
             let totalDutyHours = 0;
             let totalDutyFormatted = '--';
-            let isLate = false;
-            let status: 'PRESENT' | 'LATE' | 'IN_OFFICE' | 'HALF_DAY' = 'PRESENT';
-
-            try {
-              const d = new Date(firstIn);
-              const hour = d.getHours();
-              const min = d.getMinutes();
-              if (hour > 9 || (hour === 9 && min > 30)) {
-                isLate = true;
-                status = 'LATE';
-              }
-            } catch {}
+            let status: 'DUTY_MET' | 'DUTY_SHORT' | 'IN_OFFICE' | 'HALF_DAY' | 'WEEK_OFF' | 'WEEK_OFF_WORK' | 'ABSENT' | 'UPCOMING' = 'DUTY_SHORT';
+            let dutyMet = false;
+            let shortfallHours = 8;
 
             if (lastOut && lastOut !== firstIn) {
               outTimeStr = formatTime(lastOut);
@@ -1247,12 +1239,18 @@ export default function StaffPortalPage() {
                 const hours = Math.floor(diffMs / (1000 * 60 * 60));
                 const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
                 totalDutyFormatted = `${hours}h ${mins}m (${totalDutyHours} hrs)`;
-                if (totalDutyHours < 4 && !isLate) {
-                  status = 'HALF_DAY';
+                if (totalDutyHours >= 8) {
+                  status = 'DUTY_MET';
+                  dutyMet = true;
+                  shortfallHours = 0;
+                } else {
+                  status = 'DUTY_SHORT';
+                  dutyMet = false;
+                  shortfallHours = Math.round((8 - totalDutyHours) * 10) / 10;
                 }
               }
             } else if (isToday) {
-              status = isLate ? 'LATE' : 'PRESENT';
+              status = 'IN_OFFICE';
               const diffMs = Date.now() - new Date(firstIn).getTime();
               if (diffMs > 0) {
                 const hours = Math.floor(diffMs / (1000 * 60 * 60));
@@ -1261,6 +1259,7 @@ export default function StaffPortalPage() {
               }
             } else {
               totalDutyFormatted = 'Single Punch';
+              status = 'DUTY_SHORT';
             }
 
             // Nepali date and day of week
@@ -1289,7 +1288,8 @@ export default function StaffPortalPage() {
               totalDutyFormatted,
               status,
               isToday,
-              isLate,
+              dutyMet,
+              shortfallHours,
               punchesCount: dayLogs.length
             };
 
@@ -1305,7 +1305,7 @@ export default function StaffPortalPage() {
               hasPunched: true,
               inTime: todayEntry.inTime,
               outTime: todayEntry.outTime,
-              status: todayEntry.isLate ? 'LATE' : 'PRESENT',
+              status: todayEntry.status === 'DUTY_MET' ? 'DUTY_MET' : todayEntry.outTime ? 'DUTY_SHORT' : 'IN_OFFICE',
               shift: 'AP1 Shift (Broadcasting / Operations)',
               totalPunchesToday: todayEntry.punchesCount,
               totalDutyFormatted: todayEntry.totalDutyFormatted
@@ -1368,7 +1368,7 @@ export default function StaffPortalPage() {
       outTime: string | null;
       dutyHours: number;
       dutyFormatted: string;
-      status: 'PRESENT' | 'LATE' | 'IN_OFFICE' | 'HALF_DAY' | 'WEEK_OFF' | 'WEEK_OFF_WORK' | 'ABSENT' | 'UPCOMING';
+      status: 'DUTY_MET' | 'DUTY_SHORT' | 'IN_OFFICE' | 'HALF_DAY' | 'WEEK_OFF' | 'WEEK_OFF_WORK' | 'ABSENT' | 'UPCOMING';
       punchesCount: number;
     }> = [];
 
@@ -1395,7 +1395,7 @@ export default function StaffPortalPage() {
       let outTime: string | null = null;
       let dutyHours = 0;
       let dutyFormatted = '--';
-      let status: 'PRESENT' | 'LATE' | 'IN_OFFICE' | 'HALF_DAY' | 'WEEK_OFF' | 'WEEK_OFF_WORK' | 'ABSENT' | 'UPCOMING' = 'UPCOMING';
+      let status: 'DUTY_MET' | 'DUTY_SHORT' | 'IN_OFFICE' | 'HALF_DAY' | 'WEEK_OFF' | 'WEEK_OFF_WORK' | 'ABSENT' | 'UPCOMING' = 'UPCOMING';
       let punchesCount = 0;
 
       if (existingPunch) {
@@ -1409,12 +1409,10 @@ export default function StaffPortalPage() {
           status = 'WEEK_OFF_WORK'; // Worked on weekly off!
         } else if (isToday && !outTime && inTime) {
           status = 'IN_OFFICE';
-        } else if (existingPunch.status === 'LATE' || existingPunch.isLate) {
-          status = 'LATE';
-        } else if (existingPunch.status === 'HALF_DAY') {
-          status = 'HALF_DAY';
+        } else if (dutyHours >= 8) {
+          status = 'DUTY_MET'; // ड्युटी पुगेको (८h+)
         } else {
-          status = 'PRESENT';
+          status = 'DUTY_SHORT'; // ड्युटी नपुगेको (<८h)
         }
       } else {
         if (isWeeklyOff) {
@@ -1457,8 +1455,9 @@ export default function StaffPortalPage() {
 
     // Actual worked hours in this selected Nepali month
     const actualWorkedHours = Math.round(monthDaysList.reduce((acc, d) => acc + d.dutyHours, 0) * 10) / 10;
-    const presentDaysCount = monthDaysList.filter(d => d.dutyHours > 0 || d.status === 'PRESENT' || d.status === 'LATE' || d.status === 'WEEK_OFF_WORK' || d.status === 'IN_OFFICE').length;
-    const lateDaysCount = monthDaysList.filter(d => d.status === 'LATE').length;
+    const presentDaysCount = monthDaysList.filter(d => d.dutyHours > 0 || d.status === 'DUTY_MET' || d.status === 'DUTY_SHORT' || d.status === 'WEEK_OFF_WORK' || d.status === 'IN_OFFICE').length;
+    const dutyMetCount = monthDaysList.filter(d => d.status === 'DUTY_MET' || (d.status === 'WEEK_OFF_WORK' && d.dutyHours >= 8)).length;
+    const dutyShortCount = monthDaysList.filter(d => d.status === 'DUTY_SHORT' || (d.status === 'WEEK_OFF_WORK' && d.dutyHours > 0 && d.dutyHours < 8)).length;
     const weekOffWorkCount = monthDaysList.filter(d => d.status === 'WEEK_OFF_WORK').length;
     const absentDaysCount = monthDaysList.filter(d => d.status === 'ABSENT').length;
 
@@ -1497,7 +1496,8 @@ export default function StaffPortalPage() {
       monthlyCycle56hTotal,
       actualWorkedHours,
       presentDaysCount,
-      lateDaysCount,
+      dutyMetCount,
+      dutyShortCount,
       weekOffWorkCount,
       absentDaysCount,
       elapsedDays,
@@ -3168,8 +3168,16 @@ export default function StaffPortalPage() {
 
               <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
                 <span className="truncate mr-2">Shift: {todayPunch.shift}</span>
-                <span className={`shrink-0 ${todayPunch.status === 'PRESENT' ? 'text-emerald-400 font-semibold' : todayPunch.status === 'LATE' ? 'text-amber-400 font-semibold' : 'text-slate-500 font-medium'}`}>
-                  Status: {todayPunch.status === 'PRESENT' ? 'On Time' : todayPunch.status === 'LATE' ? 'Late Arrival' : 'Not Checked In'}
+                <span className={`shrink-0 font-semibold ${
+                  todayPunch.status === 'DUTY_MET'
+                    ? 'text-emerald-400'
+                    : todayPunch.outTime
+                    ? 'text-amber-400'
+                    : todayPunch.hasPunched
+                    ? 'text-blue-400'
+                    : 'text-slate-500'
+                }`}>
+                  स्थिति: {todayPunch.status === 'DUTY_MET' ? '✅ ड्युटी पुगेको (८h+)' : todayPunch.outTime ? '⚠️ ड्युटी नपुगेको (<८h)' : todayPunch.hasPunched ? '🏢 कार्यालयमा कार्यरत' : 'आज पञ्च छैन'}
                 </span>
               </div>
             </div>
@@ -3396,9 +3404,14 @@ export default function StaffPortalPage() {
                   <span className="px-2 py-0.5 bg-slate-950 rounded-lg border border-slate-800 text-slate-300">
                     ✅ उपस्थित: <strong className="text-emerald-400">{monthlyDutySummary.presentDaysCount} दिन</strong>
                   </span>
-                  <span className="px-2 py-0.5 bg-slate-950 rounded-lg border border-slate-800 text-slate-300">
-                    ⚠️ ढिला आगमन: <strong className="text-amber-400">{monthlyDutySummary.lateDaysCount} दिन</strong>
+                  <span className="px-2 py-0.5 bg-slate-950 rounded-lg border border-emerald-500/30 text-slate-300">
+                    ✅ ड्युटी पुगेको (८h+): <strong className="text-emerald-400">{monthlyDutySummary.dutyMetCount} दिन</strong>
                   </span>
+                  {monthlyDutySummary.dutyShortCount > 0 && (
+                    <span className="px-2 py-0.5 bg-slate-950 rounded-lg border border-amber-500/30 text-slate-300">
+                      ⚠️ ड्युटी नपुगेको (&lt;८h): <strong className="text-amber-400">{monthlyDutySummary.dutyShortCount} दिन</strong>
+                    </span>
+                  )}
                   {monthlyDutySummary.absentDaysCount > 0 && (
                     <span className="px-2 py-0.5 bg-slate-950 rounded-lg border border-slate-800 text-slate-300">
                       ❌ अनुपस्थित: <strong className="text-rose-400">{monthlyDutySummary.absentDaysCount} दिन</strong>
@@ -3501,17 +3514,10 @@ export default function StaffPortalPage() {
 
                                 <td className="py-3.5 px-4">
                                   {item.inTime ? (
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-mono text-emerald-400 font-bold text-xs inline-flex items-center gap-1.5">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                                        {item.inTime}
-                                      </span>
-                                      {item.status === 'LATE' && (
-                                        <span className="px-1.5 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[9px] font-bold">
-                                          ढिला
-                                        </span>
-                                      )}
-                                    </div>
+                                    <span className="font-mono text-emerald-400 font-bold text-xs inline-flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                      {item.inTime}
+                                    </span>
                                   ) : (
                                     <span className="text-slate-500 font-mono text-xs">-- : --</span>
                                   )}
@@ -3540,7 +3546,7 @@ export default function StaffPortalPage() {
                                     <div>
                                       <div className="font-mono font-bold text-white text-xs flex items-center gap-1.5">
                                         <Timer className="w-3.5 h-3.5 text-purple-400" />
-                                        <span className={item.dutyHours >= 8 ? 'text-emerald-400' : item.dutyHours >= 4 ? 'text-amber-300' : 'text-slate-300'}>
+                                        <span className={item.dutyHours >= 8 ? 'text-emerald-400' : 'text-amber-300'}>
                                           {item.dutyFormatted}
                                         </span>
                                       </div>
@@ -3559,9 +3565,9 @@ export default function StaffPortalPage() {
 
                                 <td className="py-3.5 px-4 text-center">
                                   <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                                    item.status === 'PRESENT'
+                                    item.status === 'DUTY_MET'
                                       ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                                      : item.status === 'LATE'
+                                      : item.status === 'DUTY_SHORT'
                                       ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
                                       : item.status === 'WEEK_OFF'
                                       ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
@@ -3569,19 +3575,16 @@ export default function StaffPortalPage() {
                                       ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
                                       : item.status === 'IN_OFFICE'
                                       ? 'bg-fuchsia-500/10 text-fuchsia-300 border-fuchsia-500/30'
-                                      : item.status === 'HALF_DAY'
-                                      ? 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30'
                                       : item.status === 'ABSENT'
                                       ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
                                       : 'bg-slate-800 text-slate-500 border-slate-700'
                                   }`}>
-                                    {item.status === 'PRESENT' ? 'उपस्थित' : 
-                                     item.status === 'LATE' ? 'ढिला आगमन' : 
-                                     item.status === 'WEEK_OFF' ? 'साप्ताहिक बिदा' : 
-                                     item.status === 'WEEK_OFF_WORK' ? '⭐ बिदामा काम (OT)' : 
-                                     item.status === 'IN_OFFICE' ? '🏢 कार्यालयमा' : 
-                                     item.status === 'HALF_DAY' ? 'आधा दिन' : 
-                                     item.status === 'ABSENT' ? 'अनुपस्थित' : 'आगामी दिन'}
+                                    {item.status === 'DUTY_MET' ? '✅ ड्युटी पुगेको' : 
+                                     item.status === 'DUTY_SHORT' ? (item.dutyHours > 0 ? `⚠️ नपुगेको (-${Math.round((8 - item.dutyHours) * 10) / 10}h)` : '⚠️ ड्युटी नपुगेको') : 
+                                     item.status === 'WEEK_OFF' ? '🌴 साप्ताहिक बिदा' : 
+                                     item.status === 'WEEK_OFF_WORK' ? `⭐ बिदामा काम (${item.dutyHours}h OT)` : 
+                                     item.status === 'IN_OFFICE' ? '🏢 कार्यालयमा (चालु)' : 
+                                     item.status === 'ABSENT' ? '❌ अनुपस्थित' : 'आगामी दिन'}
                                   </span>
                                 </td>
                               </tr>
@@ -3629,9 +3632,9 @@ export default function StaffPortalPage() {
                               </div>
 
                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                                item.status === 'PRESENT'
+                                item.status === 'DUTY_MET'
                                   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                                  : item.status === 'LATE'
+                                  : item.status === 'DUTY_SHORT'
                                   ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
                                   : item.status === 'WEEK_OFF'
                                   ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
@@ -3639,19 +3642,16 @@ export default function StaffPortalPage() {
                                   ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
                                   : item.status === 'IN_OFFICE'
                                   ? 'bg-fuchsia-500/10 text-fuchsia-300 border-fuchsia-500/30'
-                                  : item.status === 'HALF_DAY'
-                                  ? 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30'
                                   : item.status === 'ABSENT'
                                   ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
                                   : 'bg-slate-800 text-slate-500 border-slate-700'
                               }`}>
-                                {item.status === 'PRESENT' ? 'उपस्थित' : 
-                                 item.status === 'LATE' ? 'ढिला आगमन' : 
-                                 item.status === 'WEEK_OFF' ? 'साप्ताहिक बिदा' : 
+                                {item.status === 'DUTY_MET' ? '✅ ड्युटी पुगेको' : 
+                                 item.status === 'DUTY_SHORT' ? (item.dutyHours > 0 ? `⚠️ नपुगेको (-${Math.round((8 - item.dutyHours) * 10) / 10}h)` : '⚠️ नपुगेको') : 
+                                 item.status === 'WEEK_OFF' ? '🌴 साप्ताहिक बिदा' : 
                                  item.status === 'WEEK_OFF_WORK' ? '⭐ बिदामा काम' : 
                                  item.status === 'IN_OFFICE' ? '🏢 कार्यालयमा' : 
-                                 item.status === 'HALF_DAY' ? 'आधा दिन' : 
-                                 item.status === 'ABSENT' ? 'अनुपस्थित' : 'आगामी'}
+                                 item.status === 'ABSENT' ? '❌ अनुपस्थित' : 'आगामी'}
                               </span>
                             </div>
 
@@ -3662,13 +3662,9 @@ export default function StaffPortalPage() {
                                 <span className="text-xs font-mono font-bold text-emerald-400 mt-0.5 block">
                                   {item.inTime || '--:--'}
                                 </span>
-                                {item.status === 'LATE' ? (
-                                  <span className="text-[8px] text-amber-400 font-bold block mt-0.5">ढिला</span>
-                                ) : (
-                                  <span className="text-[8px] text-slate-500 block mt-0.5">
-                                    {item.inTime ? 'आगमन' : item.isWeeklyOff ? 'बिदा' : '--'}
-                                  </span>
-                                )}
+                                <span className="text-[8px] text-slate-500 block mt-0.5">
+                                  {item.inTime ? 'आगमन' : item.isWeeklyOff ? 'बिदा' : '--'}
+                                </span>
                               </div>
 
                               <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800/60">
