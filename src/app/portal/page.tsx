@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { initialEmployees, generateTodayAttendance, initialAssets, initialFieldDutyRequests } from '@/lib/mock-data';
 import { Employee, CompanyAsset, LeaveRequest, FieldDutyRequest, DailyAttendance, PayrollRecord, UserRole } from '@/lib/types';
@@ -44,7 +44,13 @@ import {
   ArrowLeft,
   ShieldAlert,
   Sparkles,
-  Send
+  Send,
+  MessageSquare,
+  Users,
+  Megaphone,
+  Pin,
+  Trash2,
+  ThumbsUp
 } from 'lucide-react';
 import { generatePayslipPdf } from '@/lib/pdf/payslip-generator';
 
@@ -938,8 +944,155 @@ export default function StaffPortalPage() {
     }
   };
 
-  // Mobile Tabs: 'home' | 'attendance' | 'leaves' | 'profile'
-  const [mobileTab, setMobileTab] = useState<'home' | 'attendance' | 'leaves' | 'profile'>('home');
+  // Mobile Tabs: 'home' | 'attendance' | 'leaves' | 'chat' | 'profile'
+  const [mobileTab, setMobileTab] = useState<'home' | 'attendance' | 'leaves' | 'chat' | 'profile'>('home');
+
+  // Staff Group Chat State
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatInputText, setChatInputText] = useState('');
+  const [chatMsgType, setChatMsgType] = useState<'normal' | 'urgent' | 'announcement'>('normal');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatSending, setChatSending] = useState(false);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [chatFilter, setChatFilter] = useState<'all' | 'announcements'>('all');
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const lastSeenChatIdRef = useRef<string | null>(null);
+
+  // Load & Poll Chat Messages
+  const fetchChatMessages = async (silent = false) => {
+    try {
+      if (!silent) setChatLoading(true);
+      const res = await fetch(`/api/chat?limit=100&t=${Date.now()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.messages)) {
+          setChatMessages(data.messages);
+          if (mobileTab === 'chat') {
+            setUnreadChatCount(0);
+            if (data.messages.length > 0) {
+              const lastId = data.messages[data.messages.length - 1].id;
+              lastSeenChatIdRef.current = lastId;
+              try { localStorage.setItem('ap1_last_seen_chat_id', lastId); } catch {}
+            }
+          } else {
+            const savedLastId = typeof window !== 'undefined' ? localStorage.getItem('ap1_last_seen_chat_id') : null;
+            if (savedLastId) {
+              const lastIdx = data.messages.findIndex((m: any) => m.id === savedLastId);
+              if (lastIdx !== -1) {
+                const unread = data.messages.length - 1 - lastIdx;
+                setUnreadChatCount(Math.max(0, unread));
+              }
+            } else if (data.messages.length > 0) {
+              setUnreadChatCount(Math.min(5, data.messages.length));
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to poll chat:', err);
+    } finally {
+      if (!silent) setChatLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!activeEmployee) return;
+    fetchChatMessages();
+    const intervalTime = mobileTab === 'chat' ? 3500 : 25000;
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchChatMessages(true);
+    }, intervalTime);
+    return () => clearInterval(interval);
+  }, [activeEmployee, mobileTab]);
+
+  useEffect(() => {
+    if (mobileTab === 'chat' && chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [chatMessages, mobileTab]);
+
+  const handleSendChatMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!activeEmployee || !chatInputText.trim() || chatSending) return;
+
+    const textToSend = chatInputText.trim();
+    setChatSending(true);
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderPin: activeEmployee.biometric_pin,
+          senderName: activeEmployee.full_name,
+          senderRole: activeEmployee.role || 'staff',
+          department: activeEmployee.department_name || 'AP1 Staff',
+          photoUrl: activeEmployee.photo_url || '',
+          text: textToSend,
+          type: chatMsgType,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.message) {
+          setChatInputText('');
+          setChatMsgType('normal');
+          setChatMessages(prev => [...prev, data.message]);
+          lastSeenChatIdRef.current = data.message.id;
+          try { localStorage.setItem('ap1_last_seen_chat_id', data.message.id); } catch {}
+          setUnreadChatCount(0);
+          setTimeout(() => {
+            if (chatScrollRef.current) {
+              chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+            }
+          }, 100);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to send chat message:', err);
+    } finally {
+      setChatSending(false);
+    }
+  };
+
+  const handleToggleChatLike = async (messageId: string) => {
+    if (!activeEmployee) return;
+    const pin = activeEmployee.biometric_pin;
+    setChatMessages(prev => prev.map(m => {
+      if (m.id !== messageId) return m;
+      const set = new Set(m.likes || []);
+      if (set.has(pin)) set.delete(pin);
+      else set.add(pin);
+      return { ...m, likes: Array.from(set) };
+    }));
+
+    try {
+      await fetch('/api/chat', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId, pin, action: 'toggle_like' })
+      });
+    } catch (err) {
+      console.error('Like toggle failed:', err);
+    }
+  };
+
+  const handleDeleteChatMessage = async (messageId: string) => {
+    if (!activeEmployee) return;
+    if (!confirm('के तपाईं यो सन्देश च्याटबाट मेटाउन निश्चित हुनुहुन्छ? (Delete message?)')) return;
+    
+    setChatMessages(prev => prev.filter(m => m.id !== messageId));
+
+    try {
+      await fetch(`/api/chat?id=${messageId}&pin=${activeEmployee.biometric_pin}&isAdmin=${activeEmployee.role === 'admin'}`, {
+        method: 'DELETE',
+      });
+    } catch (err) {
+      console.error('Delete message failed:', err);
+    }
+  };
 
   // Real Biometric Machine Attendance State
   const [todayPunch, setTodayPunch] = useState<{
@@ -2609,6 +2762,48 @@ export default function StaffPortalPage() {
               </div>
             </div>
 
+            {/* Quick Access: Staff Group Chat Card */}
+            <div 
+              onClick={() => setMobileTab('chat')}
+              className="bg-gradient-to-r from-purple-950/70 via-slate-900 to-indigo-950/60 border border-purple-500/40 hover:border-purple-500/70 rounded-3xl p-4 shadow-xl cursor-pointer transition active:scale-98"
+            >
+              <div className="flex items-center justify-between mb-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-purple-600/30 shrink-0">
+                    <MessageSquare className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>AP1 Staff Group Chat</span>
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    </h3>
+                    <p className="text-[10px] text-purple-200/70">सबै कर्मचारीहरूसँग च्याट तथा सामूहिक सूचना</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 text-[11px] font-bold text-fuchsia-400 bg-purple-950/80 px-2.5 py-1 rounded-full border border-purple-700/50">
+                  <span>च्याट</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </div>
+              </div>
+
+              {chatMessages.length > 0 && (
+                <div className="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-2.5 text-[11px] flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className="font-bold text-purple-300 shrink-0">
+                      {chatMessages[chatMessages.length - 1].senderName}:
+                    </span>
+                    <span className="text-slate-300 truncate">
+                      {chatMessages[chatMessages.length - 1].text}
+                    </span>
+                  </div>
+                  <span className="text-[9px] text-slate-500 font-mono shrink-0 pl-1">
+                    {chatMessages.length} msgs
+                  </span>
+                </div>
+              )}
+            </div>
+
             {/* Live Today Attendance Punch Status */}
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-3">
               <div className="flex items-center justify-between">
@@ -2908,7 +3103,294 @@ export default function StaffPortalPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 4: PROFILE & ASSETS */}
+        {/* TAB 4: STAFF GROUP CHAT / टिम च्याट (ALL STAFF MESSAGES) */}
+        {/* ========================================================================= */}
+        {mobileTab === 'chat' && (
+          <div className="flex flex-col h-[calc(100vh-175px)] min-h-[500px] max-w-lg mx-auto bg-slate-950/80 border border-slate-800/80 rounded-3xl overflow-hidden shadow-2xl backdrop-blur-md animate-in fade-in duration-200">
+            {/* Chat Room Header */}
+            <div className="px-4 py-3 bg-gradient-to-r from-slate-900 via-purple-950/40 to-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="relative">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-700 via-fuchsia-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-purple-600/30">
+                    <Users className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-900 animate-pulse"></span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="text-xs font-bold text-white tracking-wide">AP1 All-Staff Group</h3>
+                    <span className="px-1.5 py-0.2 bg-purple-500/20 border border-purple-500/30 rounded text-[9px] text-purple-300 font-semibold uppercase">Live</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    {employees.length > 0 ? `${employees.length} प्रसारण तथा प्राविधिक सदस्यहरू` : 'सबै कर्मचारी टिम'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setChatFilter(prev => prev === 'all' ? 'announcements' : 'all')}
+                  className={`px-2.5 py-1 rounded-xl text-[10px] font-bold border transition-colors cursor-pointer flex items-center gap-1 ${
+                    chatFilter === 'announcements'
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white'
+                  }`}
+                  title="Filter announcements"
+                >
+                  <Megaphone className="w-3 h-3 text-amber-400" />
+                  <span>{chatFilter === 'announcements' ? 'सबै' : 'सूचना'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fetchChatMessages(false)}
+                  className="p-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl border border-slate-700 transition cursor-pointer"
+                  title="Refresh chat"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${chatLoading ? 'animate-spin text-purple-400' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Pinned Announcement Banner (if any) */}
+            {chatMessages.some(m => m.pinned) && chatFilter === 'all' && (
+              <div className="px-3 py-2 bg-amber-500/10 border-b border-amber-500/20 flex items-center justify-between text-xs shrink-0">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <Pin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span className="text-[10px] font-semibold text-amber-200 truncate">
+                    {chatMessages.filter(m => m.pinned).slice(-1)[0]?.text}
+                  </span>
+                </div>
+                <span className="text-[9px] text-amber-400/80 font-bold shrink-0 ml-2">पिन गरिएको</span>
+              </div>
+            )}
+
+            {/* Messages Scroll Area */}
+            <div 
+              ref={chatScrollRef}
+              className="flex-1 overflow-y-auto p-3.5 space-y-3.5 divide-y-0"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              {chatMessages.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
+                  <MessageSquare className="w-10 h-10 text-slate-600 mb-2" />
+                  <p className="text-xs font-semibold text-slate-300">कुनै सन्देश छैन</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">सबै कर्मचारीहरूसँग पहिलो सन्देश सुरु गर्नुहोस्!</p>
+                </div>
+              ) : (
+                chatMessages
+                  .filter(m => chatFilter === 'all' || m.type === 'announcement' || m.type === 'urgent')
+                  .map((msg, idx) => {
+                    const isMe = String(msg.senderPin) === String(activeEmployee.biometric_pin);
+                    const isUrgent = msg.type === 'urgent';
+                    const isAnnouncement = msg.type === 'announcement';
+                    const isManagement = msg.senderRole === 'admin' || msg.senderPin === '1' || msg.senderPin === '100';
+
+                    let timeLabel = '';
+                    try {
+                      const d = new Date(msg.createdAt);
+                      timeLabel = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                    } catch {
+                      timeLabel = 'Just now';
+                    }
+
+                    const hasLiked = (msg.likes || []).includes(activeEmployee.biometric_pin);
+
+                    return (
+                      <div 
+                        key={msg.id || idx}
+                        className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1`}
+                      >
+                        {/* Sender info for other members */}
+                        {!isMe && (
+                          <div className="flex items-center gap-1.5 pl-1 text-[11px]">
+                            <span className="font-bold text-slate-200">{msg.senderName}</span>
+                            {isManagement ? (
+                              <span className="px-1.5 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[9px] font-bold">
+                                ⭐ Management
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-400">
+                                • {msg.department || 'Staff'} (PIN #{msg.senderPin})
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Speech Bubble */}
+                        <div className={`relative max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs shadow-md ${
+                          isMe
+                            ? 'bg-gradient-to-r from-purple-700 via-purple-600 to-indigo-600 text-white rounded-tr-xs'
+                            : isUrgent
+                            ? 'bg-red-950/80 border border-red-500/50 text-red-100 rounded-tl-xs shadow-red-500/10'
+                            : isAnnouncement
+                            ? 'bg-amber-950/70 border border-amber-500/50 text-amber-100 rounded-tl-xs'
+                            : 'bg-slate-800/90 border border-slate-700/70 text-slate-100 rounded-tl-xs'
+                        }`}>
+                          {/* Announcement / Urgent Header inside Bubble */}
+                          {isUrgent && (
+                            <div className="flex items-center gap-1 text-[10px] font-extrabold text-red-300 uppercase tracking-wider mb-1 pb-1 border-b border-red-500/30">
+                              <span className="animate-pulse">🚨</span>
+                              <span>जरुरी सूचना (Urgent Notice)</span>
+                            </div>
+                          )}
+                          {isAnnouncement && (
+                            <div className="flex items-center gap-1 text-[10px] font-extrabold text-amber-300 uppercase tracking-wider mb-1 pb-1 border-b border-amber-500/30">
+                              <span>📢</span>
+                              <span>आधिकारिक सूचना (Announcement)</span>
+                            </div>
+                          )}
+
+                          {/* Message Body */}
+                          <p className="whitespace-pre-wrap leading-relaxed select-text font-normal text-xs">
+                            {msg.text}
+                          </p>
+
+                          {/* Footer: Time & Actions */}
+                          <div className={`flex items-center justify-between gap-3 mt-1.5 pt-1 text-[9px] ${
+                            isMe ? 'text-purple-200/80 border-t border-purple-500/30' : 'text-slate-400 border-t border-slate-700/50'
+                          }`}>
+                            <span className="font-mono">{timeLabel}</span>
+                            <div className="flex items-center gap-2">
+                              {/* Like / Acknowledge Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleChatLike(msg.id)}
+                                className={`flex items-center gap-0.5 cursor-pointer px-1 rounded transition-colors ${
+                                  hasLiked 
+                                    ? (isMe ? 'text-amber-300 font-bold' : 'text-fuchsia-400 font-bold') 
+                                    : 'hover:text-white'
+                                }`}
+                              >
+                                <ThumbsUp className="w-2.5 h-2.5" />
+                                <span>{(msg.likes || []).length > 0 ? (msg.likes || []).length : ''}</span>
+                              </button>
+
+                              {/* Delete message if me or admin */}
+                              {(isMe || activeEmployee.role === 'admin') && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteChatMessage(msg.id)}
+                                  className="text-slate-400 hover:text-red-400 p-0.5 cursor-pointer transition"
+                                  title="मेटाउनुहोस् (Delete)"
+                                >
+                                  <Trash2 className="w-2.5 h-2.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+              )}
+            </div>
+
+            {/* Quick Emoji Bar */}
+            <div className="px-3 py-1.5 bg-slate-900/90 border-t border-slate-800 flex items-center justify-between gap-1 overflow-x-auto shrink-0 select-none">
+              <span className="text-[10px] text-slate-500 shrink-0 font-medium mr-1">Emoji:</span>
+              {['👍', '🙏', '📺', '🚨', '👏', '✅', '⏰', '📢', '🔥', '💪'].map(emoji => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => setChatInputText(prev => prev + emoji)}
+                  className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-xs rounded-lg transition active:scale-95 cursor-pointer shrink-0"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+
+            {/* Message Input & Send Form */}
+            <form 
+              onSubmit={handleSendChatMessage}
+              className="p-2.5 bg-slate-900 border-t border-slate-800/80 shrink-0 space-y-2"
+            >
+              {/* Priority / Announcement Toggle */}
+              <div className="flex items-center justify-between text-[10px]">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400">प्रकार:</span>
+                  <button
+                    type="button"
+                    onClick={() => setChatMsgType('normal')}
+                    className={`px-2 py-0.5 rounded-lg font-bold transition cursor-pointer ${
+                      chatMsgType === 'normal' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400'
+                    }`}
+                  >
+                    साधारण
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChatMsgType('urgent')}
+                    className={`px-2 py-0.5 rounded-lg font-bold transition cursor-pointer ${
+                      chatMsgType === 'urgent' ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-400'
+                    }`}
+                  >
+                    🔴 जरुरी
+                  </button>
+                  {(activeEmployee.role === 'admin' || activeEmployee.biometric_pin === '1' || activeEmployee.biometric_pin === '100') && (
+                    <button
+                      type="button"
+                      onClick={() => setChatMsgType('announcement')}
+                      className={`px-2 py-0.5 rounded-lg font-bold transition cursor-pointer ${
+                        chatMsgType === 'announcement' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      📢 सूचना
+                    </button>
+                  )}
+                </div>
+
+                <span className="text-slate-500 font-mono text-[9px]">{chatInputText.length}/2000</span>
+              </div>
+
+              {/* Text Input Row */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder={
+                    chatMsgType === 'urgent' 
+                      ? '🔴 सबैलाई तत्काल जरुरी सूचना टाइप गर्नुहोस्...'
+                      : chatMsgType === 'announcement'
+                      ? '📢 आधिकारिक सूचना यहाँ टाइप गर्नुहोस्...'
+                      : 'यहाँ सन्देश लेख्नुहोस् (Message all staff)...'
+                  }
+                  value={chatInputText}
+                  onChange={e => setChatInputText(e.target.value)}
+                  maxLength={2000}
+                  className={`flex-1 px-3.5 py-2.5 bg-slate-800/90 border rounded-2xl text-white text-xs placeholder:text-slate-500 focus:outline-none transition ${
+                    chatMsgType === 'urgent'
+                      ? 'border-red-500/50 focus:border-red-500 focus:ring-1 focus:ring-red-500/30'
+                      : chatMsgType === 'announcement'
+                      ? 'border-amber-500/50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30'
+                      : 'border-slate-700 focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20'
+                  }`}
+                />
+                <button
+                  type="submit"
+                  disabled={!chatInputText.trim() || chatSending}
+                  className={`p-2.5 rounded-2xl text-white shadow-lg transition active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0 ${
+                    chatMsgType === 'urgent'
+                      ? 'bg-red-600 hover:bg-red-500 shadow-red-600/30'
+                      : chatMsgType === 'announcement'
+                      ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/30'
+                      : 'bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 shadow-purple-600/30'
+                  }`}
+                  title="सन्देश पठाउनुहोस्"
+                >
+                  {chatSending ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 5: PROFILE & ASSETS */}
         {/* ========================================================================= */}
         {mobileTab === 'profile' && (
           <div className="space-y-4 animate-in fade-in duration-200">
@@ -3043,46 +3525,72 @@ export default function StaffPortalPage() {
       </main>
 
       {/* FIXED MOBILE BOTTOM NAVIGATION BAR */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 pt-1.5 px-3 safe-bottom select-none">
-        <div className="max-w-lg mx-auto grid grid-cols-4 gap-1 text-center">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 pt-1.5 px-2 safe-bottom select-none">
+        <div className="max-w-lg mx-auto grid grid-cols-5 gap-0.5 text-center">
           <button
+            type="button"
             onClick={() => setMobileTab('home')}
             className={`py-1.5 flex flex-col items-center justify-center rounded-xl transition-colors cursor-pointer ${
               mobileTab === 'home' ? 'text-fuchsia-400 font-bold' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <Home className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px]">Home</span>
+            <span className="text-[9px] sm:text-[10px]">Home</span>
           </button>
 
           <button
+            type="button"
             onClick={() => setMobileTab('attendance')}
             className={`py-1.5 flex flex-col items-center justify-center rounded-xl transition-colors cursor-pointer ${
               mobileTab === 'attendance' ? 'text-fuchsia-400 font-bold' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <Clock className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px]">Attendance</span>
+            <span className="text-[9px] sm:text-[10px]">Attendance</span>
+          </button>
+
+          {/* Group Chat Button with Real-time Unread Badge */}
+          <button
+            type="button"
+            onClick={() => {
+              setMobileTab('chat');
+              setUnreadChatCount(0);
+            }}
+            className={`py-1.5 flex flex-col items-center justify-center rounded-xl transition-colors cursor-pointer relative ${
+              mobileTab === 'chat' ? 'text-fuchsia-400 font-bold' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <div className="relative">
+              <MessageSquare className="w-5 h-5 mb-0.5" />
+              {unreadChatCount > 0 && (
+                <span className="absolute -top-1 -right-2 px-1 py-0.2 bg-gradient-to-r from-red-600 to-rose-600 text-white font-extrabold text-[8px] rounded-full min-w-3.5 h-3.5 flex items-center justify-center shadow-lg shadow-red-500/40 animate-bounce">
+                  {unreadChatCount > 9 ? '9+' : unreadChatCount}
+                </span>
+              )}
+            </div>
+            <span className="text-[9px] sm:text-[10px]">Chat</span>
           </button>
 
           <button
+            type="button"
             onClick={() => setMobileTab('leaves')}
             className={`py-1.5 flex flex-col items-center justify-center rounded-xl transition-colors cursor-pointer ${
               mobileTab === 'leaves' ? 'text-fuchsia-400 font-bold' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <CalendarDays className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px]">Leaves/Duty</span>
+            <span className="text-[9px] sm:text-[10px]">Leaves</span>
           </button>
 
           <button
+            type="button"
             onClick={() => setMobileTab('profile')}
             className={`py-1.5 flex flex-col items-center justify-center rounded-xl transition-colors cursor-pointer ${
               mobileTab === 'profile' ? 'text-fuchsia-400 font-bold' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <QrCode className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px]">ID / Assets</span>
+            <span className="text-[9px] sm:text-[10px]">ID / Assets</span>
           </button>
         </div>
       </nav>
