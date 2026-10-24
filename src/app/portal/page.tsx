@@ -1075,17 +1075,29 @@ export default function StaffPortalPage() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const [isAlreadyInstalled, setIsAlreadyInstalled] = useState(false);
+  const [isBannerDismissed, setIsBannerDismissed] = useState(false);
   const [isIosDevice, setIsIosDevice] = useState(false);
   const [showIosGuide, setShowIosGuide] = useState(false);
 
   useEffect(() => {
-    // Check if running on iOS (iPhone/iPad/Safari)
+    // Check if running on iOS (iPhone/iPad/Safari) or Android Native App
     if (typeof window !== 'undefined') {
       const ua = navigator.userAgent || '';
       const isIos = /iPhone|iPad|iPod/i.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/i.test(ua));
       setIsIosDevice(isIos);
 
+      if (localStorage.getItem('ap1_pwa_banner_dismissed') === 'true') {
+        setIsBannerDismissed(true);
+      }
+
+      // Check if running inside Native Android APK (WebView) or standalone PWA
+      const isNativeApp = 
+        Boolean((window as any).AndroidBridge) ||
+        'AndroidBridge' in window ||
+        /wv|WebView|AP1HRMSApp/i.test(ua);
+
       const isStandalone = 
+        isNativeApp ||
         window.matchMedia('(display-mode: standalone)').matches ||
         (window.navigator as any).standalone === true ||
         document.referrer.includes('android-app://') ||
@@ -1093,6 +1105,7 @@ export default function StaffPortalPage() {
 
       if (isStandalone) {
         setIsAlreadyInstalled(true);
+        try { localStorage.setItem('ap1_pwa_installed', 'true'); } catch {}
       }
 
       const mediaQuery = window.matchMedia('(display-mode: standalone)');
@@ -2516,8 +2529,8 @@ export default function StaffPortalPage() {
       {/* Main Mobile Content Area */}
       <main className="flex-1 max-w-lg w-full mx-auto p-4 space-y-4">
         {/* PWA Floating Install Helper Banner */}
-        {!isAlreadyInstalled && (
-          <div className="bg-gradient-to-r from-purple-950/80 via-slate-900 to-fuchsia-950/40 border border-purple-500/40 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-lg">
+        {!isAlreadyInstalled && !isBannerDismissed && (
+          <div className="bg-gradient-to-r from-purple-950/80 via-slate-900 to-fuchsia-950/40 border border-purple-500/40 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-lg relative">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-700 to-fuchsia-600 flex items-center justify-center shrink-0 shadow-md shadow-purple-600/30">
                 <Smartphone className="w-5 h-5 text-white" />
@@ -2527,12 +2540,25 @@ export default function StaffPortalPage() {
                 <p className="text-[11px] text-purple-200/70">Add to your home screen for quick daily access</p>
               </div>
             </div>
-            <button
-              onClick={handleInstallClick}
-              className="px-3 py-1.5 bg-gradient-to-r from-purple-700 via-purple-600 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-500 text-white rounded-xl text-xs font-bold shrink-0 shadow-md cursor-pointer active:scale-95"
-            >
-              Install
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleInstallClick}
+                className="px-3 py-1.5 bg-gradient-to-r from-purple-700 via-purple-600 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-500 text-white rounded-xl text-xs font-bold shrink-0 shadow-md cursor-pointer active:scale-95"
+              >
+                Install
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsBannerDismissed(true);
+                  try { localStorage.setItem('ap1_pwa_banner_dismissed', 'true'); } catch {}
+                }}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         )}
 
