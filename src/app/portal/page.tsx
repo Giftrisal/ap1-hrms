@@ -58,7 +58,8 @@ import {
   Pin,
   Trash2,
   ThumbsUp,
-  Timer
+  Timer,
+  ArrowUpDown
 } from 'lucide-react';
 import { generatePayslipPdf } from '@/lib/pdf/payslip-generator';
 
@@ -1338,6 +1339,7 @@ export default function StaffPortalPage() {
   const todayBs = useMemo(() => getNepaliDate(new Date()), []);
   const [selectedBsYear, setSelectedBsYear] = useState<number>(() => getNepaliDate(new Date()).bsYear);
   const [selectedBsMonth, setSelectedBsMonth] = useState<number>(() => getNepaliDate(new Date()).bsMonth);
+  const [dutySortAsc, setDutySortAsc] = useState<boolean>(true); // default true: 1, 2, 3, 4, 5, 6... (Ascending)
 
   // Nepali Calendar Monthly Duty Summary Calculation:
   // Rules: Daily 8 hrs duty, Weekly 1 day off (Weekly 56 hrs cycle, 6 working days * 8h = 48h working duty)
@@ -1481,8 +1483,8 @@ export default function StaffPortalPage() {
       ? Math.min(100, Math.round((actualWorkedHours / monthlyRequiredWorkingHours) * 100))
       : 0;
 
-    // Sort descending by day for list view so newest dates appear first
-    const sortedDaysList = [...monthDaysList].sort((a, b) => b.bsDay - a.bsDay);
+    // Sort by day: ascending (1, 2, 3, 4, 5...) or descending based on dutySortAsc
+    const sortedDaysList = [...monthDaysList].sort((a, b) => dutySortAsc ? a.bsDay - b.bsDay : b.bsDay - a.bsDay);
 
     return {
       monthNameNp: NEPALI_MONTHS_NP[selectedBsMonth - 1] || 'कार्तिक',
@@ -1515,7 +1517,7 @@ export default function StaffPortalPage() {
       isCurrentMonth,
       empWeeklyOffName: empWeeklyOff.charAt(0).toUpperCase() + empWeeklyOff.slice(1)
     };
-  }, [selectedBsYear, selectedBsMonth, activeEmployee, myDailyAttendance, todayBs]);
+  }, [selectedBsYear, selectedBsMonth, activeEmployee, myDailyAttendance, todayBs, dutySortAsc]);
 
   // Mobile Only Restriction Check (Blocks Laptop / Desktop / PC)
   const [isDesktopBlocked, setIsDesktopBlocked] = useState(false);
@@ -3466,9 +3468,20 @@ export default function StaffPortalPage() {
                         मिति, आगमन, प्रस्थान र कुल काम गरेको घण्टा (Total Duty Hr)
                       </p>
                     </div>
-                    <span className="text-[11px] font-mono font-semibold px-2.5 py-1 bg-slate-950 rounded-xl border border-slate-800 text-purple-300">
-                      PIN #{activeEmployee.biometric_pin}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDutySortAsc(prev => !prev)}
+                        className="px-2.5 py-1 bg-slate-950 hover:bg-slate-800 rounded-xl border border-purple-500/30 text-[10px] font-bold text-purple-300 transition-colors flex items-center gap-1 cursor-pointer shadow-sm"
+                        title="क्रमानुसार बदल्नुहोस् (Sort Order)"
+                      >
+                        <ArrowUpDown className="w-3 h-3 text-purple-400" />
+                        <span>{dutySortAsc ? '१ → ३० गते' : '३० → १ गते'}</span>
+                      </button>
+                      <span className="text-[11px] font-mono font-semibold px-2.5 py-1 bg-slate-950 rounded-xl border border-slate-800 text-purple-300">
+                        PIN #{activeEmployee.biometric_pin}
+                      </span>
+                    </div>
                   </div>
 
                   {monthlyDutySummary.sortedDaysList.length === 0 ? (
