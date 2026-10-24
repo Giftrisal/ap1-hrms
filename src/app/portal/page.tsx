@@ -937,6 +937,111 @@ export default function StaffPortalPage() {
   // Mobile Tabs: 'home' | 'attendance' | 'leaves' | 'profile'
   const [mobileTab, setMobileTab] = useState<'home' | 'attendance' | 'leaves' | 'profile'>('home');
 
+  // Real Biometric Machine Attendance State
+  const [todayPunch, setTodayPunch] = useState<{
+    hasPunched: boolean;
+    inTime: string | null;
+    outTime: string | null;
+    status: 'PRESENT' | 'LATE' | 'NOT_PUNCHED';
+    shift: string;
+    totalPunchesToday: number;
+  }>({
+    hasPunched: false,
+    inTime: null,
+    outTime: null,
+    status: 'NOT_PUNCHED',
+    shift: 'AP1 Shift (Broadcasting / Operations)',
+    totalPunchesToday: 0
+  });
+
+  const [myRecentPunches, setMyRecentPunches] = useState<any[]>([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+
+  // Poll /api/biometric/sync for real-time punches of this logged-in staff member
+  useEffect(() => {
+    if (!activeEmployee) return;
+
+    const fetchBiometricAttendance = async () => {
+      try {
+        setAttendanceLoading(true);
+        const res = await fetch(`/api/biometric/sync?t=${Date.now()}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (Array.isArray(data.recent_logs)) {
+          const pin = String(activeEmployee.biometric_pin || '').trim();
+
+          // Filter logs belonging to this employee
+          const myLogs = data.recent_logs.filter((l: any) => 
+            String(l.user_id || l.biometric_pin || '').trim() === pin
+          ).sort((a: any, b: any) => (b.punch_time || '').localeCompare(a.punch_time || ''));
+
+          setMyRecentPunches(myLogs.slice(0, 30));
+
+          // Today's date in YYYY-MM-DD
+          const todayStr = new Date().toISOString().split('T')[0];
+
+          // Today's logs
+          const todayLogs = myLogs.filter((l: any) => {
+            const punchDate = l.punch_time ? l.punch_time.split('T')[0].split(' ')[0] : '';
+            return punchDate === todayStr;
+          }).sort((a: any, b: any) => (a.punch_time || '').localeCompare(b.punch_time || ''));
+
+          const formatTime = (timeStr: string) => {
+            try {
+              const d = new Date(timeStr);
+              return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            } catch {
+              return timeStr;
+            }
+          };
+
+          if (todayLogs.length > 0) {
+            const firstIn = todayLogs[0].punch_time;
+            const lastOut = todayLogs.length > 1 ? todayLogs[todayLogs.length - 1].punch_time : null;
+
+            let isLate = false;
+            try {
+              const d = new Date(firstIn);
+              const hour = d.getHours();
+              const min = d.getMinutes();
+              if (hour > 9 || (hour === 9 && min > 30)) {
+                isLate = true;
+              }
+            } catch {}
+
+            setTodayPunch({
+              hasPunched: true,
+              inTime: formatTime(firstIn),
+              outTime: lastOut ? formatTime(lastOut) : null,
+              status: isLate ? 'LATE' : 'PRESENT',
+              shift: 'AP1 Shift (Broadcasting / Operations)',
+              totalPunchesToday: todayLogs.length
+            });
+          } else {
+            // Not punched yet today
+            setTodayPunch({
+              hasPunched: false,
+              inTime: null,
+              outTime: null,
+              status: 'NOT_PUNCHED',
+              shift: 'AP1 Shift (Broadcasting / Operations)',
+              totalPunchesToday: 0
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching biometric punches:', err);
+      } finally {
+        setAttendanceLoading(false);
+      }
+    };
+
+    fetchBiometricAttendance();
+    const interval = setInterval(fetchBiometricAttendance, 30000);
+    return () => clearInterval(interval);
+  }, [activeEmployee]);
+
   // Mobile Only Restriction Check (Blocks Laptop / Desktop / PC)
   const [isDesktopBlocked, setIsDesktopBlocked] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -1444,7 +1549,7 @@ export default function StaffPortalPage() {
   // If no staff is currently logged into the mobile app: Show Clean Login / Signup / Reset Screen
   if (!activeEmployee) {
     return (
-      <div className="min-h-[100dvh] max-w-full overflow-x-hidden bg-slate-950 text-slate-100 flex flex-col justify-between px-3.5 py-2 sm:px-6 sm:py-4 font-sans safe-top safe-bottom overscroll-none touch-pan-y">
+      <div className="min-h-screen w-full overflow-x-hidden bg-slate-950 text-slate-100 flex flex-col justify-between px-3.5 py-2 sm:px-6 sm:py-4 font-sans safe-top safe-bottom">
         {/* Top Header */}
         <div className="flex items-center justify-between pt-1 sm:pt-2">
           <div className="flex items-center gap-2.5 sm:gap-3">
@@ -2357,7 +2462,7 @@ export default function StaffPortalPage() {
 
   // LOGGED-IN MOBILE STAFF PORTAL INTERFACE
   return (
-    <div className="min-h-[100dvh] max-w-full overflow-x-hidden bg-slate-950 text-slate-100 flex flex-col font-sans pb-28 overscroll-none touch-pan-y">
+    <div className="min-h-screen w-full overflow-x-hidden overflow-y-auto bg-slate-950 text-slate-100 flex flex-col font-sans pb-32">
       {/* Top Mobile App Header */}
       <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-4 py-3 safe-top">
         <div className="max-w-lg mx-auto flex items-center justify-between">
@@ -2480,24 +2585,30 @@ export default function StaffPortalPage() {
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 text-center">
                   <span className="text-[10px] font-semibold text-slate-500 block uppercase">Check In (Arrival)</span>
-                  <span className="text-lg font-mono font-black text-emerald-400 mt-1 block">
-                    09:15 AM
+                  <span className={`text-lg font-mono font-black mt-1 block ${todayPunch.hasPunched ? 'text-emerald-400' : 'text-slate-500'}`}>
+                    {todayPunch.hasPunched ? todayPunch.inTime : '-- : --'}
                   </span>
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">Recorded on machine</span>
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">
+                    {todayPunch.hasPunched ? 'Recorded on machine' : 'Not punched today'}
+                  </span>
                 </div>
 
                 <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 text-center">
                   <span className="text-[10px] font-semibold text-slate-500 block uppercase">Check Out (Departure)</span>
-                  <span className="text-lg font-mono font-black text-amber-400 mt-1 block">
-                    -- : --
+                  <span className={`text-lg font-mono font-black mt-1 block ${todayPunch.outTime ? 'text-amber-400' : 'text-slate-500'}`}>
+                    {todayPunch.outTime || '-- : --'}
                   </span>
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">Shift in progress</span>
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">
+                    {todayPunch.outTime ? 'Departure punched' : todayPunch.hasPunched ? 'Shift in progress' : 'Awaiting check-in'}
+                  </span>
                 </div>
               </div>
 
               <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-                <span>Shift: Morning Broadcast (9 AM - 5 PM)</span>
-                <span className="text-emerald-400 font-semibold">Status: On Time</span>
+                <span>Shift: {todayPunch.shift}</span>
+                <span className={todayPunch.status === 'PRESENT' ? 'text-emerald-400 font-semibold' : todayPunch.status === 'LATE' ? 'text-amber-400 font-semibold' : 'text-slate-500 font-medium'}>
+                  Status: {todayPunch.status === 'PRESENT' ? 'On Time' : todayPunch.status === 'LATE' ? 'Late Arrival' : 'Not Checked In'}
+                </span>
               </div>
             </div>
 
@@ -2565,56 +2676,75 @@ export default function StaffPortalPage() {
             {/* Monthly Attendance Counters */}
             <div className="grid grid-cols-3 gap-2.5">
               <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl text-center">
-                <span className="text-[10px] font-semibold text-slate-400 block uppercase">Present</span>
-                <span className="text-xl font-black text-emerald-400 mt-1 block">22</span>
-                <span className="text-[10px] text-slate-500">Days</span>
+                <span className="text-[10px] font-semibold text-slate-400 block uppercase">Punches</span>
+                <span className="text-xl font-black text-purple-400 mt-1 block">{myRecentPunches.length}</span>
+                <span className="text-[10px] text-slate-500">Recorded</span>
               </div>
               <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl text-center">
-                <span className="text-[10px] font-semibold text-slate-400 block uppercase">Late</span>
-                <span className="text-xl font-black text-amber-400 mt-1 block">1</span>
-                <span className="text-[10px] text-slate-500">Day</span>
+                <span className="text-[10px] font-semibold text-slate-400 block uppercase">Today</span>
+                <span className={`text-xl font-black mt-1 block ${todayPunch.hasPunched ? 'text-emerald-400' : 'text-slate-500'}`}>
+                  {todayPunch.hasPunched ? 'Present' : 'No Punch'}
+                </span>
+                <span className="text-[10px] text-slate-500">{todayPunch.hasPunched ? 'Punched' : 'Absent/Away'}</span>
               </div>
               <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl text-center">
-                <span className="text-[10px] font-semibold text-slate-400 block uppercase">Absent</span>
-                <span className="text-xl font-black text-rose-400 mt-1 block">0</span>
-                <span className="text-[10px] text-slate-500">Days</span>
+                <span className="text-[10px] font-semibold text-slate-400 block uppercase">Hardware</span>
+                <span className="text-xs font-bold text-emerald-400 mt-2 block">ZK 4370</span>
+                <span className="text-[10px] text-slate-500">Sync Active</span>
               </div>
             </div>
 
             {/* Attendance Logs */}
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4.5 space-y-3">
               <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <h3 className="font-bold text-sm text-white">Recent Attendance Records</h3>
+                <h3 className="font-bold text-sm text-white">Machine Punch Records</h3>
                 <span className="text-[11px] text-slate-400">PIN #{activeEmployee.biometric_pin}</span>
               </div>
 
-              <div className="space-y-2">
-                {[
-                  { date: '2026-09-19', day: 'Today', in: '09:15 AM', out: '--', status: 'PRESENT' },
-                  { date: '2026-09-18', day: 'Friday', in: '09:08 AM', out: '05:12 PM', status: 'PRESENT' },
-                  { date: '2026-09-17', day: 'Thursday', in: '09:32 AM', out: '05:05 PM', status: 'LATE' },
-                  { date: '2026-09-16', day: 'Wednesday', in: '08:58 AM', out: '05:30 PM', status: 'PRESENT' },
-                  { date: '2026-09-15', day: 'Tuesday', in: '09:02 AM', out: '05:15 PM', status: 'PRESENT' },
-                ].map((row, idx) => (
-                  <div key={idx} className="p-3 bg-slate-950 rounded-2xl border border-slate-800/80 flex items-center justify-between text-xs">
-                    <div>
-                      <p className="font-bold text-white">{row.day}</p>
-                      <p className="text-[10px] text-slate-400 font-mono">{row.date}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-mono text-slate-200">
-                        <span className="text-emerald-400 font-semibold">{row.in}</span> - {row.out}
-                      </p>
-                      <span className={`inline-block text-[9px] font-bold px-2 py-0.2 rounded-full mt-0.5 ${
-                        row.status === 'PRESENT' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' :
-                        'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                      }`}>
-                        {row.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {myRecentPunches.length === 0 ? (
+                <div className="p-6 text-center text-slate-400 space-y-1">
+                  <Clock className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                  <p className="text-xs font-semibold text-slate-300">No Biometric Punches Yet</p>
+                  <p className="text-[11px] text-slate-500">
+                    When you punch your finger/face on the AP1 biometric machine (PIN #{activeEmployee.biometric_pin}), logs will appear here in real-time.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {myRecentPunches.map((log, idx) => {
+                    const rawDate = log.punch_time ? log.punch_time.split('T')[0].split(' ')[0] : '';
+                    const isToday = rawDate === new Date().toISOString().split('T')[0];
+                    const timeOnly = (() => {
+                      try {
+                        return new Date(log.punch_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                      } catch {
+                        return log.punch_time || '';
+                      }
+                    })();
+
+                    return (
+                      <div key={idx} className="p-3 bg-slate-950 rounded-2xl border border-slate-800/80 flex items-center justify-between text-xs">
+                        <div>
+                          <p className="font-bold text-white flex items-center gap-1.5">
+                            {isToday ? <span className="text-emerald-400 font-black">Today</span> : rawDate}
+                          </p>
+                          <p className="text-[10px] text-slate-400 font-mono">
+                            Machine: {log.device_ip || '10.1.2.216'}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-mono text-emerald-400 font-bold text-sm">
+                            {timeOnly}
+                          </p>
+                          <span className="inline-block text-[9px] font-bold px-2 py-0.2 rounded-full mt-0.5 bg-purple-500/10 text-purple-300 border border-purple-500/30">
+                            {log.punch_type || 'Biometric Punch'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
