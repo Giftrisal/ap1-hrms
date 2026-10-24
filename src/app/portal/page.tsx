@@ -3277,14 +3277,14 @@ export default function StaffPortalPage() {
                   </div>
                 </div>
 
-                {/* 4 Main Metrics Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {/* 3 Main Metrics Grid */}
+                <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
                   {/* 1. Required Duty Hours */}
-                  <div className="bg-slate-950/80 border border-slate-800/90 p-3 sm:p-3.5 rounded-2xl">
-                    <span className="text-[9px] sm:text-[10px] font-semibold text-slate-400 block uppercase">
+                  <div className="bg-slate-950/80 border border-slate-800/90 p-2.5 sm:p-3.5 rounded-2xl">
+                    <span className="text-[9px] sm:text-[10px] font-semibold text-slate-400 block uppercase truncate">
                       हुनुपर्ने कुल ड्युटी
                     </span>
-                    <span className="text-lg sm:text-xl font-mono font-black text-white mt-1 block">
+                    <span className="text-base sm:text-xl font-mono font-black text-white mt-1 block">
                       {monthlyDutySummary.monthlyRequiredWorkingHours}h
                     </span>
                     <span className="text-[9px] text-slate-400 mt-0.5 block truncate">
@@ -3293,11 +3293,11 @@ export default function StaffPortalPage() {
                   </div>
 
                   {/* 2. Actual Worked Duty Hours */}
-                  <div className="bg-slate-950/80 border border-slate-800/90 p-3 sm:p-3.5 rounded-2xl">
-                    <span className="text-[9px] sm:text-[10px] font-semibold text-emerald-400 block uppercase">
+                  <div className="bg-slate-950/80 border border-slate-800/90 p-2.5 sm:p-3.5 rounded-2xl">
+                    <span className="text-[9px] sm:text-[10px] font-semibold text-emerald-400 block uppercase truncate">
                       काम भएको ड्युटी
                     </span>
-                    <span className="text-lg sm:text-xl font-mono font-black text-emerald-400 mt-1 block">
+                    <span className="text-base sm:text-xl font-mono font-black text-emerald-400 mt-1 block">
                       {monthlyDutySummary.actualWorkedHours}h
                     </span>
                     <span className="text-[9px] text-slate-400 mt-0.5 block truncate">
@@ -3306,11 +3306,11 @@ export default function StaffPortalPage() {
                   </div>
 
                   {/* 3. Pace / Status / Shortfall */}
-                  <div className="bg-slate-950/80 border border-slate-800/90 p-3 sm:p-3.5 rounded-2xl">
+                  <div className="bg-slate-950/80 border border-slate-800/90 p-2.5 sm:p-3.5 rounded-2xl">
                     <span className="text-[9px] sm:text-[10px] font-semibold text-purple-300 block uppercase truncate">
                       {monthlyDutySummary.isCurrentMonth ? 'आजसम्मको स्थिति' : 'महिनाको स्थिति'}
                     </span>
-                    <span className={`text-base sm:text-lg font-mono font-black mt-1 block truncate ${
+                    <span className={`text-sm sm:text-lg font-mono font-black mt-1 block truncate ${
                       monthlyDutySummary.isAheadTillToday ? 'text-emerald-400' : 'text-rose-400'
                     }`}>
                       {monthlyDutySummary.isAheadTillToday
@@ -3321,19 +3321,6 @@ export default function StaffPortalPage() {
                       {monthlyDutySummary.isCurrentMonth
                         ? `आजसम्म ${monthlyDutySummary.targetHoursTillToday}h मा ${monthlyDutySummary.actualWorkedHours}h`
                         : `कुल ${monthlyDutySummary.monthlyRequiredWorkingHours}h मा ${monthlyDutySummary.actualWorkedHours}h`}
-                    </span>
-                  </div>
-
-                  {/* 4. Remaining Hours */}
-                  <div className="bg-slate-950/80 border border-slate-800/90 p-3 sm:p-3.5 rounded-2xl">
-                    <span className="text-[9px] sm:text-[10px] font-semibold text-amber-300 block uppercase">
-                      पूरा गर्न बाँकी
-                    </span>
-                    <span className="text-lg sm:text-xl font-mono font-black text-amber-300 mt-1 block">
-                      {monthlyDutySummary.remainingMonthlyHours}h
-                    </span>
-                    <span className="text-[9px] text-slate-400 mt-0.5 block truncate">
-                      बाँकी {monthlyDutySummary.remainingDays} दिन (औसत {monthlyDutySummary.requiredDailyHoursRemaining}h/दिन)
                     </span>
                   </div>
                 </div>
