@@ -50,7 +50,8 @@ import {
   Megaphone,
   Pin,
   Trash2,
-  ThumbsUp
+  ThumbsUp,
+  Timer
 } from 'lucide-react';
 import { generatePayslipPdf } from '@/lib/pdf/payslip-generator';
 
@@ -1095,6 +1096,23 @@ export default function StaffPortalPage() {
   };
 
   // Real Biometric Machine Attendance State
+  interface StaffDailyDuty {
+    date: string;
+    nepaliDate: string;
+    dayOfWeek: string;
+    dayOfWeekNepali: string;
+    inTime: string | null;
+    rawInTime: string | null;
+    outTime: string | null;
+    rawOutTime: string | null;
+    totalDutyHours: number;
+    totalDutyFormatted: string;
+    status: 'PRESENT' | 'LATE' | 'IN_OFFICE' | 'HALF_DAY';
+    isToday: boolean;
+    isLate: boolean;
+    punchesCount: number;
+  }
+
   const [todayPunch, setTodayPunch] = useState<{
     hasPunched: boolean;
     inTime: string | null;
@@ -1102,16 +1120,20 @@ export default function StaffPortalPage() {
     status: 'PRESENT' | 'LATE' | 'NOT_PUNCHED';
     shift: string;
     totalPunchesToday: number;
+    totalDutyFormatted?: string;
   }>({
     hasPunched: false,
     inTime: null,
     outTime: null,
     status: 'NOT_PUNCHED',
     shift: 'AP1 Shift (Broadcasting / Operations)',
-    totalPunchesToday: 0
+    totalPunchesToday: 0,
+    totalDutyFormatted: '--'
   });
 
   const [myRecentPunches, setMyRecentPunches] = useState<any[]>([]);
+  const [myDailyAttendance, setMyDailyAttendance] = useState<StaffDailyDuty[]>([]);
+  const [attendanceViewMode, setAttendanceViewMode] = useState<'daily' | 'raw'>('daily');
   const [attendanceLoading, setAttendanceLoading] = useState(false);
 
   // Poll /api/biometric/sync for real-time punches of this logged-in staff member
@@ -1128,23 +1150,19 @@ export default function StaffPortalPage() {
         if (Array.isArray(data.recent_logs)) {
           const pin = String(activeEmployee.biometric_pin || '').trim();
 
-          // Filter logs belonging to this employee
-          const myLogs = data.recent_logs.filter((l: any) => 
-            String(l.user_id || l.biometric_pin || '').trim() === pin
-          ).sort((a: any, b: any) => (b.punch_time || '').localeCompare(a.punch_time || ''));
+          // Filter logs belonging to this employee (with support for pin 1/100 alias)
+          const myLogs = data.recent_logs.filter((l: any) => {
+            const lPin = String(l.user_id || l.biometric_pin || '').trim();
+            return lPin === pin || (pin === '100' && lPin === '1') || (pin === '1' && lPin === '100');
+          }).sort((a: any, b: any) => (b.punch_time || '').localeCompare(a.punch_time || ''));
 
-          setMyRecentPunches(myLogs.slice(0, 30));
+          setMyRecentPunches(myLogs.slice(0, 50));
 
           // Today's date in YYYY-MM-DD
           const todayStr = new Date().toISOString().split('T')[0];
 
-          // Today's logs
-          const todayLogs = myLogs.filter((l: any) => {
-            const punchDate = l.punch_time ? l.punch_time.split('T')[0].split(' ')[0] : '';
-            return punchDate === todayStr;
-          }).sort((a: any, b: any) => (a.punch_time || '').localeCompare(b.punch_time || ''));
-
-          const formatTime = (timeStr: string) => {
+          const formatTime = (timeStr?: string | null) => {
+            if (!timeStr) return '-- : --';
             try {
               const d = new Date(timeStr);
               return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -1153,37 +1171,147 @@ export default function StaffPortalPage() {
             }
           };
 
-          if (todayLogs.length > 0) {
-            const firstIn = todayLogs[0].punch_time;
-            const lastOut = todayLogs.length > 1 ? todayLogs[todayLogs.length - 1].punch_time : null;
+          // Group all logs by date YYYY-MM-DD
+          const logsByDate = new Map<string, any[]>();
+          myLogs.forEach((l: any) => {
+            const rawTime = l.punch_time || '';
+            const punchDate = rawTime.includes('T') ? rawTime.split('T')[0] : rawTime.split(' ')[0];
+            if (!punchDate) return;
+            if (!logsByDate.has(punchDate)) {
+              logsByDate.set(punchDate, []);
+            }
+            logsByDate.get(punchDate)!.push(l);
+          });
 
+          // Also merge any saved attendance records from primary system for this pin
+          try {
+            const savedAtt = typeof window !== 'undefined' ? localStorage.getItem('goinfi_attendance_records') : null;
+            if (savedAtt) {
+              const parsedAtt = JSON.parse(savedAtt);
+              if (Array.isArray(parsedAtt)) {
+                parsedAtt.forEach((rec: any) => {
+                  const recPin = String(rec.employee_pin || '').trim();
+                  if (recPin === pin || (pin === '100' && recPin === '1') || (pin === '1' && recPin === '100')) {
+                    const rDate = rec.date ? rec.date.split('T')[0].split(' ')[0] : '';
+                    if (rDate && !logsByDate.has(rDate) && (rec.in_time || rec.out_time)) {
+                      const dummyLogs: any[] = [];
+                      if (rec.in_time) dummyLogs.push({ punch_time: rec.in_time, punch_type: 'Check-In' });
+                      if (rec.out_time) dummyLogs.push({ punch_time: rec.out_time, punch_type: 'Check-Out' });
+                      if (dummyLogs.length > 0) logsByDate.set(rDate, dummyLogs);
+                    }
+                  }
+                });
+              }
+            }
+          } catch {}
+
+          const dailyList: StaffDailyDuty[] = [];
+          const sortedDates = Array.from(logsByDate.keys()).sort((a, b) => b.localeCompare(a));
+
+          sortedDates.forEach(dateStr => {
+            const dayLogs = logsByDate.get(dateStr)!.sort((a, b) => (a.punch_time || '').localeCompare(b.punch_time || ''));
+            const isToday = dateStr === todayStr;
+
+            const firstIn = dayLogs[0].punch_time;
+            const lastOut = dayLogs.length > 1 ? dayLogs[dayLogs.length - 1].punch_time : null;
+
+            let inTimeStr = formatTime(firstIn);
+            let outTimeStr: string | null = null;
+            let totalDutyHours = 0;
+            let totalDutyFormatted = '--';
             let isLate = false;
+            let status: 'PRESENT' | 'LATE' | 'IN_OFFICE' | 'HALF_DAY' = 'PRESENT';
+
             try {
               const d = new Date(firstIn);
               const hour = d.getHours();
               const min = d.getMinutes();
               if (hour > 9 || (hour === 9 && min > 30)) {
                 isLate = true;
+                status = 'LATE';
               }
             } catch {}
 
+            if (lastOut && lastOut !== firstIn) {
+              outTimeStr = formatTime(lastOut);
+              const diffMs = new Date(lastOut).getTime() - new Date(firstIn).getTime();
+              if (diffMs > 0) {
+                totalDutyHours = Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10;
+                const hours = Math.floor(diffMs / (1000 * 60 * 60));
+                const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                totalDutyFormatted = `${hours}h ${mins}m (${totalDutyHours} hrs)`;
+                if (totalDutyHours < 4 && !isLate) {
+                  status = 'HALF_DAY';
+                }
+              }
+            } else if (isToday) {
+              status = isLate ? 'LATE' : 'PRESENT';
+              const diffMs = Date.now() - new Date(firstIn).getTime();
+              if (diffMs > 0) {
+                const hours = Math.floor(diffMs / (1000 * 60 * 60));
+                const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                totalDutyFormatted = `${hours}h ${mins}m (चालु/In Office)`;
+              }
+            } else {
+              totalDutyFormatted = 'Single Punch';
+            }
+
+            // Nepali date and day of week
+            let nepaliDateStr = '';
+            let dayOfWeekEn = '';
+            let dayOfWeekNp = '';
+            try {
+              const dObj = new Date(dateStr + 'T00:00:00');
+              nepaliDateStr = getNepaliDate(dObj).formattedNp;
+              const daysEn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+              const daysNp = ['आइतबार', 'सोमबार', 'मंगलबार', 'बुधबार', 'बिहीबार', 'शुक्रबार', 'शनिबार'];
+              dayOfWeekEn = daysEn[dObj.getDay()];
+              dayOfWeekNp = daysNp[dObj.getDay()];
+            } catch {}
+
+            const item: StaffDailyDuty = {
+              date: dateStr,
+              nepaliDate: nepaliDateStr,
+              dayOfWeek: dayOfWeekEn,
+              dayOfWeekNepali: dayOfWeekNp,
+              inTime: inTimeStr,
+              rawInTime: firstIn,
+              outTime: outTimeStr,
+              rawOutTime: lastOut,
+              totalDutyHours,
+              totalDutyFormatted,
+              status,
+              isToday,
+              isLate,
+              punchesCount: dayLogs.length
+            };
+
+            dailyList.push(item);
+          });
+
+          setMyDailyAttendance(dailyList);
+
+          const todayEntry = dailyList.find(d => d.isToday);
+
+          if (todayEntry) {
             setTodayPunch({
               hasPunched: true,
-              inTime: formatTime(firstIn),
-              outTime: lastOut ? formatTime(lastOut) : null,
-              status: isLate ? 'LATE' : 'PRESENT',
+              inTime: todayEntry.inTime,
+              outTime: todayEntry.outTime,
+              status: todayEntry.isLate ? 'LATE' : 'PRESENT',
               shift: 'AP1 Shift (Broadcasting / Operations)',
-              totalPunchesToday: todayLogs.length
+              totalPunchesToday: todayEntry.punchesCount,
+              totalDutyFormatted: todayEntry.totalDutyFormatted
             });
           } else {
-            // Not punched yet today
             setTodayPunch({
               hasPunched: false,
               inTime: null,
               outTime: null,
               status: 'NOT_PUNCHED',
               shift: 'AP1 Shift (Broadcasting / Operations)',
-              totalPunchesToday: 0
+              totalPunchesToday: 0,
+              totalDutyFormatted: '--'
             });
           }
         }
@@ -2805,39 +2933,52 @@ export default function StaffPortalPage() {
             </div>
 
             {/* Live Today Attendance Punch Status */}
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-3">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4.5 sm:p-5 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Today's Biometric Attendance</span>
+                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Today&apos;s Biometric Attendance</span>
+                </span>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> UDP 4370 Live
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 text-center">
-                  <span className="text-[10px] font-semibold text-slate-500 block uppercase">Check In (Arrival)</span>
-                  <span className={`text-lg font-mono font-black mt-1 block ${todayPunch.hasPunched ? 'text-emerald-400' : 'text-slate-500'}`}>
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                <div className="bg-slate-950 p-2.5 sm:p-3 rounded-2xl border border-slate-800 text-center">
+                  <span className="text-[9px] sm:text-[10px] font-semibold text-slate-400 block uppercase">Check In</span>
+                  <span className={`text-base sm:text-lg font-mono font-black mt-1 block ${todayPunch.hasPunched ? 'text-emerald-400' : 'text-slate-500'}`}>
                     {todayPunch.hasPunched ? todayPunch.inTime : '-- : --'}
                   </span>
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">
-                    {todayPunch.hasPunched ? 'Recorded on machine' : 'Not punched today'}
+                  <span className="text-[9px] text-slate-500 mt-0.5 block truncate">
+                    {todayPunch.hasPunched ? 'आगमन' : 'Not punched'}
                   </span>
                 </div>
 
-                <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 text-center">
-                  <span className="text-[10px] font-semibold text-slate-500 block uppercase">Check Out (Departure)</span>
-                  <span className={`text-lg font-mono font-black mt-1 block ${todayPunch.outTime ? 'text-amber-400' : 'text-slate-500'}`}>
+                <div className="bg-slate-950 p-2.5 sm:p-3 rounded-2xl border border-slate-800 text-center">
+                  <span className="text-[9px] sm:text-[10px] font-semibold text-slate-400 block uppercase">Check Out</span>
+                  <span className={`text-base sm:text-lg font-mono font-black mt-1 block ${todayPunch.outTime ? 'text-blue-400' : 'text-slate-500'}`}>
                     {todayPunch.outTime || '-- : --'}
                   </span>
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">
-                    {todayPunch.outTime ? 'Departure punched' : todayPunch.hasPunched ? 'Shift in progress' : 'Awaiting check-in'}
+                  <span className="text-[9px] text-slate-500 mt-0.5 block truncate">
+                    {todayPunch.outTime ? 'प्रस्थान' : todayPunch.hasPunched ? '🏢 In Office' : 'Not yet'}
+                  </span>
+                </div>
+
+                <div className="bg-slate-950 p-2.5 sm:p-3 rounded-2xl border border-slate-800 text-center">
+                  <span className="text-[9px] sm:text-[10px] font-semibold text-purple-300 block uppercase">Total Duty</span>
+                  <span className={`text-xs sm:text-sm font-mono font-black mt-1.5 block truncate ${todayPunch.hasPunched ? 'text-purple-300' : 'text-slate-500'}`}>
+                    {todayPunch.totalDutyFormatted || '--'}
+                  </span>
+                  <span className="text-[9px] text-slate-500 mt-0.5 block truncate">
+                    {todayPunch.outTime ? 'Duty Done' : todayPunch.hasPunched ? '⏳ In Progress' : '--'}
                   </span>
                 </div>
               </div>
 
               <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-                <span>Shift: {todayPunch.shift}</span>
-                <span className={todayPunch.status === 'PRESENT' ? 'text-emerald-400 font-semibold' : todayPunch.status === 'LATE' ? 'text-amber-400 font-semibold' : 'text-slate-500 font-medium'}>
+                <span className="truncate mr-2">Shift: {todayPunch.shift}</span>
+                <span className={`shrink-0 ${todayPunch.status === 'PRESENT' ? 'text-emerald-400 font-semibold' : todayPunch.status === 'LATE' ? 'text-amber-400 font-semibold' : 'text-slate-500 font-medium'}`}>
                   Status: {todayPunch.status === 'PRESENT' ? 'On Time' : todayPunch.status === 'LATE' ? 'Late Arrival' : 'Not Checked In'}
                 </span>
               </div>
@@ -2900,85 +3041,351 @@ export default function StaffPortalPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 2: ATTENDANCE */}
+        {/* TAB 2: ATTENDANCE (DATE - CHECK-IN - CHECK-OUT - TOTAL DUTY HR) */}
         {/* ========================================================================= */}
-        {mobileTab === 'attendance' && (
-          <div className="space-y-4 animate-in fade-in duration-200">
-            {/* Monthly Attendance Counters */}
-            <div className="grid grid-cols-3 gap-2.5">
-              <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl text-center">
-                <span className="text-[10px] font-semibold text-slate-400 block uppercase">Punches</span>
-                <span className="text-xl font-black text-purple-400 mt-1 block">{myRecentPunches.length}</span>
-                <span className="text-[10px] text-slate-500">Recorded</span>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl text-center">
-                <span className="text-[10px] font-semibold text-slate-400 block uppercase">Today</span>
-                <span className={`text-xl font-black mt-1 block ${todayPunch.hasPunched ? 'text-emerald-400' : 'text-slate-500'}`}>
-                  {todayPunch.hasPunched ? 'Present' : 'No Punch'}
-                </span>
-                <span className="text-[10px] text-slate-500">{todayPunch.hasPunched ? 'Punched' : 'Absent/Away'}</span>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl text-center">
-                <span className="text-[10px] font-semibold text-slate-400 block uppercase">Hardware</span>
-                <span className="text-xs font-bold text-emerald-400 mt-2 block">ZK 4370</span>
-                <span className="text-[10px] text-slate-500">Sync Active</span>
-              </div>
-            </div>
+        {mobileTab === 'attendance' && (() => {
+          const totalWorkedHoursSum = Math.round(myDailyAttendance.reduce((acc, d) => acc + (d.totalDutyHours || 0), 0) * 10) / 10;
+          const avgDailyWorked = myDailyAttendance.length > 0 ? (Math.round((totalWorkedHoursSum / myDailyAttendance.length) * 10) / 10) : 0;
 
-            {/* Attendance Logs */}
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4.5 space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <h3 className="font-bold text-sm text-white">Machine Punch Records</h3>
-                <span className="text-[11px] text-slate-400">PIN #{activeEmployee.biometric_pin}</span>
-              </div>
-
-              {myRecentPunches.length === 0 ? (
-                <div className="p-6 text-center text-slate-400 space-y-1">
-                  <Clock className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                  <p className="text-xs font-semibold text-slate-300">No Biometric Punches Yet</p>
-                  <p className="text-[11px] text-slate-500">
-                    When you punch your finger/face on the AP1 biometric machine (PIN #{activeEmployee.biometric_pin}), logs will appear here in real-time.
-                  </p>
+          return (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              {/* Monthly Attendance Counters */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl text-center">
+                  <span className="text-[10px] font-semibold text-slate-400 block uppercase">उपस्थित दिन (Days)</span>
+                  <span className="text-xl font-black text-purple-400 mt-1 block">{myDailyAttendance.length}</span>
+                  <span className="text-[10px] text-slate-500">बायोमेट्रिक हाजिर</span>
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  {myRecentPunches.map((log, idx) => {
-                    const rawDate = log.punch_time ? log.punch_time.split('T')[0].split(' ')[0] : '';
-                    const isToday = rawDate === new Date().toISOString().split('T')[0];
-                    const timeOnly = (() => {
-                      try {
-                        return new Date(log.punch_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                      } catch {
-                        return log.punch_time || '';
-                      }
-                    })();
+                <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl text-center">
+                  <span className="text-[10px] font-semibold text-slate-400 block uppercase">कुल ड्युटी (Total Hr)</span>
+                  <span className="text-xl font-black text-emerald-400 mt-1 block">{totalWorkedHoursSum}h</span>
+                  <span className="text-[10px] text-slate-500">काम गरेको घण्टा</span>
+                </div>
+                <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl text-center">
+                  <span className="text-[10px] font-semibold text-slate-400 block uppercase">दैनिक औसत (Avg/Day)</span>
+                  <span className="text-xl font-black text-blue-400 mt-1 block">{avgDailyWorked}h</span>
+                  <span className="text-[10px] text-slate-500">प्रति दिन औसत</span>
+                </div>
+                <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl text-center">
+                  <span className="text-[10px] font-semibold text-slate-400 block uppercase">आजको स्थिति (Today)</span>
+                  <span className={`text-sm font-black mt-1.5 block truncate ${
+                    todayPunch.hasPunched ? (todayPunch.outTime ? 'text-emerald-400' : 'text-blue-400') : 'text-slate-500'
+                  }`}>
+                    {todayPunch.hasPunched ? (todayPunch.outTime ? 'ड्युटी सम्पन्न' : 'कार्यालयमा') : 'पञ्च छैन'}
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    {todayPunch.hasPunched ? (todayPunch.outTime ? 'Out Recorded' : 'In Office') : 'Absent/Away'}
+                  </span>
+                </div>
+              </div>
 
-                    return (
-                      <div key={idx} className="p-3 bg-slate-950 rounded-2xl border border-slate-800/80 flex items-center justify-between text-xs">
-                        <div>
-                          <p className="font-bold text-white flex items-center gap-1.5">
-                            {isToday ? <span className="text-emerald-400 font-black">Today</span> : rawDate}
-                          </p>
-                          <p className="text-[10px] text-slate-400 font-mono">
-                            Machine: {log.device_ip || '10.1.2.216'}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-mono text-emerald-400 font-bold text-sm">
-                            {timeOnly}
-                          </p>
-                          <span className="inline-block text-[9px] font-bold px-2 py-0.2 rounded-full mt-0.5 bg-purple-500/10 text-purple-300 border border-purple-500/30">
-                            {log.punch_type || 'Biometric Punch'}
-                          </span>
-                        </div>
+              {/* View Mode Switcher: Daily Duty vs Raw Machine Punches */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-1.5 flex gap-1.5 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setAttendanceViewMode('daily')}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    attendanceViewMode === 'daily'
+                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/20'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <Timer className="w-3.5 h-3.5" />
+                  <span>दैनिक ड्युटी विवरण (Daily Duty)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAttendanceViewMode('raw')}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    attendanceViewMode === 'raw'
+                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/20'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>सबै मेसिन पञ्चहरू ({myRecentPunches.length})</span>
+                </button>
+              </div>
+
+              {/* DAILY DUTY VIEW */}
+              {attendanceViewMode === 'daily' && (
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <div>
+                      <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-purple-400" />
+                        <span>Daily Duty & Attendance History</span>
+                      </h3>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        मिति, आगमन, प्रस्थान र कुल काम गरेको घण्टा (Total Duty Hr)
+                      </p>
+                    </div>
+                    <span className="text-[11px] font-mono font-semibold px-2.5 py-1 bg-slate-950 rounded-xl border border-slate-800 text-purple-300">
+                      PIN #{activeEmployee.biometric_pin}
+                    </span>
+                  </div>
+
+                  {myDailyAttendance.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 space-y-2">
+                      <Clock className="w-10 h-10 text-slate-700 mx-auto" />
+                      <p className="text-sm font-semibold text-slate-300">No Attendance Records Found</p>
+                      <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                        When you punch your biometric device (PIN #{activeEmployee.biometric_pin}), daily check-in, check-out, and total duty hours will be automatically recorded here.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Desktop / Tablet Table View */}
+                      <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-800">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800 uppercase text-[10px] tracking-wider">
+                            <tr>
+                              <th className="py-3 px-4">मिति / दिन (Date & Day)</th>
+                              <th className="py-3 px-4">आगमन समय (Check-In)</th>
+                              <th className="py-3 px-4">प्रस्थान समय (Check-Out)</th>
+                              <th className="py-3 px-4">कुल ड्युटी (Total Duty Hr)</th>
+                              <th className="py-3 px-4 text-center">स्थिति (Status)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/60 bg-slate-900/40 font-normal">
+                            {myDailyAttendance.map((item) => (
+                              <tr key={item.date} className={`hover:bg-slate-800/40 transition-colors ${item.isToday ? 'bg-purple-950/20' : ''}`}>
+                                <td className="py-3.5 px-4">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono font-bold text-white text-xs">{item.date}</span>
+                                    {item.isToday && (
+                                      <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[9px] font-black animate-pulse">
+                                        🟢 आज
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-purple-300 font-medium mt-0.5">
+                                    {item.nepaliDate} • {item.dayOfWeekNepali} ({item.dayOfWeek})
+                                  </p>
+                                </td>
+
+                                <td className="py-3.5 px-4">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono text-emerald-400 font-bold text-xs inline-flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                      {item.inTime || '--:--'}
+                                    </span>
+                                    {item.isLate && (
+                                      <span className="px-1.5 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[9px] font-bold">
+                                        ढिला
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[10px] text-slate-500 block mt-0.5">ZK Device</span>
+                                </td>
+
+                                <td className="py-3.5 px-4">
+                                  {item.outTime ? (
+                                    <div>
+                                      <span className="font-mono text-blue-400 font-bold text-xs inline-flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                                        {item.outTime}
+                                      </span>
+                                      <span className="text-[10px] text-slate-500 block mt-0.5">प्रस्थान पञ्च</span>
+                                    </div>
+                                  ) : item.isToday ? (
+                                    <span className="px-2.5 py-1 bg-blue-500/10 text-blue-300 border border-blue-500/30 rounded-full text-[10px] font-semibold inline-flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+                                      🏢 In Office (कार्यरत)
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-500 font-mono text-xs">-- : --</span>
+                                  )}
+                                </td>
+
+                                <td className="py-3.5 px-4">
+                                  <div className="font-mono font-bold text-white text-xs flex items-center gap-1.5">
+                                    <Timer className="w-3.5 h-3.5 text-purple-400" />
+                                    <span className={item.totalDutyHours >= 8 ? 'text-emerald-400' : item.totalDutyHours >= 4 ? 'text-amber-300' : 'text-slate-300'}>
+                                      {item.totalDutyFormatted}
+                                    </span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-500 block mt-0.5">
+                                    {item.punchesCount} पटक पञ्च गरिएको
+                                  </span>
+                                </td>
+
+                                <td className="py-3.5 px-4 text-center">
+                                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                    item.status === 'PRESENT'
+                                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                      : item.status === 'LATE'
+                                      ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                                      : item.status === 'HALF_DAY'
+                                      ? 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30'
+                                      : 'bg-blue-500/10 text-blue-300 border-blue-500/30'
+                                  }`}>
+                                    {item.status === 'PRESENT' ? 'उपस्थित' : item.status === 'LATE' ? 'ढिला आगमन' : item.status === 'HALF_DAY' ? 'आधा दिन' : 'कार्यरत'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
-                    );
-                  })}
+
+                      {/* Mobile High-Density Cards View */}
+                      <div className="block md:hidden space-y-3">
+                        {myDailyAttendance.map((item) => (
+                          <div
+                            key={item.date}
+                            className={`p-3.5 bg-slate-950 rounded-2xl border transition-all ${
+                              item.isToday
+                                ? 'border-purple-500/50 shadow-lg shadow-purple-900/10 bg-gradient-to-b from-purple-950/20 to-slate-950'
+                                : 'border-slate-800/80 hover:border-slate-700'
+                            }`}
+                          >
+                            {/* Card Top: Date & Status */}
+                            <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/70">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 font-mono text-xs font-black">
+                                  {item.date.split('-')[2] || '•'}
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-white text-xs">{item.date}</span>
+                                    {item.isToday && (
+                                      <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[9px] font-black animate-pulse">
+                                        🟢 आज
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-purple-300 font-medium">
+                                    {item.nepaliDate} • {item.dayOfWeekNepali}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                item.status === 'PRESENT'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                  : item.status === 'LATE'
+                                  ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                                  : item.status === 'HALF_DAY'
+                                  ? 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30'
+                                  : 'bg-blue-500/10 text-blue-300 border-blue-500/30'
+                              }`}>
+                                {item.status === 'PRESENT' ? 'उपस्थित' : item.status === 'LATE' ? 'ढिला आगमन' : item.status === 'HALF_DAY' ? 'आधा दिन' : 'कार्यालयमा'}
+                              </span>
+                            </div>
+
+                            {/* Card Grid: Check-In, Check-Out, Total Duty */}
+                            <div className="grid grid-cols-3 gap-2 pt-2.5 text-center">
+                              <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800/60">
+                                <span className="text-[9px] text-slate-400 font-medium block uppercase">Check In</span>
+                                <span className="text-xs font-mono font-bold text-emerald-400 mt-0.5 block">
+                                  {item.inTime || '--:--'}
+                                </span>
+                                {item.isLate ? (
+                                  <span className="text-[8px] text-amber-400 font-bold block mt-0.5">ढिला</span>
+                                ) : (
+                                  <span className="text-[8px] text-slate-500 block mt-0.5">आगमन</span>
+                                )}
+                              </div>
+
+                              <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800/60">
+                                <span className="text-[9px] text-slate-400 font-medium block uppercase">Check Out</span>
+                                <span className={`text-xs font-mono font-bold mt-0.5 block ${item.outTime ? 'text-blue-400' : 'text-slate-500'}`}>
+                                  {item.outTime || (item.isToday ? 'In Office' : '--:--')}
+                                </span>
+                                <span className="text-[8px] text-slate-500 block mt-0.5 truncate">
+                                  {item.outTime ? 'प्रस्थान' : item.isToday ? '🏢 In Office' : 'Single'}
+                                </span>
+                              </div>
+
+                              <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800/60">
+                                <span className="text-[9px] text-purple-300 font-medium block uppercase">Total Duty</span>
+                                <span className={`text-xs font-mono font-bold mt-0.5 block ${
+                                  item.totalDutyHours >= 8 ? 'text-emerald-400' : item.totalDutyHours >= 4 ? 'text-amber-300' : 'text-slate-300'
+                                }`}>
+                                  {item.totalDutyHours > 0 ? `${item.totalDutyHours} hrs` : (item.isToday ? 'चालु' : '--')}
+                                </span>
+                                <span className="text-[8px] text-slate-500 block mt-0.5 truncate">
+                                  {item.punchesCount} पञ्च
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Duration Summary Bar */}
+                            {item.totalDutyFormatted && item.totalDutyFormatted !== '--' && (
+                              <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] text-slate-400 px-1">
+                                <span className="flex items-center gap-1 text-slate-400">
+                                  <Timer className="w-3.5 h-3.5 text-purple-400" />
+                                  <span>ड्युटी अवधि:</span>
+                                </span>
+                                <span className="font-mono text-purple-200 font-semibold">{item.totalDutyFormatted}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* RAW MACHINE PUNCHES VIEW */}
+              {attendanceViewMode === 'raw' && (
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4.5 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <h3 className="font-bold text-sm text-white">सबै मेसिन पञ्चहरू (Machine Punch Records)</h3>
+                    <span className="text-[11px] text-slate-400 font-mono">PIN #{activeEmployee.biometric_pin}</span>
+                  </div>
+
+                  {myRecentPunches.length === 0 ? (
+                    <div className="p-6 text-center text-slate-400 space-y-1">
+                      <Clock className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                      <p className="text-xs font-semibold text-slate-300">कुनै पञ्च भेटिएन</p>
+                      <p className="text-[11px] text-slate-500">
+                        When you punch your finger/face on the AP1 biometric machine (PIN #{activeEmployee.biometric_pin}), logs will appear here in real-time.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {myRecentPunches.map((log, idx) => {
+                        const rawDate = log.punch_time ? log.punch_time.split('T')[0].split(' ')[0] : '';
+                        const isToday = rawDate === new Date().toISOString().split('T')[0];
+                        const timeOnly = (() => {
+                          try {
+                            return new Date(log.punch_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                          } catch {
+                            return log.punch_time || '';
+                          }
+                        })();
+
+                        return (
+                          <div key={idx} className="p-3 bg-slate-950 rounded-2xl border border-slate-800/80 flex items-center justify-between text-xs">
+                            <div>
+                              <p className="font-bold text-white flex items-center gap-1.5">
+                                {isToday ? <span className="text-emerald-400 font-black">🟢 आज</span> : rawDate}
+                              </p>
+                              <p className="text-[10px] text-slate-400 font-mono">
+                                मेसिन IP: {log.device_ip || '10.1.2.216'}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-mono text-emerald-400 font-bold text-sm">
+                                {timeOnly}
+                              </p>
+                              <span className="inline-block text-[9px] font-bold px-2 py-0.2 rounded-full mt-0.5 bg-purple-500/10 text-purple-300 border border-purple-500/30">
+                                {log.punch_type || 'Biometric Punch'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* ========================================================================= */}
         {/* TAB 3: LEAVES & DUTY */}
