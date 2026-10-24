@@ -67,33 +67,13 @@ export default function StaffPortalPage() {
   // Active Staff Authentication via Biometric Machine PIN
   const [activePin, setActivePin] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      const rev = localStorage.getItem('goinfi_session_revocation_id');
-      const pin = localStorage.getItem('goinfi_portal_user_pin') || '';
-      // Force logout all existing non-admin staff sessions
-      if (rev !== 'v2_revoked_all') {
-        if (pin !== '1') {
-          localStorage.removeItem('goinfi_portal_user_pin');
-          localStorage.setItem('goinfi_session_revocation_id', 'v2_revoked_all');
-          return '';
-        }
-      }
-      return pin;
+      return localStorage.getItem('goinfi_portal_user_pin') || '';
     }
     return '';
   });
 
   useEffect(() => {
     document.title = "Staff Portal";
-    // Force wipe any old non-admin staff session
-    if (typeof window !== 'undefined') {
-      const pin = localStorage.getItem('goinfi_portal_user_pin') || '';
-      if (pin && pin !== '1') {
-        localStorage.removeItem('goinfi_portal_user_pin');
-        localStorage.setItem('goinfi_session_revocation_id', 'v2_revoked_all');
-        setActivePin('');
-        setLoginError('🔒 सबै कर्मचारी खाताहरू लगआउट गरिएका छन्। कृपया पुनः लगइन गर्नुहोस्।');
-      }
-    }
   }, []);
 
   // Auth Modes: 'login' | 'signup' | 'forgot_password'
