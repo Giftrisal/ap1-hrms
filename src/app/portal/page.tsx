@@ -1115,7 +1115,7 @@ export default function StaffPortalPage() {
     rawOutTime: string | null;
     totalDutyHours: number;
     totalDutyFormatted: string;
-    status: 'DUTY_MET' | 'DUTY_SHORT' | 'IN_OFFICE' | 'HALF_DAY' | 'WEEK_OFF' | 'WEEK_OFF_WORK' | 'ABSENT' | 'UPCOMING';
+    status: 'DUTY_MET' | 'DUTY_SHORT' | 'IN_OFFICE' | 'HALF_DAY' | 'ABSENT' | 'UPCOMING';
     isToday: boolean;
     dutyMet: boolean;
     shortfallHours: number;
@@ -1228,7 +1228,7 @@ export default function StaffPortalPage() {
             let outTimeStr: string | null = null;
             let totalDutyHours = 0;
             let totalDutyFormatted = '--';
-            let status: 'DUTY_MET' | 'DUTY_SHORT' | 'IN_OFFICE' | 'HALF_DAY' | 'WEEK_OFF' | 'WEEK_OFF_WORK' | 'ABSENT' | 'UPCOMING' = 'DUTY_SHORT';
+            let status: 'DUTY_MET' | 'DUTY_SHORT' | 'IN_OFFICE' | 'HALF_DAY' | 'ABSENT' | 'UPCOMING' = 'DUTY_SHORT';
             let dutyMet = false;
             let shortfallHours = 8;
 
@@ -1342,15 +1342,11 @@ export default function StaffPortalPage() {
   const [dutySortAsc, setDutySortAsc] = useState<boolean>(true); // default true: 1, 2, 3, 4, 5, 6... (Ascending)
 
   // Nepali Calendar Monthly Duty Summary Calculation:
-  // Rules: Daily 8 hrs duty, Weekly 1 day off (Weekly 56 hrs cycle, 6 working days * 8h = 48h working duty)
+  // Rules: Daily 8 hrs duty, Monthly target = daysCount * 8 hrs
   const monthlyDutySummary = useMemo(() => {
     const daysCount = getDaysInBsMonth(selectedBsYear, selectedBsMonth);
-    const empWeeklyOff = (activeEmployee?.weekly_off_day || 'Saturday').toLowerCase();
     const isCurrentMonth = selectedBsYear === todayBs.bsYear && selectedBsMonth === todayBs.bsMonth;
     const currentElapsedDay = isCurrentMonth ? todayBs.bsDay : daysCount;
-
-    let totalWeeklyOffs = 0;
-    let weeklyOffsElapsed = 0;
 
     // Fast lookup map for punches by AD date
     const attMap = new Map<string, StaffDailyDuty>();
@@ -1363,14 +1359,13 @@ export default function StaffPortalPage() {
       adDateStr: string;
       dayNameNp: string;
       dayNameEn: string;
-      isWeeklyOff: boolean;
       isPastOrToday: boolean;
       isToday: boolean;
       inTime: string | null;
       outTime: string | null;
       dutyHours: number;
       dutyFormatted: string;
-      status: 'DUTY_MET' | 'DUTY_SHORT' | 'IN_OFFICE' | 'HALF_DAY' | 'WEEK_OFF' | 'WEEK_OFF_WORK' | 'ABSENT' | 'UPCOMING';
+      status: 'DUTY_MET' | 'DUTY_SHORT' | 'IN_OFFICE' | 'HALF_DAY' | 'ABSENT' | 'UPCOMING';
       punchesCount: number;
     }> = [];
 
@@ -1382,22 +1377,16 @@ export default function StaffPortalPage() {
       const daysNp = ['आइतबार', 'सोमबार', 'मंगलबार', 'बुधबार', 'बिहीबार', 'शुक्रबार', 'शनिबार'];
       const dayNameEn = daysEn[dayOfWeekIdx];
       const dayNameNp = daysNp[dayOfWeekIdx];
-      const isWeeklyOff = dayNameEn.toLowerCase() === empWeeklyOff;
-      if (isWeeklyOff) totalWeeklyOffs++;
 
       const isPastOrToday = isCurrentMonth ? day <= todayBs.bsDay : (selectedBsYear < todayBs.bsYear || (selectedBsYear === todayBs.bsYear && selectedBsMonth < todayBs.bsMonth));
       const isToday = isCurrentMonth && day === todayBs.bsDay;
-
-      if (isWeeklyOff && isPastOrToday) {
-        weeklyOffsElapsed++;
-      }
 
       const existingPunch = attMap.get(adDateStr);
       let inTime: string | null = null;
       let outTime: string | null = null;
       let dutyHours = 0;
       let dutyFormatted = '--';
-      let status: 'DUTY_MET' | 'DUTY_SHORT' | 'IN_OFFICE' | 'HALF_DAY' | 'WEEK_OFF' | 'WEEK_OFF_WORK' | 'ABSENT' | 'UPCOMING' = 'UPCOMING';
+      let status: 'DUTY_MET' | 'DUTY_SHORT' | 'IN_OFFICE' | 'HALF_DAY' | 'ABSENT' | 'UPCOMING' = 'UPCOMING';
       let punchesCount = 0;
 
       if (existingPunch) {
@@ -1407,9 +1396,7 @@ export default function StaffPortalPage() {
         dutyFormatted = existingPunch.totalDutyFormatted;
         punchesCount = existingPunch.punchesCount;
 
-        if (isWeeklyOff) {
-          status = 'WEEK_OFF_WORK'; // Worked on weekly off!
-        } else if (isToday && !outTime && inTime) {
+        if (isToday && !outTime && inTime) {
           status = 'IN_OFFICE';
         } else if (dutyHours >= 8) {
           status = 'DUTY_MET'; // ड्युटी पुगेको (८h+)
@@ -1417,9 +1404,7 @@ export default function StaffPortalPage() {
           status = 'DUTY_SHORT'; // ड्युटी नपुगेको (<८h)
         }
       } else {
-        if (isWeeklyOff) {
-          status = 'WEEK_OFF';
-        } else if (isPastOrToday) {
+        if (isPastOrToday) {
           status = 'ABSENT';
         } else {
           status = 'UPCOMING';
@@ -1438,7 +1423,6 @@ export default function StaffPortalPage() {
         adDateStr,
         dayNameNp,
         dayNameEn,
-        isWeeklyOff,
         isPastOrToday,
         isToday,
         inTime,
@@ -1450,23 +1434,19 @@ export default function StaffPortalPage() {
       });
     }
 
-    // Rules: daily 8 hrs duty, weekly 1 day off (weekly 56 hrs cycle, 6 working days * 8h = 48h working duty)
-    const totalExpectedWorkingDays = daysCount - totalWeeklyOffs; // e.g. 26
-    const monthlyRequiredWorkingHours = totalExpectedWorkingDays * 8; // e.g. 26 * 8 = 208 hrs
-    const monthlyCycle56hTotal = daysCount * 8; // e.g. 240 hrs (7 days * 8h = 56h/week cycle)
+    // Rules: daily 8 hrs duty, monthly target = daysCount * 8 hrs
+    const monthlyRequiredWorkingHours = daysCount * 8; // e.g. 30 * 8 = 240 hrs
 
     // Actual worked hours in this selected Nepali month
     const actualWorkedHours = Math.round(monthDaysList.reduce((acc, d) => acc + d.dutyHours, 0) * 10) / 10;
-    const presentDaysCount = monthDaysList.filter(d => d.dutyHours > 0 || d.status === 'DUTY_MET' || d.status === 'DUTY_SHORT' || d.status === 'WEEK_OFF_WORK' || d.status === 'IN_OFFICE').length;
-    const dutyMetCount = monthDaysList.filter(d => d.status === 'DUTY_MET' || (d.status === 'WEEK_OFF_WORK' && d.dutyHours >= 8)).length;
-    const dutyShortCount = monthDaysList.filter(d => d.status === 'DUTY_SHORT' || (d.status === 'WEEK_OFF_WORK' && d.dutyHours > 0 && d.dutyHours < 8)).length;
-    const weekOffWorkCount = monthDaysList.filter(d => d.status === 'WEEK_OFF_WORK').length;
+    const presentDaysCount = monthDaysList.filter(d => d.dutyHours > 0 || d.status === 'DUTY_MET' || d.status === 'DUTY_SHORT' || d.status === 'IN_OFFICE').length;
+    const dutyMetCount = monthDaysList.filter(d => d.status === 'DUTY_MET').length;
+    const dutyShortCount = monthDaysList.filter(d => d.status === 'DUTY_SHORT').length;
     const absentDaysCount = monthDaysList.filter(d => d.status === 'ABSENT').length;
 
     // Target up to today (for current month vs past month)
     const elapsedDays = Math.min(daysCount, currentElapsedDay);
-    const workingDaysElapsed = Math.max(0, elapsedDays - weeklyOffsElapsed);
-    const targetHoursTillToday = isCurrentMonth ? (workingDaysElapsed * 8) : monthlyRequiredWorkingHours;
+    const targetHoursTillToday = isCurrentMonth ? (elapsedDays * 8) : monthlyRequiredWorkingHours;
 
     // Pace difference (today's pace):
     const paceDifference = Math.round((actualWorkedHours - targetHoursTillToday) * 10) / 10;
@@ -1475,8 +1455,8 @@ export default function StaffPortalPage() {
 
     // Remaining hours to complete entire month:
     const remainingMonthlyHours = Math.max(0, Math.round((monthlyRequiredWorkingHours - actualWorkedHours) * 10) / 10);
-    const remainingWorkingDays = Math.max(0, totalExpectedWorkingDays - workingDaysElapsed);
-    const requiredDailyHoursRemaining = remainingWorkingDays > 0 ? (Math.round((remainingMonthlyHours / remainingWorkingDays) * 10) / 10) : 0;
+    const remainingDays = Math.max(0, daysCount - elapsedDays);
+    const requiredDailyHoursRemaining = remainingDays > 0 ? (Math.round((remainingMonthlyHours / remainingDays) * 10) / 10) : 0;
 
     // Percentage
     const completionRate = monthlyRequiredWorkingHours > 0
@@ -1492,32 +1472,26 @@ export default function StaffPortalPage() {
       bsYear: selectedBsYear,
       bsMonth: selectedBsMonth,
       daysCount,
-      totalWeeklyOffs,
-      totalExpectedWorkingDays,
       monthlyRequiredWorkingHours,
-      monthlyCycle56hTotal,
       actualWorkedHours,
       presentDaysCount,
       dutyMetCount,
       dutyShortCount,
-      weekOffWorkCount,
       absentDaysCount,
       elapsedDays,
-      workingDaysElapsed,
       targetHoursTillToday,
       paceDifference,
       isAheadTillToday,
       paceDiffAbs,
       remainingMonthlyHours,
-      remainingWorkingDays,
+      remainingDays,
       requiredDailyHoursRemaining,
       completionRate,
       monthDaysList,
       sortedDaysList,
-      isCurrentMonth,
-      empWeeklyOffName: empWeeklyOff.charAt(0).toUpperCase() + empWeeklyOff.slice(1)
+      isCurrentMonth
     };
-  }, [selectedBsYear, selectedBsMonth, activeEmployee, myDailyAttendance, todayBs, dutySortAsc]);
+  }, [selectedBsYear, selectedBsMonth, myDailyAttendance, todayBs, dutySortAsc]);
 
   // Mobile Only Restriction Check (Blocks Laptop / Desktop / PC)
   const [isDesktopBlocked, setIsDesktopBlocked] = useState(false);
@@ -3270,7 +3244,7 @@ export default function StaffPortalPage() {
                           )}
                         </h3>
                         <p className="text-[10px] text-slate-400">
-                          नेपाली क्यालेन्डर (BS) • दैनिक ८ घण्टा ड्युटी • साप्ताहिक १ दिन बिदा (५६h चक्र)
+                          नेपाली क्यालेन्डर (BS) • दैनिक ८ घण्टा ड्युटी • मासिक हिसाब
                         </p>
                       </div>
                     </div>
@@ -3300,10 +3274,6 @@ export default function StaffPortalPage() {
                       </select>
                       <ChevronRight className="w-3.5 h-3.5 text-purple-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none rotate-90" />
                     </div>
-
-                    <span className="text-[10px] font-mono px-2 py-1 bg-slate-950 rounded-xl border border-slate-800 text-slate-400 whitespace-nowrap">
-                      बिदा: {monthlyDutySummary.empWeeklyOffName}
-                    </span>
                   </div>
                 </div>
 
@@ -3318,7 +3288,7 @@ export default function StaffPortalPage() {
                       {monthlyDutySummary.monthlyRequiredWorkingHours}h
                     </span>
                     <span className="text-[9px] text-slate-400 mt-0.5 block truncate">
-                      {monthlyDutySummary.totalExpectedWorkingDays} काम दिन × ८h (५६h चक्र)
+                      {monthlyDutySummary.daysCount} दिन × ८h (मासिक लक्ष्य)
                     </span>
                   </div>
 
@@ -3363,7 +3333,7 @@ export default function StaffPortalPage() {
                       {monthlyDutySummary.remainingMonthlyHours}h
                     </span>
                     <span className="text-[9px] text-slate-400 mt-0.5 block truncate">
-                      बाँकी {monthlyDutySummary.remainingWorkingDays} दिन (औसत {monthlyDutySummary.requiredDailyHoursRemaining}h/दिन)
+                      बाँकी {monthlyDutySummary.remainingDays} दिन (औसत {monthlyDutySummary.requiredDailyHoursRemaining}h/दिन)
                     </span>
                   </div>
                 </div>
@@ -3398,12 +3368,6 @@ export default function StaffPortalPage() {
                     📅 महिनाको दिन: <strong className="text-white">{monthlyDutySummary.daysCount}</strong>
                   </span>
                   <span className="px-2 py-0.5 bg-slate-950 rounded-lg border border-slate-800 text-slate-300">
-                    💼 काम दिन: <strong className="text-white">{monthlyDutySummary.totalExpectedWorkingDays}</strong>
-                  </span>
-                  <span className="px-2 py-0.5 bg-slate-950 rounded-lg border border-slate-800 text-slate-300">
-                    🌴 साप्ताहिक बिदा: <strong className="text-blue-400">{monthlyDutySummary.totalWeeklyOffs} दिन</strong>
-                  </span>
-                  <span className="px-2 py-0.5 bg-slate-950 rounded-lg border border-slate-800 text-slate-300">
                     ✅ उपस्थित: <strong className="text-emerald-400">{monthlyDutySummary.presentDaysCount} दिन</strong>
                   </span>
                   <span className="px-2 py-0.5 bg-slate-950 rounded-lg border border-emerald-500/30 text-slate-300">
@@ -3417,11 +3381,6 @@ export default function StaffPortalPage() {
                   {monthlyDutySummary.absentDaysCount > 0 && (
                     <span className="px-2 py-0.5 bg-slate-950 rounded-lg border border-slate-800 text-slate-300">
                       ❌ अनुपस्थित: <strong className="text-rose-400">{monthlyDutySummary.absentDaysCount} दिन</strong>
-                    </span>
-                  )}
-                  {monthlyDutySummary.weekOffWorkCount > 0 && (
-                    <span className="px-2 py-0.5 bg-purple-950/60 rounded-lg border border-purple-800/50 text-purple-300">
-                      ⭐ बिदामा काम (OT): <strong className="text-purple-200">{monthlyDutySummary.weekOffWorkCount} दिन</strong>
                     </span>
                   )}
                 </div>
@@ -3509,7 +3468,7 @@ export default function StaffPortalPage() {
                           <tbody className="divide-y divide-slate-800/60 bg-slate-900/40 font-normal">
                             {monthlyDutySummary.sortedDaysList.map((item) => (
                               <tr key={item.bsDay} className={`hover:bg-slate-800/40 transition-colors ${
-                                item.isToday ? 'bg-purple-950/20' : item.isWeeklyOff ? 'bg-slate-950/30' : ''
+                                item.isToday ? 'bg-purple-950/20' : ''
                               }`}>
                                 <td className="py-3.5 px-4">
                                   <div className="flex items-center gap-2">
@@ -3547,8 +3506,6 @@ export default function StaffPortalPage() {
                                       <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
                                       🏢 In Office (कार्यरत)
                                     </span>
-                                  ) : item.isWeeklyOff ? (
-                                    <span className="text-blue-400/80 font-medium text-xs">साप्ताहिक बिदा</span>
                                   ) : (
                                     <span className="text-slate-500 font-mono text-xs">-- : --</span>
                                   )}
@@ -3567,8 +3524,6 @@ export default function StaffPortalPage() {
                                         {item.punchesCount} पटक पञ्च गरिएको
                                       </span>
                                     </div>
-                                  ) : item.isWeeklyOff ? (
-                                    <span className="text-[11px] text-blue-400 font-medium">🌴 साप्ताहिक बिदा</span>
                                   ) : item.isPastOrToday ? (
                                     <span className="text-slate-500 text-xs font-mono">० घण्टा</span>
                                   ) : (
@@ -3582,10 +3537,6 @@ export default function StaffPortalPage() {
                                       ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                                       : item.status === 'DUTY_SHORT'
                                       ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                                      : item.status === 'WEEK_OFF'
-                                      ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
-                                      : item.status === 'WEEK_OFF_WORK'
-                                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
                                       : item.status === 'IN_OFFICE'
                                       ? 'bg-fuchsia-500/10 text-fuchsia-300 border-fuchsia-500/30'
                                       : item.status === 'ABSENT'
@@ -3594,8 +3545,6 @@ export default function StaffPortalPage() {
                                   }`}>
                                     {item.status === 'DUTY_MET' ? '✅ ड्युटी पुगेको' : 
                                      item.status === 'DUTY_SHORT' ? (item.dutyHours > 0 ? `⚠️ नपुगेको (-${Math.round((8 - item.dutyHours) * 10) / 10}h)` : '⚠️ ड्युटी नपुगेको') : 
-                                     item.status === 'WEEK_OFF' ? '🌴 साप्ताहिक बिदा' : 
-                                     item.status === 'WEEK_OFF_WORK' ? `⭐ बिदामा काम (${item.dutyHours}h OT)` : 
                                      item.status === 'IN_OFFICE' ? '🏢 कार्यालयमा (चालु)' : 
                                      item.status === 'ABSENT' ? '❌ अनुपस्थित' : 'आगामी दिन'}
                                   </span>
@@ -3614,19 +3563,13 @@ export default function StaffPortalPage() {
                             className={`p-3.5 bg-slate-950 rounded-2xl border transition-all ${
                               item.isToday
                                 ? 'border-purple-500/50 shadow-lg shadow-purple-900/10 bg-gradient-to-b from-purple-950/20 to-slate-950'
-                                : item.isWeeklyOff
-                                ? 'border-blue-900/40 bg-blue-950/10'
                                 : 'border-slate-800/80 hover:border-slate-700'
                             }`}
                           >
                             {/* Card Top: Date & Status */}
                             <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/70">
                               <div className="flex items-center gap-2.5">
-                                <div className={`w-8 h-8 rounded-xl border flex items-center justify-center font-mono text-xs font-black ${
-                                  item.isWeeklyOff 
-                                    ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' 
-                                    : 'bg-purple-500/10 border-purple-500/20 text-purple-400'
-                                }`}>
+                                <div className="w-8 h-8 rounded-xl border flex items-center justify-center font-mono text-xs font-black bg-purple-500/10 border-purple-500/20 text-purple-400">
                                   {toNepaliDigits(item.bsDay)}
                                 </div>
                                 <div>
@@ -3649,10 +3592,6 @@ export default function StaffPortalPage() {
                                   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                                   : item.status === 'DUTY_SHORT'
                                   ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                                  : item.status === 'WEEK_OFF'
-                                  ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
-                                  : item.status === 'WEEK_OFF_WORK'
-                                  ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
                                   : item.status === 'IN_OFFICE'
                                   ? 'bg-fuchsia-500/10 text-fuchsia-300 border-fuchsia-500/30'
                                   : item.status === 'ABSENT'
@@ -3661,8 +3600,6 @@ export default function StaffPortalPage() {
                               }`}>
                                 {item.status === 'DUTY_MET' ? '✅ ड्युटी पुगेको' : 
                                  item.status === 'DUTY_SHORT' ? (item.dutyHours > 0 ? `⚠️ नपुगेको (-${Math.round((8 - item.dutyHours) * 10) / 10}h)` : '⚠️ नपुगेको') : 
-                                 item.status === 'WEEK_OFF' ? '🌴 साप्ताहिक बिदा' : 
-                                 item.status === 'WEEK_OFF_WORK' ? '⭐ बिदामा काम' : 
                                  item.status === 'IN_OFFICE' ? '🏢 कार्यालयमा' : 
                                  item.status === 'ABSENT' ? '❌ अनुपस्थित' : 'आगामी'}
                               </span>
@@ -3676,7 +3613,7 @@ export default function StaffPortalPage() {
                                   {item.inTime || '--:--'}
                                 </span>
                                 <span className="text-[8px] text-slate-500 block mt-0.5">
-                                  {item.inTime ? 'आगमन' : item.isWeeklyOff ? 'बिदा' : '--'}
+                                  {item.inTime ? 'आगमन' : '--'}
                                 </span>
                               </div>
 
@@ -3686,7 +3623,7 @@ export default function StaffPortalPage() {
                                   {item.outTime || (item.status === 'IN_OFFICE' ? 'In Office' : '--:--')}
                                 </span>
                                 <span className="text-[8px] text-slate-500 block mt-0.5 truncate">
-                                  {item.outTime ? 'प्रस्थान' : item.status === 'IN_OFFICE' ? '🏢 In Office' : item.isWeeklyOff ? 'साप्ताहिक बिदा' : '--'}
+                                  {item.outTime ? 'प्रस्थान' : item.status === 'IN_OFFICE' ? '🏢 In Office' : '--'}
                                 </span>
                               </div>
 
@@ -3695,10 +3632,10 @@ export default function StaffPortalPage() {
                                 <span className={`text-xs font-mono font-bold mt-0.5 block ${
                                   item.dutyHours >= 8 ? 'text-emerald-400' : item.dutyHours >= 4 ? 'text-amber-300' : item.dutyHours > 0 ? 'text-slate-300' : 'text-slate-500'
                                 }`}>
-                                  {item.dutyHours > 0 ? `${item.dutyHours} hrs` : item.status === 'IN_OFFICE' ? 'चालु' : item.isWeeklyOff ? 'बिदा' : '--'}
+                                  {item.dutyHours > 0 ? `${item.dutyHours} hrs` : item.status === 'IN_OFFICE' ? 'चालु' : item.isPastOrToday ? '०h' : '--'}
                                 </span>
                                 <span className="text-[8px] text-slate-500 block mt-0.5 truncate">
-                                  {item.punchesCount > 0 ? `${item.punchesCount} पञ्च` : item.isWeeklyOff ? 'Weekly Off' : '--'}
+                                  {item.punchesCount > 0 ? `${item.punchesCount} पञ्च` : '--'}
                                 </span>
                               </div>
                             </div>
