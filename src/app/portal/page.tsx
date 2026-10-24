@@ -1,10 +1,17 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { initialEmployees, generateTodayAttendance, initialAssets, initialFieldDutyRequests } from '@/lib/mock-data';
 import { Employee, CompanyAsset, LeaveRequest, FieldDutyRequest, DailyAttendance, PayrollRecord, UserRole } from '@/lib/types';
-import { getNepaliDate } from '@/lib/nepali-date';
+import { 
+  getNepaliDate, 
+  NEPALI_MONTHS_NP, 
+  NEPALI_MONTHS_EN, 
+  toNepaliDigits, 
+  getDaysInBsMonth, 
+  bsToAd 
+} from '@/lib/nepali-date';
 import { 
   User, 
   Clock, 
@@ -1107,7 +1114,7 @@ export default function StaffPortalPage() {
     rawOutTime: string | null;
     totalDutyHours: number;
     totalDutyFormatted: string;
-    status: 'PRESENT' | 'LATE' | 'IN_OFFICE' | 'HALF_DAY';
+    status: 'PRESENT' | 'LATE' | 'IN_OFFICE' | 'HALF_DAY' | 'WEEK_OFF' | 'WEEK_OFF_WORK' | 'ABSENT' | 'UPCOMING';
     isToday: boolean;
     isLate: boolean;
     punchesCount: number;
@@ -1326,6 +1333,189 @@ export default function StaffPortalPage() {
     const interval = setInterval(fetchBiometricAttendance, 30000);
     return () => clearInterval(interval);
   }, [activeEmployee]);
+
+  // Nepali Calendar (Bikram Sambat) Monthly Duty State
+  const todayBs = useMemo(() => getNepaliDate(new Date()), []);
+  const [selectedBsYear, setSelectedBsYear] = useState<number>(() => getNepaliDate(new Date()).bsYear);
+  const [selectedBsMonth, setSelectedBsMonth] = useState<number>(() => getNepaliDate(new Date()).bsMonth);
+
+  // Nepali Calendar Monthly Duty Summary Calculation:
+  // Rules: Daily 8 hrs duty, Weekly 1 day off (Weekly 56 hrs cycle, 6 working days * 8h = 48h working duty)
+  const monthlyDutySummary = useMemo(() => {
+    const daysCount = getDaysInBsMonth(selectedBsYear, selectedBsMonth);
+    const empWeeklyOff = (activeEmployee?.weekly_off_day || 'Saturday').toLowerCase();
+    const isCurrentMonth = selectedBsYear === todayBs.bsYear && selectedBsMonth === todayBs.bsMonth;
+    const currentElapsedDay = isCurrentMonth ? todayBs.bsDay : daysCount;
+
+    let totalWeeklyOffs = 0;
+    let weeklyOffsElapsed = 0;
+
+    // Fast lookup map for punches by AD date
+    const attMap = new Map<string, StaffDailyDuty>();
+    myDailyAttendance.forEach(a => attMap.set(a.date, a));
+
+    const monthDaysList: Array<{
+      bsDay: number;
+      bsDateStr: string;
+      nepaliFullDate: string;
+      adDateStr: string;
+      dayNameNp: string;
+      dayNameEn: string;
+      isWeeklyOff: boolean;
+      isPastOrToday: boolean;
+      isToday: boolean;
+      inTime: string | null;
+      outTime: string | null;
+      dutyHours: number;
+      dutyFormatted: string;
+      status: 'PRESENT' | 'LATE' | 'IN_OFFICE' | 'HALF_DAY' | 'WEEK_OFF' | 'WEEK_OFF_WORK' | 'ABSENT' | 'UPCOMING';
+      punchesCount: number;
+    }> = [];
+
+    for (let day = 1; day <= daysCount; day++) {
+      const adDateObj = bsToAd(selectedBsYear, selectedBsMonth, day);
+      const adDateStr = adDateObj.toISOString().split('T')[0];
+      const dayOfWeekIdx = adDateObj.getDay();
+      const daysEn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const daysNp = ['आइतबार', 'सोमबार', 'मंगलबार', 'बुधबार', 'बिहीबार', 'शुक्रबार', 'शनिबार'];
+      const dayNameEn = daysEn[dayOfWeekIdx];
+      const dayNameNp = daysNp[dayOfWeekIdx];
+      const isWeeklyOff = dayNameEn.toLowerCase() === empWeeklyOff;
+      if (isWeeklyOff) totalWeeklyOffs++;
+
+      const isPastOrToday = isCurrentMonth ? day <= todayBs.bsDay : (selectedBsYear < todayBs.bsYear || (selectedBsYear === todayBs.bsYear && selectedBsMonth < todayBs.bsMonth));
+      const isToday = isCurrentMonth && day === todayBs.bsDay;
+
+      if (isWeeklyOff && isPastOrToday) {
+        weeklyOffsElapsed++;
+      }
+
+      const existingPunch = attMap.get(adDateStr);
+      let inTime: string | null = null;
+      let outTime: string | null = null;
+      let dutyHours = 0;
+      let dutyFormatted = '--';
+      let status: 'PRESENT' | 'LATE' | 'IN_OFFICE' | 'HALF_DAY' | 'WEEK_OFF' | 'WEEK_OFF_WORK' | 'ABSENT' | 'UPCOMING' = 'UPCOMING';
+      let punchesCount = 0;
+
+      if (existingPunch) {
+        inTime = existingPunch.inTime;
+        outTime = existingPunch.outTime;
+        dutyHours = existingPunch.totalDutyHours;
+        dutyFormatted = existingPunch.totalDutyFormatted;
+        punchesCount = existingPunch.punchesCount;
+
+        if (isWeeklyOff) {
+          status = 'WEEK_OFF_WORK'; // Worked on weekly off!
+        } else if (isToday && !outTime && inTime) {
+          status = 'IN_OFFICE';
+        } else if (existingPunch.status === 'LATE' || existingPunch.isLate) {
+          status = 'LATE';
+        } else if (existingPunch.status === 'HALF_DAY') {
+          status = 'HALF_DAY';
+        } else {
+          status = 'PRESENT';
+        }
+      } else {
+        if (isWeeklyOff) {
+          status = 'WEEK_OFF';
+        } else if (isPastOrToday) {
+          status = 'ABSENT';
+        } else {
+          status = 'UPCOMING';
+        }
+      }
+
+      const bsDayPadded = String(day).padStart(2, '0');
+      const bsMonthPadded = String(selectedBsMonth).padStart(2, '0');
+      const bsDateStr = `${toNepaliDigits(selectedBsYear)}/${toNepaliDigits(bsMonthPadded)}/${toNepaliDigits(bsDayPadded)}`;
+      const nepaliFullDate = `${toNepaliDigits(selectedBsYear)} ${NEPALI_MONTHS_NP[selectedBsMonth - 1]} ${toNepaliDigits(day)}`;
+
+      monthDaysList.push({
+        bsDay: day,
+        bsDateStr,
+        nepaliFullDate,
+        adDateStr,
+        dayNameNp,
+        dayNameEn,
+        isWeeklyOff,
+        isPastOrToday,
+        isToday,
+        inTime,
+        outTime,
+        dutyHours,
+        dutyFormatted,
+        status,
+        punchesCount
+      });
+    }
+
+    // Rules: daily 8 hrs duty, weekly 1 day off (weekly 56 hrs cycle, 6 working days * 8h = 48h working duty)
+    const totalExpectedWorkingDays = daysCount - totalWeeklyOffs; // e.g. 26
+    const monthlyRequiredWorkingHours = totalExpectedWorkingDays * 8; // e.g. 26 * 8 = 208 hrs
+    const monthlyCycle56hTotal = daysCount * 8; // e.g. 240 hrs (7 days * 8h = 56h/week cycle)
+
+    // Actual worked hours in this selected Nepali month
+    const actualWorkedHours = Math.round(monthDaysList.reduce((acc, d) => acc + d.dutyHours, 0) * 10) / 10;
+    const presentDaysCount = monthDaysList.filter(d => d.dutyHours > 0 || d.status === 'PRESENT' || d.status === 'LATE' || d.status === 'WEEK_OFF_WORK' || d.status === 'IN_OFFICE').length;
+    const lateDaysCount = monthDaysList.filter(d => d.status === 'LATE').length;
+    const weekOffWorkCount = monthDaysList.filter(d => d.status === 'WEEK_OFF_WORK').length;
+    const absentDaysCount = monthDaysList.filter(d => d.status === 'ABSENT').length;
+
+    // Target up to today (for current month vs past month)
+    const elapsedDays = Math.min(daysCount, currentElapsedDay);
+    const workingDaysElapsed = Math.max(0, elapsedDays - weeklyOffsElapsed);
+    const targetHoursTillToday = isCurrentMonth ? (workingDaysElapsed * 8) : monthlyRequiredWorkingHours;
+
+    // Pace difference (today's pace):
+    const paceDifference = Math.round((actualWorkedHours - targetHoursTillToday) * 10) / 10;
+    const isAheadTillToday = paceDifference >= 0;
+    const paceDiffAbs = Math.abs(paceDifference);
+
+    // Remaining hours to complete entire month:
+    const remainingMonthlyHours = Math.max(0, Math.round((monthlyRequiredWorkingHours - actualWorkedHours) * 10) / 10);
+    const remainingWorkingDays = Math.max(0, totalExpectedWorkingDays - workingDaysElapsed);
+    const requiredDailyHoursRemaining = remainingWorkingDays > 0 ? (Math.round((remainingMonthlyHours / remainingWorkingDays) * 10) / 10) : 0;
+
+    // Percentage
+    const completionRate = monthlyRequiredWorkingHours > 0
+      ? Math.min(100, Math.round((actualWorkedHours / monthlyRequiredWorkingHours) * 100))
+      : 0;
+
+    // Sort descending by day for list view so newest dates appear first
+    const sortedDaysList = [...monthDaysList].sort((a, b) => b.bsDay - a.bsDay);
+
+    return {
+      monthNameNp: NEPALI_MONTHS_NP[selectedBsMonth - 1] || 'कार्तिक',
+      monthNameEn: NEPALI_MONTHS_EN[selectedBsMonth - 1] || 'Kartik',
+      bsYear: selectedBsYear,
+      bsMonth: selectedBsMonth,
+      daysCount,
+      totalWeeklyOffs,
+      totalExpectedWorkingDays,
+      monthlyRequiredWorkingHours,
+      monthlyCycle56hTotal,
+      actualWorkedHours,
+      presentDaysCount,
+      lateDaysCount,
+      weekOffWorkCount,
+      absentDaysCount,
+      elapsedDays,
+      workingDaysElapsed,
+      targetHoursTillToday,
+      paceDifference,
+      isAheadTillToday,
+      paceDiffAbs,
+      remainingMonthlyHours,
+      remainingWorkingDays,
+      requiredDailyHoursRemaining,
+      completionRate,
+      monthDaysList,
+      sortedDaysList,
+      isCurrentMonth,
+      empWeeklyOffName: empWeeklyOff.charAt(0).toUpperCase() + empWeeklyOff.slice(1)
+    };
+  }, [selectedBsYear, selectedBsMonth, activeEmployee, myDailyAttendance, todayBs]);
 
   // Mobile Only Restriction Check (Blocks Laptop / Desktop / PC)
   const [isDesktopBlocked, setIsDesktopBlocked] = useState(false);
@@ -3049,37 +3239,180 @@ export default function StaffPortalPage() {
 
           return (
             <div className="space-y-4 animate-in fade-in duration-200">
-              {/* Monthly Attendance Counters */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl text-center">
-                  <span className="text-[10px] font-semibold text-slate-400 block uppercase">उपस्थित दिन (Days)</span>
-                  <span className="text-xl font-black text-purple-400 mt-1 block">{myDailyAttendance.length}</span>
-                  <span className="text-[10px] text-slate-500">बायोमेट्रिक हाजिर</span>
+              {/* ========================================================================= */}
+              {/* NEPALI CALENDAR MONTHLY DUTY HOURS & TARGET CARD */}
+              {/* ========================================================================= */}
+              <div className="bg-gradient-to-b from-slate-900 via-slate-900 to-purple-950/20 border border-slate-800 rounded-3xl p-4 sm:p-5 space-y-4 shadow-xl">
+                {/* Header: Title + BS Month Dropdown */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+                        <Calendar className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                          <span>मासिक ड्युटी हिसाब (Monthly Duty Hours)</span>
+                          {monthlyDutySummary.isCurrentMonth && (
+                            <span className="px-2 py-0.2 rounded-full text-[9px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                              चालु महिना
+                            </span>
+                          )}
+                        </h3>
+                        <p className="text-[10px] text-slate-400">
+                          नेपाली क्यालेन्डर (BS) • दैनिक ८ घण्टा ड्युटी • साप्ताहिक १ दिन बिदा (५६h चक्र)
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    {/* Nepali Month Selector */}
+                    <div className="relative">
+                      <select
+                        value={`${selectedBsYear}-${selectedBsMonth}`}
+                        onChange={(e) => {
+                          const [y, m] = e.target.value.split('-').map(Number);
+                          setSelectedBsYear(y);
+                          setSelectedBsMonth(m);
+                        }}
+                        className="bg-slate-950 text-purple-200 font-bold text-xs px-3 py-2 pr-7 rounded-2xl border border-purple-500/40 hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 cursor-pointer appearance-none shadow-sm"
+                      >
+                        {NEPALI_MONTHS_NP.map((mName, idx) => {
+                          const mNum = idx + 1;
+                          const isCur = 2083 === todayBs.bsYear && mNum === todayBs.bsMonth;
+                          return (
+                            <option key={mNum} value={`2083-${mNum}`} className="bg-slate-900 text-white">
+                              {mName} २०८३ {isCur ? '★ चालु (Current)' : ''}
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <ChevronRight className="w-3.5 h-3.5 text-purple-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none rotate-90" />
+                    </div>
+
+                    <span className="text-[10px] font-mono px-2 py-1 bg-slate-950 rounded-xl border border-slate-800 text-slate-400 whitespace-nowrap">
+                      बिदा: {monthlyDutySummary.empWeeklyOffName}
+                    </span>
+                  </div>
                 </div>
-                <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl text-center">
-                  <span className="text-[10px] font-semibold text-slate-400 block uppercase">कुल ड्युटी (Total Hr)</span>
-                  <span className="text-xl font-black text-emerald-400 mt-1 block">{totalWorkedHoursSum}h</span>
-                  <span className="text-[10px] text-slate-500">काम गरेको घण्टा</span>
+
+                {/* 4 Main Metrics Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {/* 1. Required Duty Hours */}
+                  <div className="bg-slate-950/80 border border-slate-800/90 p-3 sm:p-3.5 rounded-2xl">
+                    <span className="text-[9px] sm:text-[10px] font-semibold text-slate-400 block uppercase">
+                      हुनुपर्ने कुल ड्युटी
+                    </span>
+                    <span className="text-lg sm:text-xl font-mono font-black text-white mt-1 block">
+                      {monthlyDutySummary.monthlyRequiredWorkingHours}h
+                    </span>
+                    <span className="text-[9px] text-slate-400 mt-0.5 block truncate">
+                      {monthlyDutySummary.totalExpectedWorkingDays} काम दिन × ८h (५६h चक्र)
+                    </span>
+                  </div>
+
+                  {/* 2. Actual Worked Duty Hours */}
+                  <div className="bg-slate-950/80 border border-slate-800/90 p-3 sm:p-3.5 rounded-2xl">
+                    <span className="text-[9px] sm:text-[10px] font-semibold text-emerald-400 block uppercase">
+                      काम भएको ड्युटी
+                    </span>
+                    <span className="text-lg sm:text-xl font-mono font-black text-emerald-400 mt-1 block">
+                      {monthlyDutySummary.actualWorkedHours}h
+                    </span>
+                    <span className="text-[9px] text-slate-400 mt-0.5 block truncate">
+                      {monthlyDutySummary.presentDaysCount} दिन हाजिर ({monthlyDutySummary.presentDaysCount > 0 ? (Math.round((monthlyDutySummary.actualWorkedHours / monthlyDutySummary.presentDaysCount) * 10) / 10) : 0}h/दिन)
+                    </span>
+                  </div>
+
+                  {/* 3. Pace / Status / Shortfall */}
+                  <div className="bg-slate-950/80 border border-slate-800/90 p-3 sm:p-3.5 rounded-2xl">
+                    <span className="text-[9px] sm:text-[10px] font-semibold text-purple-300 block uppercase truncate">
+                      {monthlyDutySummary.isCurrentMonth ? 'आजसम्मको स्थिति' : 'महिनाको स्थिति'}
+                    </span>
+                    <span className={`text-base sm:text-lg font-mono font-black mt-1 block truncate ${
+                      monthlyDutySummary.isAheadTillToday ? 'text-emerald-400' : 'text-rose-400'
+                    }`}>
+                      {monthlyDutySummary.isAheadTillToday
+                        ? `+${monthlyDutySummary.paceDiffAbs}h अगाडि`
+                        : `-${monthlyDutySummary.paceDiffAbs}h नपुगेको`}
+                    </span>
+                    <span className="text-[9px] text-slate-400 mt-0.5 block truncate">
+                      {monthlyDutySummary.isCurrentMonth
+                        ? `आजसम्म ${monthlyDutySummary.targetHoursTillToday}h मा ${monthlyDutySummary.actualWorkedHours}h`
+                        : `कुल ${monthlyDutySummary.monthlyRequiredWorkingHours}h मा ${monthlyDutySummary.actualWorkedHours}h`}
+                    </span>
+                  </div>
+
+                  {/* 4. Remaining Hours */}
+                  <div className="bg-slate-950/80 border border-slate-800/90 p-3 sm:p-3.5 rounded-2xl">
+                    <span className="text-[9px] sm:text-[10px] font-semibold text-amber-300 block uppercase">
+                      पूरा गर्न बाँकी
+                    </span>
+                    <span className="text-lg sm:text-xl font-mono font-black text-amber-300 mt-1 block">
+                      {monthlyDutySummary.remainingMonthlyHours}h
+                    </span>
+                    <span className="text-[9px] text-slate-400 mt-0.5 block truncate">
+                      बाँकी {monthlyDutySummary.remainingWorkingDays} दिन (औसत {monthlyDutySummary.requiredDailyHoursRemaining}h/दिन)
+                    </span>
+                  </div>
                 </div>
-                <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl text-center">
-                  <span className="text-[10px] font-semibold text-slate-400 block uppercase">दैनिक औसत (Avg/Day)</span>
-                  <span className="text-xl font-black text-blue-400 mt-1 block">{avgDailyWorked}h</span>
-                  <span className="text-[10px] text-slate-500">प्रति दिन औसत</span>
+
+                {/* Progress Bar */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-slate-400 font-medium">
+                      मासिक ड्युटी प्रगति (Progress): <span className="font-bold text-white font-mono">{monthlyDutySummary.completionRate}%</span>
+                    </span>
+                    <span className="font-mono text-purple-300 font-bold">
+                      {monthlyDutySummary.actualWorkedHours}h / {monthlyDutySummary.monthlyRequiredWorkingHours}h
+                    </span>
+                  </div>
+                  <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800/80">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        monthlyDutySummary.completionRate >= 100
+                          ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                          : monthlyDutySummary.isAheadTillToday
+                          ? 'bg-gradient-to-r from-purple-500 to-emerald-400'
+                          : 'bg-gradient-to-r from-purple-600 via-amber-500 to-rose-500'
+                      }`}
+                      style={{ width: `${monthlyDutySummary.completionRate}%` }}
+                    ></div>
+                  </div>
                 </div>
-                <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl text-center">
-                  <span className="text-[10px] font-semibold text-slate-400 block uppercase">आजको स्थिति (Today)</span>
-                  <span className={`text-sm font-black mt-1.5 block truncate ${
-                    todayPunch.hasPunched ? (todayPunch.outTime ? 'text-emerald-400' : 'text-blue-400') : 'text-slate-500'
-                  }`}>
-                    {todayPunch.hasPunched ? (todayPunch.outTime ? 'ड्युटी सम्पन्न' : 'कार्यालयमा') : 'पञ्च छैन'}
+
+                {/* Detailed Breakdown Pills */}
+                <div className="pt-2 border-t border-slate-800/60 flex flex-wrap gap-1.5 text-[10px]">
+                  <span className="px-2 py-0.5 bg-slate-950 rounded-lg border border-slate-800 text-slate-300">
+                    📅 महिनाको दिन: <strong className="text-white">{monthlyDutySummary.daysCount}</strong>
                   </span>
-                  <span className="text-[10px] text-slate-500">
-                    {todayPunch.hasPunched ? (todayPunch.outTime ? 'Out Recorded' : 'In Office') : 'Absent/Away'}
+                  <span className="px-2 py-0.5 bg-slate-950 rounded-lg border border-slate-800 text-slate-300">
+                    💼 काम दिन: <strong className="text-white">{monthlyDutySummary.totalExpectedWorkingDays}</strong>
                   </span>
+                  <span className="px-2 py-0.5 bg-slate-950 rounded-lg border border-slate-800 text-slate-300">
+                    🌴 साप्ताहिक बिदा: <strong className="text-blue-400">{monthlyDutySummary.totalWeeklyOffs} दिन</strong>
+                  </span>
+                  <span className="px-2 py-0.5 bg-slate-950 rounded-lg border border-slate-800 text-slate-300">
+                    ✅ उपस्थित: <strong className="text-emerald-400">{monthlyDutySummary.presentDaysCount} दिन</strong>
+                  </span>
+                  <span className="px-2 py-0.5 bg-slate-950 rounded-lg border border-slate-800 text-slate-300">
+                    ⚠️ ढिला आगमन: <strong className="text-amber-400">{monthlyDutySummary.lateDaysCount} दिन</strong>
+                  </span>
+                  {monthlyDutySummary.absentDaysCount > 0 && (
+                    <span className="px-2 py-0.5 bg-slate-950 rounded-lg border border-slate-800 text-slate-300">
+                      ❌ अनुपस्थित: <strong className="text-rose-400">{monthlyDutySummary.absentDaysCount} दिन</strong>
+                    </span>
+                  )}
+                  {monthlyDutySummary.weekOffWorkCount > 0 && (
+                    <span className="px-2 py-0.5 bg-purple-950/60 rounded-lg border border-purple-800/50 text-purple-300">
+                      ⭐ बिदामा काम (OT): <strong className="text-purple-200">{monthlyDutySummary.weekOffWorkCount} दिन</strong>
+                    </span>
+                  )}
                 </div>
               </div>
 
-              {/* View Mode Switcher: Daily Duty vs Raw Machine Punches */}
+              {/* View Mode Switcher: Daily Duty for selected month vs Raw Machine Punches */}
               <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-1.5 flex gap-1.5 shadow-sm">
                 <button
                   type="button"
@@ -3091,7 +3424,7 @@ export default function StaffPortalPage() {
                   }`}
                 >
                   <Timer className="w-3.5 h-3.5" />
-                  <span>दैनिक ड्युटी विवरण (Daily Duty)</span>
+                  <span>{monthlyDutySummary.monthNameNp} महिनाको दैनिक ड्युटी ({monthlyDutySummary.daysCount} दिन)</span>
                 </button>
                 <button
                   type="button"
@@ -3107,14 +3440,14 @@ export default function StaffPortalPage() {
                 </button>
               </div>
 
-              {/* DAILY DUTY VIEW */}
+              {/* DAILY DUTY VIEW FOR SELECTED NEPALI MONTH */}
               {attendanceViewMode === 'daily' && (
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 space-y-4">
                   <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                     <div>
                       <h3 className="font-bold text-sm text-white flex items-center gap-2">
                         <Clock className="w-4 h-4 text-purple-400" />
-                        <span>Daily Duty & Attendance History</span>
+                        <span>{monthlyDutySummary.monthNameNp} २०८३ दैनिक ड्युटी विवरण</span>
                       </h3>
                       <p className="text-[11px] text-slate-400 mt-0.5">
                         मिति, आगमन, प्रस्थान र कुल काम गरेको घण्टा (Total Duty Hr)
@@ -3125,12 +3458,12 @@ export default function StaffPortalPage() {
                     </span>
                   </div>
 
-                  {myDailyAttendance.length === 0 ? (
+                  {monthlyDutySummary.sortedDaysList.length === 0 ? (
                     <div className="p-8 text-center text-slate-400 space-y-2">
                       <Clock className="w-10 h-10 text-slate-700 mx-auto" />
-                      <p className="text-sm font-semibold text-slate-300">No Attendance Records Found</p>
+                      <p className="text-sm font-semibold text-slate-300">कुनै हाजिर विवरण भेटिएन</p>
                       <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                        When you punch your biometric device (PIN #{activeEmployee.biometric_pin}), daily check-in, check-out, and total duty hours will be automatically recorded here.
+                        यस महिनाको कुनै पनि हाजिर रेकर्ड फेला परेन।
                       </p>
                     </div>
                   ) : (
@@ -3140,19 +3473,21 @@ export default function StaffPortalPage() {
                         <table className="w-full text-left text-xs">
                           <thead className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800 uppercase text-[10px] tracking-wider">
                             <tr>
-                              <th className="py-3 px-4">मिति / दिन (Date & Day)</th>
+                              <th className="py-3 px-4">नेपाली मिति / दिन (BS Date & Day)</th>
                               <th className="py-3 px-4">आगमन समय (Check-In)</th>
                               <th className="py-3 px-4">प्रस्थान समय (Check-Out)</th>
-                              <th className="py-3 px-4">कुल ड्युटी (Total Duty Hr)</th>
+                              <th className="py-3 px-4">ड्युटी समय (Total Duty Hr)</th>
                               <th className="py-3 px-4 text-center">स्थिति (Status)</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-800/60 bg-slate-900/40 font-normal">
-                            {myDailyAttendance.map((item) => (
-                              <tr key={item.date} className={`hover:bg-slate-800/40 transition-colors ${item.isToday ? 'bg-purple-950/20' : ''}`}>
+                            {monthlyDutySummary.sortedDaysList.map((item) => (
+                              <tr key={item.bsDay} className={`hover:bg-slate-800/40 transition-colors ${
+                                item.isToday ? 'bg-purple-950/20' : item.isWeeklyOff ? 'bg-slate-950/30' : ''
+                              }`}>
                                 <td className="py-3.5 px-4">
                                   <div className="flex items-center gap-2">
-                                    <span className="font-mono font-bold text-white text-xs">{item.date}</span>
+                                    <span className="font-mono font-bold text-white text-xs">{item.bsDateStr}</span>
                                     {item.isToday && (
                                       <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[9px] font-black animate-pulse">
                                         🟢 आज
@@ -3160,54 +3495,66 @@ export default function StaffPortalPage() {
                                     )}
                                   </div>
                                   <p className="text-[11px] text-purple-300 font-medium mt-0.5">
-                                    {item.nepaliDate} • {item.dayOfWeekNepali} ({item.dayOfWeek})
+                                    {item.nepaliFullDate} • {item.dayNameNp} ({item.adDateStr})
                                   </p>
                                 </td>
 
                                 <td className="py-3.5 px-4">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-mono text-emerald-400 font-bold text-xs inline-flex items-center gap-1.5">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                                      {item.inTime || '--:--'}
-                                    </span>
-                                    {item.isLate && (
-                                      <span className="px-1.5 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[9px] font-bold">
-                                        ढिला
+                                  {item.inTime ? (
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-mono text-emerald-400 font-bold text-xs inline-flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                        {item.inTime}
                                       </span>
-                                    )}
-                                  </div>
-                                  <span className="text-[10px] text-slate-500 block mt-0.5">ZK Device</span>
-                                </td>
-
-                                <td className="py-3.5 px-4">
-                                  {item.outTime ? (
-                                    <div>
-                                      <span className="font-mono text-blue-400 font-bold text-xs inline-flex items-center gap-1.5">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
-                                        {item.outTime}
-                                      </span>
-                                      <span className="text-[10px] text-slate-500 block mt-0.5">प्रस्थान पञ्च</span>
+                                      {item.status === 'LATE' && (
+                                        <span className="px-1.5 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[9px] font-bold">
+                                          ढिला
+                                        </span>
+                                      )}
                                     </div>
-                                  ) : item.isToday ? (
-                                    <span className="px-2.5 py-1 bg-blue-500/10 text-blue-300 border border-blue-500/30 rounded-full text-[10px] font-semibold inline-flex items-center gap-1.5">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
-                                      🏢 In Office (कार्यरत)
-                                    </span>
                                   ) : (
                                     <span className="text-slate-500 font-mono text-xs">-- : --</span>
                                   )}
                                 </td>
 
                                 <td className="py-3.5 px-4">
-                                  <div className="font-mono font-bold text-white text-xs flex items-center gap-1.5">
-                                    <Timer className="w-3.5 h-3.5 text-purple-400" />
-                                    <span className={item.totalDutyHours >= 8 ? 'text-emerald-400' : item.totalDutyHours >= 4 ? 'text-amber-300' : 'text-slate-300'}>
-                                      {item.totalDutyFormatted}
+                                  {item.outTime ? (
+                                    <span className="font-mono text-blue-400 font-bold text-xs inline-flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                                      {item.outTime}
                                     </span>
-                                  </div>
-                                  <span className="text-[10px] text-slate-500 block mt-0.5">
-                                    {item.punchesCount} पटक पञ्च गरिएको
-                                  </span>
+                                  ) : item.status === 'IN_OFFICE' ? (
+                                    <span className="px-2.5 py-1 bg-blue-500/10 text-blue-300 border border-blue-500/30 rounded-full text-[10px] font-semibold inline-flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+                                      🏢 In Office (कार्यरत)
+                                    </span>
+                                  ) : item.isWeeklyOff ? (
+                                    <span className="text-blue-400/80 font-medium text-xs">साप्ताहिक बिदा</span>
+                                  ) : (
+                                    <span className="text-slate-500 font-mono text-xs">-- : --</span>
+                                  )}
+                                </td>
+
+                                <td className="py-3.5 px-4">
+                                  {item.dutyHours > 0 ? (
+                                    <div>
+                                      <div className="font-mono font-bold text-white text-xs flex items-center gap-1.5">
+                                        <Timer className="w-3.5 h-3.5 text-purple-400" />
+                                        <span className={item.dutyHours >= 8 ? 'text-emerald-400' : item.dutyHours >= 4 ? 'text-amber-300' : 'text-slate-300'}>
+                                          {item.dutyFormatted}
+                                        </span>
+                                      </div>
+                                      <span className="text-[10px] text-slate-500 block mt-0.5">
+                                        {item.punchesCount} पटक पञ्च गरिएको
+                                      </span>
+                                    </div>
+                                  ) : item.isWeeklyOff ? (
+                                    <span className="text-[11px] text-blue-400 font-medium">🌴 साप्ताहिक बिदा</span>
+                                  ) : item.isPastOrToday ? (
+                                    <span className="text-slate-500 text-xs font-mono">० घण्टा</span>
+                                  ) : (
+                                    <span className="text-slate-600 text-xs">--</span>
+                                  )}
                                 </td>
 
                                 <td className="py-3.5 px-4 text-center">
@@ -3216,11 +3563,25 @@ export default function StaffPortalPage() {
                                       ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                                       : item.status === 'LATE'
                                       ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                                      : item.status === 'WEEK_OFF'
+                                      ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+                                      : item.status === 'WEEK_OFF_WORK'
+                                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                                      : item.status === 'IN_OFFICE'
+                                      ? 'bg-fuchsia-500/10 text-fuchsia-300 border-fuchsia-500/30'
                                       : item.status === 'HALF_DAY'
                                       ? 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30'
-                                      : 'bg-blue-500/10 text-blue-300 border-blue-500/30'
+                                      : item.status === 'ABSENT'
+                                      ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                                      : 'bg-slate-800 text-slate-500 border-slate-700'
                                   }`}>
-                                    {item.status === 'PRESENT' ? 'उपस्थित' : item.status === 'LATE' ? 'ढिला आगमन' : item.status === 'HALF_DAY' ? 'आधा दिन' : 'कार्यरत'}
+                                    {item.status === 'PRESENT' ? 'उपस्थित' : 
+                                     item.status === 'LATE' ? 'ढिला आगमन' : 
+                                     item.status === 'WEEK_OFF' ? 'साप्ताहिक बिदा' : 
+                                     item.status === 'WEEK_OFF_WORK' ? '⭐ बिदामा काम (OT)' : 
+                                     item.status === 'IN_OFFICE' ? '🏢 कार्यालयमा' : 
+                                     item.status === 'HALF_DAY' ? 'आधा दिन' : 
+                                     item.status === 'ABSENT' ? 'अनुपस्थित' : 'आगामी दिन'}
                                   </span>
                                 </td>
                               </tr>
@@ -3231,24 +3592,30 @@ export default function StaffPortalPage() {
 
                       {/* Mobile High-Density Cards View */}
                       <div className="block md:hidden space-y-3">
-                        {myDailyAttendance.map((item) => (
+                        {monthlyDutySummary.sortedDaysList.map((item) => (
                           <div
-                            key={item.date}
+                            key={item.bsDay}
                             className={`p-3.5 bg-slate-950 rounded-2xl border transition-all ${
                               item.isToday
                                 ? 'border-purple-500/50 shadow-lg shadow-purple-900/10 bg-gradient-to-b from-purple-950/20 to-slate-950'
+                                : item.isWeeklyOff
+                                ? 'border-blue-900/40 bg-blue-950/10'
                                 : 'border-slate-800/80 hover:border-slate-700'
                             }`}
                           >
                             {/* Card Top: Date & Status */}
                             <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/70">
                               <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 font-mono text-xs font-black">
-                                  {item.date.split('-')[2] || '•'}
+                                <div className={`w-8 h-8 rounded-xl border flex items-center justify-center font-mono text-xs font-black ${
+                                  item.isWeeklyOff 
+                                    ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' 
+                                    : 'bg-purple-500/10 border-purple-500/20 text-purple-400'
+                                }`}>
+                                  {toNepaliDigits(item.bsDay)}
                                 </div>
                                 <div>
                                   <div className="flex items-center gap-1.5">
-                                    <span className="font-bold text-white text-xs">{item.date}</span>
+                                    <span className="font-bold text-white text-xs">{item.bsDateStr}</span>
                                     {item.isToday && (
                                       <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[9px] font-black animate-pulse">
                                         🟢 आज
@@ -3256,7 +3623,7 @@ export default function StaffPortalPage() {
                                     )}
                                   </div>
                                   <p className="text-[10px] text-purple-300 font-medium">
-                                    {item.nepaliDate} • {item.dayOfWeekNepali}
+                                    {item.nepaliFullDate} • {item.dayNameNp}
                                   </p>
                                 </div>
                               </div>
@@ -3266,11 +3633,25 @@ export default function StaffPortalPage() {
                                   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                                   : item.status === 'LATE'
                                   ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                                  : item.status === 'WEEK_OFF'
+                                  ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+                                  : item.status === 'WEEK_OFF_WORK'
+                                  ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                                  : item.status === 'IN_OFFICE'
+                                  ? 'bg-fuchsia-500/10 text-fuchsia-300 border-fuchsia-500/30'
                                   : item.status === 'HALF_DAY'
                                   ? 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30'
-                                  : 'bg-blue-500/10 text-blue-300 border-blue-500/30'
+                                  : item.status === 'ABSENT'
+                                  ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                                  : 'bg-slate-800 text-slate-500 border-slate-700'
                               }`}>
-                                {item.status === 'PRESENT' ? 'उपस्थित' : item.status === 'LATE' ? 'ढिला आगमन' : item.status === 'HALF_DAY' ? 'आधा दिन' : 'कार्यालयमा'}
+                                {item.status === 'PRESENT' ? 'उपस्थित' : 
+                                 item.status === 'LATE' ? 'ढिला आगमन' : 
+                                 item.status === 'WEEK_OFF' ? 'साप्ताहिक बिदा' : 
+                                 item.status === 'WEEK_OFF_WORK' ? '⭐ बिदामा काम' : 
+                                 item.status === 'IN_OFFICE' ? '🏢 कार्यालयमा' : 
+                                 item.status === 'HALF_DAY' ? 'आधा दिन' : 
+                                 item.status === 'ABSENT' ? 'अनुपस्थित' : 'आगामी'}
                               </span>
                             </div>
 
@@ -3281,44 +3662,46 @@ export default function StaffPortalPage() {
                                 <span className="text-xs font-mono font-bold text-emerald-400 mt-0.5 block">
                                   {item.inTime || '--:--'}
                                 </span>
-                                {item.isLate ? (
+                                {item.status === 'LATE' ? (
                                   <span className="text-[8px] text-amber-400 font-bold block mt-0.5">ढिला</span>
                                 ) : (
-                                  <span className="text-[8px] text-slate-500 block mt-0.5">आगमन</span>
+                                  <span className="text-[8px] text-slate-500 block mt-0.5">
+                                    {item.inTime ? 'आगमन' : item.isWeeklyOff ? 'बिदा' : '--'}
+                                  </span>
                                 )}
                               </div>
 
                               <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800/60">
                                 <span className="text-[9px] text-slate-400 font-medium block uppercase">Check Out</span>
                                 <span className={`text-xs font-mono font-bold mt-0.5 block ${item.outTime ? 'text-blue-400' : 'text-slate-500'}`}>
-                                  {item.outTime || (item.isToday ? 'In Office' : '--:--')}
+                                  {item.outTime || (item.status === 'IN_OFFICE' ? 'In Office' : '--:--')}
                                 </span>
                                 <span className="text-[8px] text-slate-500 block mt-0.5 truncate">
-                                  {item.outTime ? 'प्रस्थान' : item.isToday ? '🏢 In Office' : 'Single'}
+                                  {item.outTime ? 'प्रस्थान' : item.status === 'IN_OFFICE' ? '🏢 In Office' : item.isWeeklyOff ? 'साप्ताहिक बिदा' : '--'}
                                 </span>
                               </div>
 
                               <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800/60">
                                 <span className="text-[9px] text-purple-300 font-medium block uppercase">Total Duty</span>
                                 <span className={`text-xs font-mono font-bold mt-0.5 block ${
-                                  item.totalDutyHours >= 8 ? 'text-emerald-400' : item.totalDutyHours >= 4 ? 'text-amber-300' : 'text-slate-300'
+                                  item.dutyHours >= 8 ? 'text-emerald-400' : item.dutyHours >= 4 ? 'text-amber-300' : item.dutyHours > 0 ? 'text-slate-300' : 'text-slate-500'
                                 }`}>
-                                  {item.totalDutyHours > 0 ? `${item.totalDutyHours} hrs` : (item.isToday ? 'चालु' : '--')}
+                                  {item.dutyHours > 0 ? `${item.dutyHours} hrs` : item.status === 'IN_OFFICE' ? 'चालु' : item.isWeeklyOff ? 'बिदा' : '--'}
                                 </span>
                                 <span className="text-[8px] text-slate-500 block mt-0.5 truncate">
-                                  {item.punchesCount} पञ्च
+                                  {item.punchesCount > 0 ? `${item.punchesCount} पञ्च` : item.isWeeklyOff ? 'Weekly Off' : '--'}
                                 </span>
                               </div>
                             </div>
 
                             {/* Duration Summary Bar */}
-                            {item.totalDutyFormatted && item.totalDutyFormatted !== '--' && (
+                            {item.dutyFormatted && item.dutyFormatted !== '--' && (
                               <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] text-slate-400 px-1">
                                 <span className="flex items-center gap-1 text-slate-400">
                                   <Timer className="w-3.5 h-3.5 text-purple-400" />
                                   <span>ड्युटी अवधि:</span>
                                 </span>
-                                <span className="font-mono text-purple-200 font-semibold">{item.totalDutyFormatted}</span>
+                                <span className="font-mono text-purple-200 font-semibold">{item.dutyFormatted}</span>
                               </div>
                             )}
                           </div>

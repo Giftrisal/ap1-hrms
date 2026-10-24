@@ -47,7 +47,7 @@ export interface BSDate {
 }
 
 // Days in months for 2080 to 2085 BS
-const BS_CALENDAR_DATA: Record<number, number[]> = {
+export const BS_CALENDAR_DATA: Record<number, number[]> = {
   2080: [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30],
   2081: [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 30, 30],
   2082: [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 31],
@@ -57,8 +57,37 @@ const BS_CALENDAR_DATA: Record<number, number[]> = {
 };
 
 // Anchor: 2026-04-14 = 2083-01-01 (Baishakh 1, 2083)
-const ANCHOR_AD_TIME = new Date('2026-04-14T00:00:00Z').getTime();
-const ANCHOR_BS_YEAR = 2083;
+export const ANCHOR_AD_TIME = new Date('2026-04-14T00:00:00Z').getTime();
+export const ANCHOR_BS_YEAR = 2083;
+
+export function getDaysInBsMonth(bsYear: number, bsMonth: number): number {
+  return (BS_CALENDAR_DATA[bsYear] && BS_CALENDAR_DATA[bsYear][bsMonth - 1]) || 30;
+}
+
+export function bsToAd(bsYear: number, bsMonth: number, bsDay: number): Date {
+  let days = 0;
+  if (bsYear >= ANCHOR_BS_YEAR) {
+    for (let y = ANCHOR_BS_YEAR; y < bsYear; y++) {
+      const yDays = (BS_CALENDAR_DATA[y] || []).reduce((a, b) => a + b, 0);
+      days += yDays;
+    }
+    for (let m = 0; m < bsMonth - 1; m++) {
+      days += (BS_CALENDAR_DATA[bsYear] && BS_CALENDAR_DATA[bsYear][m]) || 30;
+    }
+    days += (bsDay - 1);
+  } else {
+    for (let y = bsYear; y < ANCHOR_BS_YEAR; y++) {
+      const yDays = (BS_CALENDAR_DATA[y] || []).reduce((a, b) => a + b, 0);
+      days -= yDays;
+    }
+    for (let m = 0; m < bsMonth - 1; m++) {
+      days += (BS_CALENDAR_DATA[bsYear] && BS_CALENDAR_DATA[bsYear][m]) || 30;
+    }
+    days += (bsDay - 1);
+  }
+  const adTime = ANCHOR_AD_TIME + days * 24 * 60 * 60 * 1000;
+  return new Date(adTime);
+}
 
 export function getNepaliDate(adDateInput: Date | string = new Date()): BSDate {
   const adDate = typeof adDateInput === 'string' ? new Date(adDateInput) : adDateInput;
