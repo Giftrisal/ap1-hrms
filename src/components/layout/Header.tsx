@@ -151,14 +151,10 @@ export default function Header({
 
       {/* Right Actions & Biometric Status (Desktop / Tablet) */}
       <div className="hidden md:flex items-center flex-wrap gap-2.5">
-        {/* Bikram Sambat Dual Date */}
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50/80 rounded-lg border border-blue-200/80 text-xs font-semibold text-blue-900 shadow-2xs">
-          <Calendar className="w-3.5 h-3.5 text-blue-600" />
-          <span>{getNepaliDate().formattedEn}</span>
-          <span className="text-blue-400">|</span>
-          <span className="text-[11px] text-blue-700 font-normal">
-            {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-          </span>
+        {/* Bikram Sambat Nepali Date */}
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50/90 rounded-lg border border-red-200/80 text-xs font-bold text-red-900 shadow-2xs">
+          <Calendar className="w-3.5 h-3.5 text-red-600" />
+          <span>{getNepaliDate().formattedNp}</span>
         </div>
 
         {/* Live Clock */}

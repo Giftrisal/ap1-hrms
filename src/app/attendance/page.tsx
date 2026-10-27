@@ -5,7 +5,15 @@ import DashboardShell from '@/components/layout/DashboardShell';
 import { useLanguage } from '@/lib/i18n/context';
 import { useAuth } from '@/lib/auth/auth-context';
 import { DailyAttendance, Employee, AttendanceStatus } from '@/lib/types';
-import { getNepaliDate } from '@/lib/nepali-date';
+import { 
+  getNepaliDate, 
+  getBsMonthAdDates, 
+  getDaysInBsMonth, 
+  NEPALI_MONTHS_NP, 
+  NEPALI_MONTHS_EN, 
+  toNepaliDigits, 
+  AVAILABLE_BS_YEARS 
+} from '@/lib/nepali-date';
 import { 
   Clock, 
   Calendar, 
@@ -347,12 +355,10 @@ export default function AttendancePage() {
     remarks: 'फिल्ड ड्युटी / म्यानुअल हाजिरी'
   });
 
-  // Monthly Report Modal
+  // Monthly Report Modal (Bikram Sambat)
   const [showMonthlyModal, setShowMonthlyModal] = useState<boolean>(false);
-  const [monthlyYearMonth, setMonthlyYearMonth] = useState<string>(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  });
+  const [selectedMonthlyBsYear, setSelectedMonthlyBsYear] = useState<number>(() => getNepaliDate(new Date()).bsYear);
+  const [selectedMonthlyBsMonth, setSelectedMonthlyBsMonth] = useState<number>(() => getNepaliDate(new Date()).bsMonth);
 
   // Assign Rotational Week-Off Modal
   const [showWeekOffModal, setShowWeekOffModal] = useState<boolean>(false);
@@ -1117,7 +1123,7 @@ export default function AttendancePage() {
     const rows = [
       ['AP1 TELEVISION NETWORK PVT. LTD.'],
       ['DAILY BIOMETRIC ATTENDANCE REPORT'],
-      [`Date (AD): ${selectedDate}`, `Date (BS): ${bsDate?.formattedNp || '-'}`, `Generated At: ${new Date().toLocaleTimeString()}`],
+      [`नेपाली मिति (BS): ${bsDate?.formattedNp || selectedDate}`, `रिपोर्ट तयार गरिएको समय: ${new Date().toLocaleTimeString()}`],
       [`Total Staff: ${kpiTotal}`, `Present: ${kpiPresent}`, `Shift Completed: ${kpiCompleted}`, `Currently In Office: ${kpiInOffice}`, `Absent: ${kpiAbsent}`],
       [], // blank line
       ['S.N.', 'PIN', 'Staff Name', 'Department', 'Designation', 'Status', 'In Time', 'Out Time', 'Worked Hours', 'Remarks']
@@ -1147,7 +1153,7 @@ export default function AttendancePage() {
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Daily Attendance');
-    XLSX.writeFile(workbook, `AP1_Daily_Attendance_${selectedDate}.xlsx`);
+    XLSX.writeFile(workbook, `AP1_Daily_Attendance_${bsDate ? `${bsDate.bsYear}_${bsDate.bsMonth}_${bsDate.bsDay}` : selectedDate}.xlsx`);
   };
 
   // =========================================================================
@@ -1173,7 +1179,7 @@ export default function AttendancePage() {
     doc.setTextColor(30, 41, 59);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text(`Date: ${selectedDate}  |  Bikram Sambat: ${bsDate?.formattedEn || '-'}`, 14, 32);
+    doc.text(`Bikram Sambat: ${bsDate?.formattedEn || selectedDate} (${bsDate?.formattedNp || ''})`, 14, 32);
 
     // Summary Metric Pills
     doc.setFontSize(8.5);
@@ -1241,16 +1247,20 @@ export default function AttendancePage() {
     doc.line(145, signY, 192, signY);
     doc.text('Approved By (Managing Director)', 146, signY + 5);
 
-    doc.save(`AP1_Daily_Attendance_${selectedDate}.pdf`);
+    doc.save(`AP1_Daily_Attendance_${bsDate ? `${bsDate.bsYear}_${bsDate.bsMonth}_${bsDate.bsDay}` : selectedDate}.pdf`);
   };
 
   // =========================================================================
-  // EXPORT 3 & 4: MONTHLY Colored Excel (.xlsx) & PDF (.pdf)
+  // EXPORT 3 & 4: MONTHLY Colored Excel (.xlsx) & PDF (.pdf) - BIKRAM SAMBAT
   // =========================================================================
   const generateMonthlySummary = () => {
-    // Filter records belonging to selected month (YYYY-MM)
-    const monthPrefix = monthlyYearMonth; // e.g. "2026-09"
-    const monthRecords = records.filter(r => r.date.startsWith(monthPrefix));
+    // Filter records belonging to selected Bikram Sambat month
+    const monthAdDates = getBsMonthAdDates(selectedMonthlyBsYear, selectedMonthlyBsMonth);
+    const validDatesSet = new Set(monthAdDates);
+    const monthRecords = records.filter(r => {
+      const rDate = r.date || (r.in_time ? r.in_time.split('T')[0] : '');
+      return validDatesSet.has(rDate);
+    });
 
     // Group by staff
     const map = new Map<string, {
@@ -1320,46 +1330,51 @@ export default function AttendancePage() {
 
   const exportMonthlyExcel = () => {
     const summary = generateMonthlySummary();
+    const monthNameNp = NEPALI_MONTHS_NP[selectedMonthlyBsMonth - 1] || 'बैशाख';
+    const monthNameEn = NEPALI_MONTHS_EN[selectedMonthlyBsMonth - 1] || 'Baishakh';
+    const daysInMonth = getDaysInBsMonth(selectedMonthlyBsYear, selectedMonthlyBsMonth);
+
     const rows = [
       ['AP1 TELEVISION NETWORK PVT. LTD.'],
-      ['MONTHLY ATTENDANCE & PAYROLL SUMMARY REPORT'],
-      [`Month: ${monthlyYearMonth}`, `Generated At: ${new Date().toLocaleString()}`],
+      ['MONTHLY ATTENDANCE & PAYROLL SUMMARY REPORT (विक्रम संवत् क्यालेन्डर)'],
+      [`महिना: ${monthNameNp} ${toNepaliDigits(selectedMonthlyBsYear)} (वि.सं.)`, `कुल दिन: ${toNepaliDigits(daysInMonth)} दिन`, `रिपोर्ट मिति: ${getNepaliDate().formattedNp}`],
       [],
-      ['S.N.', 'PIN', 'Staff Name', 'Department', 'Designation', 'Present Days', 'Week-Off Days', 'Late Days', 'Total Late (Mins)', 'Leave Days', 'Worked Hours', 'Attendance Rate %']
+      ['क्र.सं.', 'PIN', 'कर्मचारीको नाम', 'विभाग', 'पद', 'उपस्थित दिन', 'हप्ता बिदा', 'ढिलो दिन', 'कुल ढिलो (मिनेट)', 'बिदा दिन', 'काम गरेको घण्टा', 'हाजिरी दर %']
     ];
 
     summary.forEach((item, idx) => {
-      const workingDaysEstimate = 26;
       const rate = Math.min(100, Math.round(((item.presentDays + item.weekOffDays) / 30) * 100));
       rows.push([
-        String(idx + 1),
+        toNepaliDigits(idx + 1),
         item.pin,
         item.name,
         item.dept,
         item.desig,
-        String(item.presentDays),
-        String(item.weekOffDays),
-        String(item.lateDays),
-        String(item.totalLateMinutes),
-        String(item.leaveDays),
-        `${Math.round(item.workedHours * 10) / 10} hrs`,
-        `${rate}%`
+        `${toNepaliDigits(item.presentDays)} दिन`,
+        `${toNepaliDigits(item.weekOffDays)} दिन`,
+        `${toNepaliDigits(item.lateDays)} दिन`,
+        `${toNepaliDigits(item.totalLateMinutes)} मि`,
+        `${toNepaliDigits(item.leaveDays)} दिन`,
+        `${toNepaliDigits(Math.round(item.workedHours * 10) / 10)} घ`,
+        `${toNepaliDigits(rate)}%`
       ]);
     });
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws['!cols'] = [
-      { wch: 6 }, { wch: 10 }, { wch: 24 }, { wch: 22 }, { wch: 20 },
-      { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 12 }, { wch: 14 }, { wch: 18 }
+      { wch: 8 }, { wch: 10 }, { wch: 25 }, { wch: 22 }, { wch: 20 },
+      { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 12 }, { wch: 16 }, { wch: 16 }
     ];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Monthly Summary');
-    XLSX.writeFile(wb, `AP1_Monthly_Attendance_${monthlyYearMonth}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, `${monthNameNp} ${selectedMonthlyBsYear}`);
+    XLSX.writeFile(wb, `AP1_Monthly_Attendance_${selectedMonthlyBsYear}_${monthNameEn}.xlsx`);
     setShowMonthlyModal(false);
   };
 
   const exportMonthlyPdf = () => {
     const summary = generateMonthlySummary();
+    const monthNameNp = NEPALI_MONTHS_NP[selectedMonthlyBsMonth - 1] || 'बैशाख';
+    const monthNameEn = NEPALI_MONTHS_EN[selectedMonthlyBsMonth - 1] || 'Baishakh';
     const doc = new jsPDF('landscape', 'mm', 'a4');
 
     // Header Banner
@@ -1372,8 +1387,8 @@ export default function AttendancePage() {
     doc.text('AP1 TELEVISION NETWORK', 14, 11);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text(`EXECUTIVE MONTHLY ATTENDANCE & PAYROLL AUDIT (${monthlyYearMonth})`, 14, 18);
-    doc.text(`Total Staff Evaluated: ${summary.length}`, 220, 18);
+    doc.text(`EXECUTIVE MONTHLY ATTENDANCE REGISTER - ${monthNameEn.toUpperCase()} ${selectedMonthlyBsYear} BS (${monthNameNp})`, 14, 18);
+    doc.text(`Total Staff: ${summary.length} | Generated: ${getNepaliDate().formattedNp}`, 175, 18);
 
     const tableBody = summary.map((s, i) => {
       const rate = Math.min(100, Math.round(((s.presentDays + s.weekOffDays) / 30) * 100));
@@ -1429,7 +1444,7 @@ export default function AttendancePage() {
     doc.line(205, signY, 265, signY);
     doc.text('Approved By (Managing Director)', 215, signY + 5);
 
-    doc.save(`AP1_Monthly_Attendance_${monthlyYearMonth}.pdf`);
+    doc.save(`AP1_Monthly_Attendance_${selectedMonthlyBsYear}_${monthNameEn}.pdf`);
     setShowMonthlyModal(false);
   };
 
@@ -1744,16 +1759,8 @@ export default function AttendancePage() {
                   ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                   : 'bg-amber-50 text-amber-800 border-amber-200'
               }`}>
-                {selectedDate === getLocalDateStr() ? '🟢 आजको हाजिरी' : `📅 ${selectedDate} को हाजिरी`}
+                {selectedDate === getLocalDateStr() ? '🟢 आजको हाजिरी' : '📅 हाजिरी'}: {bsDate ? bsDate.formattedNp : selectedDate}
               </span>
-
-              {/* Bikram Sambat Display Tag */}
-              {bsDate && (
-                <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-700 rounded-lg text-xs font-semibold border border-red-200">
-                  <span>नेपाली मिति:</span>
-                  <span className="font-bold">{bsDate.formattedNp}</span>
-                </div>
-              )}
             </div>
 
             {/* Right: Export Buttons (Daily & Monthly) */}
@@ -2529,16 +2536,44 @@ export default function AttendancePage() {
               </div>
 
               <div className="mt-4 space-y-4 text-xs">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1.5">
-                    महिना छान्नुहोस् (Select Month & Year):
-                  </label>
-                  <input
-                    type="month"
-                    value={monthlyYearMonth}
-                    onChange={(e) => setMonthlyYearMonth(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-bold text-slate-900"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1.5">
+                      साल (BS Year):
+                    </label>
+                    <select
+                      value={selectedMonthlyBsYear}
+                      onChange={(e) => setSelectedMonthlyBsYear(Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-bold text-slate-900 cursor-pointer"
+                    >
+                      {AVAILABLE_BS_YEARS.map(y => (
+                        <option key={y} value={y}>{toNepaliDigits(y)} साल (BS)</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1.5">
+                      महिना (BS Month):
+                    </label>
+                    <select
+                      value={selectedMonthlyBsMonth}
+                      onChange={(e) => setSelectedMonthlyBsMonth(Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-bold text-slate-900 cursor-pointer"
+                    >
+                      {NEPALI_MONTHS_NP.map((m, idx) => (
+                        <option key={idx + 1} value={idx + 1}>{m} ({NEPALI_MONTHS_EN[idx]})</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Selected month preview banner */}
+                <div className="flex items-center justify-between px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg text-purple-900 font-bold">
+                  <span>छानिएको नेपाली महिना:</span>
+                  <span className="px-2.5 py-0.5 bg-purple-600 text-white rounded text-[11px]">
+                    {NEPALI_MONTHS_NP[selectedMonthlyBsMonth - 1]} {toNepaliDigits(selectedMonthlyBsYear)} (वि.सं.)
+                  </span>
                 </div>
 
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-slate-600 text-[11px] space-y-1">

@@ -1,12 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import DashboardShell from '@/components/layout/DashboardShell';
 import { useLanguage } from '@/lib/i18n/context';
 import { useAuth } from '@/lib/auth/auth-context';
 import { initialEmployees } from '@/lib/mock-data';
 import { PayrollRecord, Employee } from '@/lib/types';
 import { generatePayslipPdf } from '@/lib/pdf/payslip-generator';
+import { 
+  getNepaliDate, 
+  NEPALI_MONTHS_NP, 
+  NEPALI_MONTHS_EN, 
+  toNepaliDigits, 
+  AVAILABLE_BS_YEARS 
+} from '@/lib/nepali-date';
 import { 
   CircleDollarSign, 
   Download, 
@@ -32,8 +39,9 @@ import * as XLSX from 'xlsx';
 export default function PayrollPage() {
   const { t, language } = useLanguage();
   const { role } = useAuth();
-  const [selectedMonth, setSelectedMonth] = useState('9'); // September
-  const [selectedYear, setSelectedYear] = useState('2026');
+  const todayBs = useMemo(() => getNepaliDate(new Date()), []);
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => String(todayBs.bsMonth)); // Current BS Month (e.g. 7 = Kartik)
+  const [selectedYear, setSelectedYear] = useState<string>(() => String(todayBs.bsYear)); // Current BS Year (e.g. 2083)
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPayroll, setSelectedPayroll] = useState<PayrollRecord | null>(null);
 
@@ -250,8 +258,8 @@ export default function PayrollPage() {
           recipientPhone: phone,
           payload: {
             employeeName: payroll.employee_name,
-            month: 'September',
-            year: 2026,
+            month: `${NEPALI_MONTHS_NP[Number(selectedMonth) - 1] || 'महिना'} (${NEPALI_MONTHS_EN[Number(selectedMonth) - 1] || ''})`,
+            year: `${selectedYear} BS`,
             netSalary: payroll.net_salary,
             targetHours: payroll.target_monthly_hours,
             actualHours: payroll.actual_worked_hours,
@@ -292,7 +300,8 @@ export default function PayrollPage() {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Payroll Register');
-    XLSX.writeFile(wb, `AP1_Payroll_Register_Sep_2026.xlsx`);
+    const monthNameEn = NEPALI_MONTHS_EN[Number(selectedMonth) - 1] || 'Month';
+    XLSX.writeFile(wb, `AP1_Payroll_Register_${selectedYear}_${monthNameEn}.xlsx`);
   };
 
   return (
@@ -466,15 +475,28 @@ export default function PayrollPage() {
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Bikram Sambat Month & Year Selectors */}
+          <div className="flex items-center gap-1.5 bg-red-50/70 p-1 rounded-xl border border-red-200">
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="py-1.5 px-2.5 text-xs bg-white border border-red-300 rounded-lg font-bold text-red-950 focus:outline-none cursor-pointer"
+            >
+              {AVAILABLE_BS_YEARS.map(y => (
+                <option key={y} value={String(y)}>{toNepaliDigits(y)} साल (BS)</option>
+              ))}
+            </select>
+
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-              className="py-2 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:outline-none"
+              className="py-1.5 px-2.5 text-xs bg-white border border-red-300 rounded-lg font-bold text-red-950 focus:outline-none cursor-pointer"
             >
-              <option value="9">September 2026 (Ashwin 2083)</option>
-              <option value="8">August 2026 (Bhadra 2083)</option>
-              <option value="7">July 2026 (Shrawan 2083)</option>
+              {NEPALI_MONTHS_NP.map((m, idx) => (
+                <option key={idx + 1} value={String(idx + 1)}>
+                  {m} ({NEPALI_MONTHS_EN[idx]})
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -752,7 +774,9 @@ export default function PayrollPage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-white text-base">AP1 Television - Payslip Detail</h3>
-                  <p className="text-xs text-purple-200">September 2026 (Ashwin 2083)</p>
+                  <p className="text-xs text-purple-200">
+                    {NEPALI_MONTHS_NP[Number(selectedMonth) - 1] || ''} {toNepaliDigits(selectedYear)} (वि.सं.)
+                  </p>
                 </div>
               </div>
               <button

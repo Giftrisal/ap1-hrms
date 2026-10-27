@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { PayrollRecord } from '../types';
+import { getNepaliDate, NEPALI_MONTHS_EN, NEPALI_MONTHS_NP } from '../nepali-date';
 
 export function generatePayslipPdf(payroll: PayrollRecord, companyName = 'AP1 Television') {
   const doc = new jsPDF({
@@ -9,11 +10,8 @@ export function generatePayslipPdf(payroll: PayrollRecord, companyName = 'AP1 Te
     format: 'a4'
   });
 
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  const monthStr = monthNames[payroll.month - 1] || `Month ${payroll.month}`;
+  const monthStr = NEPALI_MONTHS_EN[payroll.month - 1] || `Month ${payroll.month}`;
+  const monthStrNp = NEPALI_MONTHS_NP[payroll.month - 1] || `महिना ${payroll.month}`;
 
   // Company Header
   doc.setFillColor(15, 23, 42); // slate-900
@@ -33,12 +31,12 @@ export function generatePayslipPdf(payroll: PayrollRecord, companyName = 'AP1 Te
   doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
-  doc.text(`CONFIDENTIAL SALARY PAYSLIP - ${monthStr.toUpperCase()} ${payroll.year}`, 14, 42);
+  doc.text(`CONFIDENTIAL SALARY PAYSLIP - ${monthStr.toUpperCase()} ${payroll.year} BS`, 14, 42);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(100, 116, 139);
-  doc.text(`Generated on: ${new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}`, 140, 42);
+  doc.text(`BS: ${getNepaliDate().formattedEn}`, 145, 42);
 
   const targetHours = payroll.target_monthly_hours || (payroll.working_days * 8);
   const actualHours = payroll.actual_worked_hours ?? (targetHours - (payroll.shortfall_hours || 0));

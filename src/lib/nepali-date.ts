@@ -153,14 +153,54 @@ export function getNepaliDate(adDateInput: Date | string = new Date()): BSDate {
   };
 }
 
-export function formatDualDate(adDateInput: Date | string = new Date(), lang: 'ne' | 'en' = 'en'): string {
+/**
+ * Returns an array of YYYY-MM-DD AD date strings for every day in the specified BS month.
+ * e.g. For (2083, 7) [Kartik 2083], returns all 30 dates from 2026-10-18 to 2026-11-16.
+ */
+export function getBsMonthAdDates(bsYear: number, bsMonth: number): string[] {
+  const daysInMonth = getDaysInBsMonth(bsYear, bsMonth);
+  const adDates: string[] = [];
+  for (let day = 1; day <= daysInMonth; day++) {
+    const adDate = bsToAd(bsYear, bsMonth, day);
+    const y = adDate.getUTCFullYear();
+    const m = String(adDate.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(adDate.getUTCDate()).padStart(2, '0');
+    adDates.push(`${y}-${m}-${d}`);
+  }
+  return adDates;
+}
+
+/**
+ * Returns the AD date string YYYY-MM-DD for a specific BS date
+ */
+export function bsDateToAdString(bsYear: number, bsMonth: number, bsDay: number): string {
+  const adDate = bsToAd(bsYear, bsMonth, bsDay);
+  const y = adDate.getUTCFullYear();
+  const m = String(adDate.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(adDate.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Format BS Date as Nepali string, e.g. "२०८३ कार्तिक १०, मंगलबार"
+ */
+export function formatNepaliFullDate(adDateInput: Date | string = new Date()): string {
+  const bs = getNepaliDate(adDateInput);
+  return bs.formattedNp;
+}
+
+/**
+ * Format Month & Year in Nepali BS, e.g. "कार्तिक २०८३"
+ */
+export function formatNepaliMonthYear(bsYear: number, bsMonth: number): string {
+  const monthName = NEPALI_MONTHS_NP[bsMonth - 1] || 'बैशाख';
+  return `${monthName} ${toNepaliDigits(bsYear)}`;
+}
+
+export const AVAILABLE_BS_YEARS = [2080, 2081, 2082, 2083, 2084, 2085];
+
+export function formatDualDate(adDateInput: Date | string = new Date(), lang: 'ne' | 'en' = 'ne'): string {
   const ad = typeof adDateInput === 'string' ? new Date(adDateInput) : adDateInput;
   const bs = getNepaliDate(ad);
-  const adFormatted = ad.toLocaleDateString('en-US', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric'
-  });
-
-  return `${bs.formattedEn} (${adFormatted})`;
+  return bs.formattedNp;
 }

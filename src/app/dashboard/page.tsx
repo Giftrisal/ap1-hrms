@@ -246,7 +246,7 @@ export default function DashboardPage() {
       'Staff Name': a.employee_name,
       'Department': a.department_name,
       'Designation': a.designation,
-      'Date': a.date,
+      'Date (BS)': getNepaliDate(a.date).formattedNp,
       'In Time': a.in_time ? new Date(a.in_time).toLocaleTimeString() : 'N/A',
       'Out Time': a.out_time ? new Date(a.out_time).toLocaleTimeString() : 'N/A',
       'Status': a.status,
@@ -255,7 +255,8 @@ export default function DashboardPage() {
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Daily Attendance');
-    XLSX.writeFile(workbook, `Goinfi_Attendance_${new Date().toISOString().split('T')[0]}.xlsx`);
+    const bsToday = getNepaliDate();
+    XLSX.writeFile(workbook, `AP1_Attendance_${bsToday.bsYear}_${bsToday.bsMonth}_${bsToday.bsDay}.xlsx`);
   };
 
   const getStatusBadge = (status: string) => {

@@ -6,6 +6,7 @@ import { useLanguage } from '@/lib/i18n/context';
 import { useAuth } from '@/lib/auth/auth-context';
 import { initialHolidays, initialEmployees } from '@/lib/mock-data';
 import { LeaveRequest, PublicHoliday, Employee } from '@/lib/types';
+import { getNepaliDate } from '@/lib/nepali-date';
 import { 
   CalendarDays, 
   Plus, 
@@ -444,7 +445,9 @@ export default function LeavesPage() {
                   Public Holiday
                 </span>
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs text-slate-500 font-semibold">{holiday.holiday_date}</span>
+                  <span className="font-bold text-xs text-red-700 bg-red-50 px-2.5 py-0.5 rounded-lg border border-red-200">
+                    {holiday.nepali_date || (holiday.holiday_date ? getNepaliDate(holiday.holiday_date).formattedNp : '')}
+                  </span>
                   <button
                     onClick={() => handleDeleteHoliday(holiday.id, holiday.name)}
                     className="text-slate-300 hover:text-red-600 transition-colors cursor-pointer"
@@ -454,13 +457,12 @@ export default function LeavesPage() {
                   </button>
                 </div>
               </div>
-              <h4 className="font-bold text-slate-900 text-base">{holiday.name}</h4>
-              <p className="text-xs font-semibold text-blue-600 mt-0.5">{holiday.name_np}</p>
-              {holiday.nepali_date && (
-                <p className="text-xs text-slate-500 font-mono mt-2 bg-slate-50 p-2 rounded border border-slate-100">
-                  Bikram Sambat: {holiday.nepali_date}
-                </p>
-              )}
+              <h4 className="font-bold text-slate-900 text-base">{holiday.name_np || holiday.name}</h4>
+              <p className="text-xs font-semibold text-slate-600 mt-0.5">{holiday.name}</p>
+              <p className="text-xs text-red-700 font-bold mt-2 bg-red-50/60 p-2 rounded-lg border border-red-100 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-red-500" />
+                <span>नेपाली मिति: {holiday.nepali_date || (holiday.holiday_date ? getNepaliDate(holiday.holiday_date).formattedNp : '')}</span>
+              </p>
             </div>
           ))}
 
