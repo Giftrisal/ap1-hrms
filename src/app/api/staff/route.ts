@@ -32,25 +32,11 @@ let memoryStaffCache: { staff: any[]; registrations: any[]; lastFetched: number 
 
 async function loadStaffDirectory(forceRefresh = false): Promise<{ staff: any[]; registrations: any[] }> {
   const now = Date.now();
-  if (!forceRefresh && memoryStaffCache && now - memoryStaffCache.lastFetched < 1500) {
+  if (!forceRefresh && memoryStaffCache && now - memoryStaffCache.lastFetched < 3000) {
     return { staff: memoryStaffCache.staff, registrations: memoryStaffCache.registrations };
   }
 
-  // 1. Primary: Load from persistent local file cache
-  try {
-    const p = getTmpCachePath();
-    const fallbackP = '/tmp/ap1_staff_cache_v3.json';
-    const filePath = fs.existsSync(p) ? p : (fs.existsSync(fallbackP) ? fallbackP : null);
-    if (filePath) {
-      const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-      if (content && Array.isArray(content.staff)) {
-        memoryStaffCache = { staff: content.staff, registrations: content.registrations || [], lastFetched: now };
-        return { staff: content.staff, registrations: content.registrations || [] };
-      }
-    }
-  } catch {}
-
-  // 2. Fetch from Supabase Master Cloud Database
+  // 1. Primary: Fetch from Supabase Master Cloud Database
   try {
     const { data, error } = await supabase
       .from('articles')
@@ -65,7 +51,7 @@ async function loadStaffDirectory(forceRefresh = false): Promise<{ staff: any[];
       
       memoryStaffCache = { staff, registrations, lastFetched: now };
 
-      // Update local cache
+      // Update local fallback cache
       try {
         fs.writeFileSync(getTmpCachePath(), JSON.stringify({ staff, registrations }, null, 2), 'utf-8');
       } catch {}
@@ -76,11 +62,13 @@ async function loadStaffDirectory(forceRefresh = false): Promise<{ staff: any[];
     console.warn('[Staff API] Supabase read note:', err);
   }
 
-  // 3. Fallback
+  // 2. Fallback: Load from persistent local file cache if Supabase is offline/unreachable
   try {
     const p = getTmpCachePath();
-    if (fs.existsSync(p)) {
-      const content = JSON.parse(fs.readFileSync(p, 'utf-8'));
+    const fallbackP = '/tmp/ap1_staff_cache_v3.json';
+    const filePath = fs.existsSync(p) ? p : (fs.existsSync(fallbackP) ? fallbackP : null);
+    if (filePath) {
+      const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
       if (content && Array.isArray(content.staff)) {
         memoryStaffCache = { staff: content.staff, registrations: content.registrations || [], lastFetched: now };
         return { staff: content.staff, registrations: content.registrations || [] };
