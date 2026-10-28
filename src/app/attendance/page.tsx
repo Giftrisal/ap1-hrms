@@ -42,6 +42,7 @@ import {
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { exportIndividualStaffMonthlyExcel } from '@/lib/individual-staff-excel';
 
 interface HardwareStatus {
   online: boolean;
@@ -359,6 +360,9 @@ export default function AttendancePage() {
   const [showMonthlyModal, setShowMonthlyModal] = useState<boolean>(false);
   const [selectedMonthlyBsYear, setSelectedMonthlyBsYear] = useState<number>(() => getNepaliDate(new Date()).bsYear);
   const [selectedMonthlyBsMonth, setSelectedMonthlyBsMonth] = useState<number>(() => getNepaliDate(new Date()).bsMonth);
+  const [monthlyExportMode, setMonthlyExportMode] = useState<'all' | 'individual'>('all');
+  const [selectedIndividualStaffPin, setSelectedIndividualStaffPin] = useState<string>('');
+  const [rawBiometricLogs, setRawBiometricLogs] = useState<any[]>([]);
 
   // Assign Rotational Week-Off Modal
   const [showWeekOffModal, setShowWeekOffModal] = useState<boolean>(false);
@@ -477,6 +481,7 @@ export default function AttendancePage() {
       });
 
       if (data.recent_logs && Array.isArray(data.recent_logs)) {
+        setRawBiometricLogs(data.recent_logs);
         // Load staff list for lookup
         let currentStaff = staffList;
         if (currentStaff.length === 0 && typeof window !== 'undefined') {
@@ -2056,6 +2061,21 @@ export default function AttendancePage() {
                               जोड्नुहोस्
                             </button>
                           )}
+                          {matchedStaff && (
+                            <button
+                              onClick={() => exportIndividualStaffMonthlyExcel(
+                                matchedStaff,
+                                selectedMonthlyBsYear,
+                                selectedMonthlyBsMonth,
+                                records,
+                                rawBiometricLogs
+                              )}
+                              className="p-1.5 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                              title={`${matchedStaff.full_name} को यस महिनाको दैनिक हाजिरी Excel डाउनलोड गर्नुहोस्`}
+                            >
+                              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                            </button>
+                          )}
                           {(role === 'admin' || role === 'hr') && (
                             <>
                               <button
@@ -2536,6 +2556,56 @@ export default function AttendancePage() {
               </div>
 
               <div className="mt-4 space-y-4 text-xs">
+                {/* Mode Selector: All Staff Summary vs Individual Staff Day-by-Day */}
+                <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setMonthlyExportMode('all')}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      monthlyExportMode === 'all'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    🏢 सबै कर्मचारी सारांश
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMonthlyExportMode('individual');
+                      if (!selectedIndividualStaffPin && staffList.length > 0) {
+                        setSelectedIndividualStaffPin(String(staffList[0].biometric_pin || staffList[0].id));
+                      }
+                    }}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      monthlyExportMode === 'individual'
+                        ? 'bg-white text-purple-700 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    👤 व्यक्तिगत दैनिक विवरण
+                  </button>
+                </div>
+
+                {monthlyExportMode === 'individual' && (
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1.5">
+                      कर्मचारी छनोट गर्नुहोस्:
+                    </label>
+                    <select
+                      value={selectedIndividualStaffPin}
+                      onChange={(e) => setSelectedIndividualStaffPin(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-bold text-slate-900 cursor-pointer text-xs"
+                    >
+                      {staffList.map(s => (
+                        <option key={s.id} value={String(s.biometric_pin || s.id)}>
+                          #{s.biometric_pin || '-'} - {s.full_name} ({s.department_name || 'AP1'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block font-bold text-slate-700 mb-1.5">
@@ -2576,33 +2646,72 @@ export default function AttendancePage() {
                   </span>
                 </div>
 
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-slate-600 text-[11px] space-y-1">
-                  <p className="font-bold text-slate-800">📊 रिपोर्टमा समावेश हुने विवरणहरू:</p>
-                  <p>• कुल उपस्थित दिनहरू (Present Days) र हाजिरी दर (%)</p>
-                  <p>• ढिलो आएका दिनहरू (Late Days) र कुल ढिलो मिनेट</p>
-                  <p>• बिदा तथा अनुपस्थित दिनहरू र कार्य घण्टा (Worked Hours)</p>
-                  <p>• HR Manager तथा Managing Director को हस्ताक्षर ढाँचा</p>
-                </div>
+                {monthlyExportMode === 'all' ? (
+                  <>
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-slate-600 text-[11px] space-y-1">
+                      <p className="font-bold text-slate-800">📊 रिपोर्टमा समावेश हुने विवरणहरू:</p>
+                      <p>• कुल उपस्थित दिनहरू (Present Days) र हाजिरी दर (%)</p>
+                      <p>• ढिलो आएका दिनहरू (Late Days) र कुल ढिलो मिनेट</p>
+                      <p>• बिदा तथा अनुपस्थित दिनहरू र कार्य घण्टा (Worked Hours)</p>
+                      <p>• HR Manager तथा Managing Director को हस्ताक्षर ढाँचा</p>
+                    </div>
 
-                <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={exportMonthlyExcel}
-                    className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer"
-                  >
-                    <FileSpreadsheet className="w-4 h-4" />
-                    <span>मासिक Excel (.xlsx)</span>
-                  </button>
+                    <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={exportMonthlyExcel}
+                        className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer"
+                      >
+                        <FileSpreadsheet className="w-4 h-4" />
+                        <span>मासिक Excel (.xlsx)</span>
+                      </button>
 
-                  <button
-                    type="button"
-                    onClick={exportMonthlyPdf}
-                    className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-bold bg-red-600 hover:bg-red-700 text-white shadow-xs cursor-pointer"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span>मासिक PDF (.pdf)</span>
-                  </button>
-                </div>
+                      <button
+                        type="button"
+                        onClick={exportMonthlyPdf}
+                        className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-bold bg-red-600 hover:bg-red-700 text-white shadow-xs cursor-pointer"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>मासिक PDF (.pdf)</span>
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200 text-emerald-900 text-[11px] space-y-1">
+                      <p className="font-bold text-emerald-950">📋 व्यक्तिगत दैनिक हाजिरी विवरण:</p>
+                      <p>• यस महिनाको १ गतेदेखि मसान्तसम्मको प्रत्येक दिनको बार तथा स्थिति</p>
+                      <p>• आएको समय (In Time) र गएको समय (Out Time)</p>
+                      <p>• दैनिक काम गरेको घण्टा र ढिलो भएको मिनेट</p>
+                      <p>• साप्ताहिक बिदा, सार्वजनिक बिदा तथा स्वीकृत बिदाको विवरण</p>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const target = staffList.find(s => 
+                            String(s.biometric_pin) === String(selectedIndividualStaffPin) || s.id === selectedIndividualStaffPin
+                          ) || staffList[0];
+                          if (target) {
+                            exportIndividualStaffMonthlyExcel(
+                              target,
+                              selectedMonthlyBsYear,
+                              selectedMonthlyBsMonth,
+                              records,
+                              rawBiometricLogs
+                            );
+                            setShowMonthlyModal(false);
+                          }
+                        }}
+                        className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer text-xs"
+                      >
+                        <FileSpreadsheet className="w-4 h-4" />
+                        <span>व्यक्तिगत दैनिक Excel (.xlsx) डाउनलोड</span>
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>

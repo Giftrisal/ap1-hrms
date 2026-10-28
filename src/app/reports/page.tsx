@@ -16,7 +16,9 @@ import {
   Search,
   CheckCircle2,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  X,
+  Eye
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -30,6 +32,10 @@ import {
   toNepaliDigits, 
   AVAILABLE_BS_YEARS 
 } from '@/lib/nepali-date';
+import { 
+  generateStaffMonthlyDailyData, 
+  exportIndividualStaffMonthlyExcel 
+} from '@/lib/individual-staff-excel';
 
 export default function ReportsPage() {
   const { t, language } = useLanguage();
@@ -66,6 +72,10 @@ export default function ReportsPage() {
     return [];
   });
 
+  const [rawPunches, setRawPunches] = useState<any[]>([]);
+  const [showIndividualModal, setShowIndividualModal] = useState<boolean>(false);
+  const [selectedStaffPin, setSelectedStaffPin] = useState<string>('');
+
   useEffect(() => {
     // 1. Fetch Staff
     fetch('/api/staff')
@@ -77,6 +87,9 @@ export default function ReportsPage() {
           if (typeof window !== 'undefined') {
             localStorage.setItem('goinfi_staff_list', JSON.stringify(clean));
           }
+          if (!selectedStaffPin && clean.length > 0) {
+            setSelectedStaffPin(String(clean[0].biometric_pin || clean[0].id));
+          }
         }
       })
       .catch(() => {});
@@ -86,6 +99,7 @@ export default function ReportsPage() {
       .then(r => r.json())
       .then(d => {
         if (d && Array.isArray(d.recent_logs)) {
+          setRawPunches(d.recent_logs);
           // Keep local storage updated
           if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('goinfi_attendance_records');
@@ -96,7 +110,38 @@ export default function ReportsPage() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [selectedStaffPin]);
+
+  // Currently selected staff object for the modal
+  const selectedStaffObj = useMemo(() => {
+    if (!employees || employees.length === 0) return null;
+    return employees.find(e => String(e.biometric_pin) === selectedStaffPin || String(e.id) === selectedStaffPin) || employees[0];
+  }, [employees, selectedStaffPin]);
+
+  // Dynamically computed day-by-day attendance data for the individual staff modal
+  const individualStaffData = useMemo(() => {
+    if (!selectedStaffObj) return null;
+    return generateStaffMonthlyDailyData(
+      selectedStaffObj,
+      selectedBsYear,
+      selectedBsMonth,
+      records,
+      rawPunches
+    );
+  }, [selectedStaffObj, selectedBsYear, selectedBsMonth, records, rawPunches]);
+
+  // Direct 1-click download handler for any employee row
+  const handleExportIndividual = (pinOrId: string) => {
+    const target = employees.find(e => String(e.biometric_pin) === String(pinOrId) || String(e.id) === String(pinOrId));
+    if (!target) return;
+    exportIndividualStaffMonthlyExcel(
+      target,
+      selectedBsYear,
+      selectedBsMonth,
+      records,
+      rawPunches
+    );
+  };
 
   // Compute the AD date strings for every day in the selected Nepali (Bikram Sambat) Month
   const monthAdDates = useMemo(() => {
@@ -363,14 +408,27 @@ export default function ReportsPage() {
         </div>
 
         {/* Right: Export Buttons */}
-        <div className="flex items-center gap-2 justify-end">
+        <div className="flex items-center flex-wrap gap-2 justify-end">
+          <button
+            onClick={() => {
+              if (employees.length > 0 && !selectedStaffPin) {
+                setSelectedStaffPin(String(employees[0].biometric_pin || employees[0].id));
+              }
+              setShowIndividualModal(true);
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 transition-colors cursor-pointer"
+            title="कुनै एक कर्मचारीको व्यक्तिगत महिनाभरिको दैनिक हाजिरी विवरण हेर्नुहोस् तथा Excel डाउनलोड गर्नुहोस्"
+          >
+            <Users className="w-3.5 h-3.5 text-indigo-600" />
+            <span>व्यक्तिगत हाजिरी Excel</span>
+          </button>
           <button
             onClick={exportExcelReport}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors cursor-pointer"
             title="Download Bikram Sambat Excel Register"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Excel डाउनलोड</span>
+            <span>मासिक Excel</span>
           </button>
           <button
             onClick={exportPdfReport}
@@ -441,6 +499,7 @@ export default function ReportsPage() {
                   <th className="py-3 px-4 text-red-800 font-bold">अनुपस्थित (Absent)</th>
                   <th className="py-3 px-4 text-blue-800 font-bold">ओभरटाइम (OT)</th>
                   <th className="py-3 px-4">हाजिरी दर %</th>
+                  <th className="py-3 px-4 text-center">व्यक्तिगत Excel</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -468,6 +527,28 @@ export default function ReportsPage() {
                             style={{ width: `${s.attendancePct}%` }}
                           ></div>
                         </div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => handleExportIndividual(s.pin)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors cursor-pointer"
+                          title={`${s.name} को ${selectedBsMonthName} महिनाको दैनिक हाजिरी Excel डाउनलोड गर्नुहोस्`}
+                        >
+                          <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>दैनिक Excel</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedStaffPin(s.pin);
+                            setShowIndividualModal(true);
+                          }}
+                          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors cursor-pointer"
+                          title="दैनिक विवरण पूर्वावलोकन (Preview)"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -514,6 +595,217 @@ export default function ReportsPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* INDIVIDUAL STAFF MONTHLY DAILY ATTENDANCE MODAL (EXCEL GENERATOR) */}
+      {/* ================================================================= */}
+      {showIndividualModal && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-100 text-emerald-800 rounded-xl">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                    <span>व्यक्तिगत मासिक दैनिक हाजिरी विवरण (Individual Attendance)</span>
+                    <span className="text-[11px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md font-semibold">
+                      Excel (.xlsx)
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    कुनै एक कर्मचारीको छनोट गरिएको महिनाको १ गतेदेखि मसान्तसम्मको सम्पूर्ण दैनिक हाजिरी विवरण
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowIndividualModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Filter Controls */}
+            <div className="p-4 border-b border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white">
+              {/* Staff Selector */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  कर्मचारी छनोट गर्नुहोस्:
+                </label>
+                <select
+                  value={selectedStaffPin}
+                  onChange={(e) => setSelectedStaffPin(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  {employees.map(emp => (
+                    <option key={emp.id} value={String(emp.biometric_pin || emp.id)}>
+                      #{emp.biometric_pin || '-'} - {emp.full_name} ({emp.department_name || 'AP1'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* BS Year */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  साल (वि.सं.):
+                </label>
+                <select
+                  value={selectedBsYear}
+                  onChange={(e) => setSelectedBsYear(Number(e.target.value))}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-900 focus:outline-none cursor-pointer"
+                >
+                  {AVAILABLE_BS_YEARS.map(y => (
+                    <option key={y} value={y}>{toNepaliDigits(y)} साल (BS)</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* BS Month */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  महिना:
+                </label>
+                <select
+                  value={selectedBsMonth}
+                  onChange={(e) => setSelectedBsMonth(Number(e.target.value))}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-900 focus:outline-none cursor-pointer"
+                >
+                  {NEPALI_MONTHS_NP.map((m, idx) => (
+                    <option key={idx + 1} value={idx + 1}>
+                      {m} ({NEPALI_MONTHS_EN[idx]})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Modal Body / Summary Badges & Daily Table */}
+            {individualStaffData ? (
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* Employee Profile & Stat Cards */}
+                <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2.5 text-center">
+                  <div className="bg-white p-2 rounded-lg border border-slate-100">
+                    <span className="block text-[10px] text-slate-500 font-medium">कुल दिन</span>
+                    <span className="font-bold text-xs text-slate-900">{toNepaliDigits(individualStaffData.summary.totalDays)} दिन</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-slate-100">
+                    <span className="block text-[10px] text-emerald-600 font-medium">उपस्थित</span>
+                    <span className="font-bold text-xs text-emerald-700">{toNepaliDigits(individualStaffData.summary.presentDays)} दिन</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-slate-100">
+                    <span className="block text-[10px] text-amber-600 font-medium">ढिलो</span>
+                    <span className="font-bold text-xs text-amber-700">{toNepaliDigits(individualStaffData.summary.lateDays)} दिन</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-slate-100">
+                    <span className="block text-[10px] text-indigo-600 font-medium">हप्ता बिदा</span>
+                    <span className="font-bold text-xs text-indigo-700">{toNepaliDigits(individualStaffData.summary.weekOffDays)} दिन</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-slate-100">
+                    <span className="block text-[10px] text-blue-600 font-medium">बिदा</span>
+                    <span className="font-bold text-xs text-blue-700">{toNepaliDigits(individualStaffData.summary.leaveDays)} दिन</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-slate-100">
+                    <span className="block text-[10px] text-red-600 font-medium">अनुपस्थित</span>
+                    <span className="font-bold text-xs text-red-700">{toNepaliDigits(individualStaffData.summary.absentDays)} दिन</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-slate-100">
+                    <span className="block text-[10px] text-slate-500 font-medium">कुल समय</span>
+                    <span className="font-bold text-xs text-slate-800">{toNepaliDigits(individualStaffData.summary.totalWorkedHours.toFixed(1))} घ</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-slate-100">
+                    <span className="block text-[10px] text-emerald-600 font-medium">हाजिरी दर</span>
+                    <span className="font-bold text-xs text-emerald-700">{toNepaliDigits(individualStaffData.summary.attendanceRate)}%</span>
+                  </div>
+                </div>
+
+                {/* Day-by-Day Table */}
+                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                  <div className="max-h-72 overflow-y-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead className="sticky top-0 bg-slate-100 border-b border-slate-200 text-slate-700 font-semibold text-[11px]">
+                        <tr>
+                          <th className="py-2.5 px-3">क्र.सं.</th>
+                          <th className="py-2.5 px-3">मिति (वि.सं.)</th>
+                          <th className="py-2.5 px-3">बार</th>
+                          <th className="py-2.5 px-3">स्थिति</th>
+                          <th className="py-2.5 px-3">आएको (In)</th>
+                          <th className="py-2.5 px-3">गएको (Out)</th>
+                          <th className="py-2.5 px-3">काम गरेको समय</th>
+                          <th className="py-2.5 px-3">ढिलो</th>
+                          <th className="py-2.5 px-3">कैफियत</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {individualStaffData.days.map(d => (
+                          <tr key={d.sn} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="py-2 px-3 font-mono font-bold text-slate-500">{d.snNp}</td>
+                            <td className="py-2 px-3 font-semibold text-slate-900">{d.bsDateStr}</td>
+                            <td className="py-2 px-3 text-slate-600 font-medium">{d.dayNameNp}</td>
+                            <td className="py-2 px-3">
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                d.statusKey === 'PRESENT' ? 'bg-emerald-100 text-emerald-800' :
+                                d.statusKey === 'LATE' ? 'bg-amber-100 text-amber-800' :
+                                d.statusKey === 'WEEK_OFF' ? 'bg-indigo-100 text-indigo-800' :
+                                d.statusKey === 'WEEK_OFF_WORK' ? 'bg-purple-100 text-purple-800' :
+                                d.statusKey === 'LEAVE' ? 'bg-blue-100 text-blue-800' :
+                                d.statusKey === 'ABSENT' ? 'bg-rose-100 text-rose-800' :
+                                'bg-slate-100 text-slate-600'
+                              }`}>
+                                {d.statusNp}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 font-mono text-slate-700">{d.inTimeStr}</td>
+                            <td className="py-2 px-3 font-mono text-slate-700">{d.outTimeStr}</td>
+                            <td className="py-2 px-3 font-medium text-slate-800">{d.workedHoursStr}</td>
+                            <td className="py-2 px-3 font-medium text-amber-700">{d.lateMinutesStr}</td>
+                            <td className="py-2 px-3 text-slate-500 text-[11px]">{d.remarks}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-8 text-center text-slate-400">कर्मचारी चयन गर्नुहोस्...</div>
+            )}
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setShowIndividualModal(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+              >
+                बन्द गर्नुहोस्
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedStaffObj) {
+                    exportIndividualStaffMonthlyExcel(
+                      selectedStaffObj,
+                      selectedBsYear,
+                      selectedBsMonth,
+                      records,
+                      rawPunches
+                    );
+                  }
+                }}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-colors cursor-pointer text-xs"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span>दैनिक हाजिरी Excel डाउनलोड गर्नुहोस् (.xlsx)</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </DashboardShell>

@@ -59,9 +59,11 @@ import {
   Trash2,
   ThumbsUp,
   Timer,
-  ArrowUpDown
+  ArrowUpDown,
+  FileSpreadsheet
 } from 'lucide-react';
 import { generatePayslipPdf } from '@/lib/pdf/payslip-generator';
+import { exportIndividualStaffMonthlyExcel } from '@/lib/individual-staff-excel';
 
 export default function StaffPortalPage() {
   const [employees, setEmployees] = useState<Employee[]>(() => {
@@ -3274,6 +3276,26 @@ export default function StaffPortalPage() {
                       </select>
                       <ChevronRight className="w-3.5 h-3.5 text-purple-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none rotate-90" />
                     </div>
+
+                    {/* Download My Monthly Excel Button */}
+                    <button
+                      onClick={() => {
+                        if (activeEmployee) {
+                          exportIndividualStaffMonthlyExcel(
+                            activeEmployee,
+                            selectedBsYear,
+                            selectedBsMonth,
+                            [],
+                            myRecentPunches || []
+                          );
+                        }
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold bg-emerald-600/90 hover:bg-emerald-500 text-white border border-emerald-400/40 shadow-sm transition-colors cursor-pointer"
+                      title="यस महिनाको मेरो दैनिक हाजिरी विवरण Excel (.xlsx) मा डाउनलोड गर्नुहोस्"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-200" />
+                      <span className="hidden sm:inline">Excel</span>
+                    </button>
                   </div>
                 </div>
 
