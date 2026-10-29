@@ -199,6 +199,98 @@ export function formatNepaliMonthYear(bsYear: number, bsMonth: number): string {
 
 export const AVAILABLE_BS_YEARS = [2080, 2081, 2082, 2083, 2084, 2085];
 
+export interface BsDateRangeItem {
+  bsYear: number;
+  bsMonth: number;
+  bsDay: number;
+  bsDateStr: string;        // "२०८३/०७/०२"
+  formattedNp: string;      // "२०८३ कार्तिक ०२, सोमबार"
+  adDateStr: string;        // "2026-10-19"
+  dayNameNp: string;        // "सोमबार"
+  dayNameEn: string;        // "Monday"
+  dayOfWeek: number;        // 0-6
+}
+
+/**
+ * Returns an array of date items for every day in the specified BS date range.
+ * e.g. from (2083, 7, 2) to (2083, 7, 5) returns Kartik 2, 3, 4, 5.
+ */
+export function getBsDateRange(
+  fromYear: number,
+  fromMonth: number,
+  fromDay: number,
+  toYear: number,
+  toMonth: number,
+  toDay: number
+): BsDateRangeItem[] {
+  let startAd = bsToAd(fromYear, fromMonth, fromDay);
+  let endAd = bsToAd(toYear, toMonth, toDay);
+
+  if (startAd.getTime() > endAd.getTime()) {
+    const tmp = startAd;
+    startAd = endAd;
+    endAd = tmp;
+  }
+
+  const items: BsDateRangeItem[] = [];
+  const cur = new Date(startAd.getTime());
+
+  // Loop day by day until endAd
+  while (cur.getTime() <= endAd.getTime() + 12 * 60 * 60 * 1000) {
+    const bs = getNepaliDate(cur);
+    const y = cur.getUTCFullYear();
+    const m = String(cur.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(cur.getUTCDate()).padStart(2, '0');
+    const adDateStr = `${y}-${m}-${d}`;
+
+    const bsMonthPadded = String(bs.bsMonth).padStart(2, '0');
+    const bsDayPadded = String(bs.bsDay).padStart(2, '0');
+    const bsDateStr = `${toNepaliDigits(bs.bsYear)}/${toNepaliDigits(bsMonthPadded)}/${toNepaliDigits(bsDayPadded)}`;
+
+    items.push({
+      bsYear: bs.bsYear,
+      bsMonth: bs.bsMonth,
+      bsDay: bs.bsDay,
+      bsDateStr,
+      formattedNp: bs.formattedNp,
+      adDateStr,
+      dayNameNp: bs.dayNameNp,
+      dayNameEn: bs.dayNameNp,
+      dayOfWeek: cur.getUTCDay()
+    });
+
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+
+  return items;
+}
+
+/**
+ * Formats a BS Date Range in pure Nepali wording
+ * e.g. "२०८३ कार्तिक ०२ देखि ०५ गते सम्म" or "२०८३ कार्तिक ०२ देखि २०८३ मंसिर ०५ सम्म"
+ */
+export function formatBsDateRangeLabel(
+  fromYear: number,
+  fromMonth: number,
+  fromDay: number,
+  toYear: number,
+  toMonth: number,
+  toDay: number
+): string {
+  const fromMonthName = NEPALI_MONTHS_NP[fromMonth - 1] || 'बैशाख';
+  const toMonthName = NEPALI_MONTHS_NP[toMonth - 1] || 'बैशाख';
+  
+  if (fromYear === toYear && fromMonth === toMonth) {
+    if (fromDay === toDay) {
+      return `${toNepaliDigits(fromYear)} ${fromMonthName} ${toNepaliDigits(fromDay)} गते`;
+    }
+    return `${toNepaliDigits(fromYear)} ${fromMonthName} ${toNepaliDigits(fromDay)} देखि ${toNepaliDigits(toDay)} गते सम्म`;
+  } else if (fromYear === toYear) {
+    return `${toNepaliDigits(fromYear)} ${fromMonthName} ${toNepaliDigits(fromDay)} देखि ${toMonthName} ${toNepaliDigits(toDay)} सम्म`;
+  }
+  return `${toNepaliDigits(fromYear)} ${fromMonthName} ${toNepaliDigits(fromDay)} देखि ${toNepaliDigits(toYear)} ${toMonthName} ${toNepaliDigits(toDay)} सम्म`;
+}
+
 export function formatDualDate(adDateInput: Date | string = new Date(), lang: 'ne' | 'en' = 'ne'): string {
   const ad = typeof adDateInput === 'string' ? new Date(adDateInput) : adDateInput;
   const bs = getNepaliDate(ad);

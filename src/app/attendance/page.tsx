@@ -12,7 +12,9 @@ import {
   NEPALI_MONTHS_NP, 
   NEPALI_MONTHS_EN, 
   toNepaliDigits, 
-  AVAILABLE_BS_YEARS 
+  AVAILABLE_BS_YEARS,
+  getBsDateRange,
+  formatBsDateRangeLabel
 } from '@/lib/nepali-date';
 import { 
   Clock, 
@@ -43,6 +45,11 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { exportIndividualStaffMonthlyExcel } from '@/lib/individual-staff-excel';
+import { 
+  buildDateRangeReportData, 
+  exportDateRangeExcel, 
+  exportDateRangePdf 
+} from '@/lib/date-range-export';
 
 interface HardwareStatus {
   online: boolean;
@@ -356,13 +363,46 @@ export default function AttendancePage() {
     remarks: 'फिल्ड ड्युटी / म्यानुअल हाजिरी'
   });
 
-  // Monthly Report Modal (Bikram Sambat)
+  // Monthly & Date Range Report Modal State
   const [showMonthlyModal, setShowMonthlyModal] = useState<boolean>(false);
+  const [modalPeriodType, setModalPeriodType] = useState<'month' | 'range'>('month');
   const [selectedMonthlyBsYear, setSelectedMonthlyBsYear] = useState<number>(() => getNepaliDate(new Date()).bsYear);
   const [selectedMonthlyBsMonth, setSelectedMonthlyBsMonth] = useState<number>(() => getNepaliDate(new Date()).bsMonth);
-  const [monthlyExportMode, setMonthlyExportMode] = useState<'all' | 'individual'>('all');
+  const [modalRangeFromYear, setModalRangeFromYear] = useState<number>(() => getNepaliDate(new Date()).bsYear);
+  const [modalRangeFromMonth, setModalRangeFromMonth] = useState<number>(() => getNepaliDate(new Date()).bsMonth);
+  const [modalRangeFromDay, setModalRangeFromDay] = useState<number>(1);
+  const [modalRangeToYear, setModalRangeToYear] = useState<number>(() => getNepaliDate(new Date()).bsYear);
+  const [modalRangeToMonth, setModalRangeToMonth] = useState<number>(() => getNepaliDate(new Date()).bsMonth);
+  const [modalRangeToDay, setModalRangeToDay] = useState<number>(() => Math.min(getNepaliDate(new Date()).bsDay || 30, 30));
+  const [modalScope, setModalScope] = useState<'all' | 'dept' | 'individual'>('all');
+  const [modalSelectedDept, setModalSelectedDept] = useState<string>('ALL');
   const [selectedIndividualStaffPin, setSelectedIndividualStaffPin] = useState<string>('');
   const [rawBiometricLogs, setRawBiometricLogs] = useState<any[]>([]);
+
+  const modalDaysInFromMonth = useMemo(() => getDaysInBsMonth(modalRangeFromYear, modalRangeFromMonth), [modalRangeFromYear, modalRangeFromMonth]);
+  const modalDaysInToMonth = useMemo(() => getDaysInBsMonth(modalRangeToYear, modalRangeToMonth), [modalRangeToYear, modalRangeToMonth]);
+
+  const modalRangeCount = useMemo(() => {
+    return getBsDateRange(
+      modalRangeFromYear,
+      modalRangeFromMonth,
+      modalRangeFromDay,
+      modalRangeToYear,
+      modalRangeToMonth,
+      modalRangeToDay
+    ).length;
+  }, [modalRangeFromYear, modalRangeFromMonth, modalRangeFromDay, modalRangeToYear, modalRangeToMonth, modalRangeToDay]);
+
+  const modalRangeLabel = useMemo(() => {
+    return formatBsDateRangeLabel(
+      modalRangeFromYear,
+      modalRangeFromMonth,
+      modalRangeFromDay,
+      modalRangeToYear,
+      modalRangeToMonth,
+      modalRangeToDay
+    );
+  }, [modalRangeFromYear, modalRangeFromMonth, modalRangeFromDay, modalRangeToYear, modalRangeToMonth, modalRangeToDay]);
 
   // Assign Rotational Week-Off Modal
   const [showWeekOffModal, setShowWeekOffModal] = useState<boolean>(false);
@@ -1453,6 +1493,65 @@ export default function AttendancePage() {
     setShowMonthlyModal(false);
   };
 
+  // Date Range Report Modal Generator (Excel & PDF for arbitrary BS date range)
+  const exportDateRangeReportModal = (format: 'excel' | 'pdf') => {
+    let dateRange: any[] = [];
+    let rangeLabel = '';
+
+    if (modalPeriodType === 'range') {
+      dateRange = getBsDateRange(
+        modalRangeFromYear,
+        modalRangeFromMonth,
+        modalRangeFromDay,
+        modalRangeToYear,
+        modalRangeToMonth,
+        modalRangeToDay
+      );
+      rangeLabel = formatBsDateRangeLabel(
+        modalRangeFromYear,
+        modalRangeFromMonth,
+        modalRangeFromDay,
+        modalRangeToYear,
+        modalRangeToMonth,
+        modalRangeToDay
+      );
+    } else {
+      // Full Month
+      const daysCount = getDaysInBsMonth(selectedMonthlyBsYear, selectedMonthlyBsMonth);
+      dateRange = getBsDateRange(
+        selectedMonthlyBsYear,
+        selectedMonthlyBsMonth,
+        1,
+        selectedMonthlyBsYear,
+        selectedMonthlyBsMonth,
+        daysCount
+      );
+      const mName = NEPALI_MONTHS_NP[selectedMonthlyBsMonth - 1] || 'बैशाख';
+      rangeLabel = `${mName} ${toNepaliDigits(selectedMonthlyBsYear)} वि.सं. (पूरा महिना)`;
+    }
+
+    const deptFilter = modalScope === 'dept' ? modalSelectedDept : 'ALL';
+    const staffFilter = modalScope === 'individual' ? selectedIndividualStaffPin : 'ALL';
+
+    const data = buildDateRangeReportData({
+      dateRange,
+      rangeLabel,
+      employees: staffList,
+      records,
+      rawPunches: rawBiometricLogs,
+      departmentFilter: deptFilter,
+      staffPinFilter: staffFilter
+    });
+
+    if (format === 'excel') {
+      exportDateRangeExcel(data);
+    } else {
+      exportDateRangePdf(data);
+    }
+
+    setShowMonthlyModal(false);
+  };
+
   return (
     <DashboardShell
       title={t.navAttendance}
@@ -1789,9 +1888,25 @@ export default function AttendancePage() {
                 <span>दैनिक PDF</span>
               </button>
 
+              {/* Date Range Export Trigger */}
+              <button
+                onClick={() => {
+                  setModalPeriodType('range');
+                  setShowMonthlyModal(true);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors cursor-pointer"
+                title="कुनै निश्चित मिति दायरा (जस्तै कार्तिक २ देखि ५ सम्म) को हाजिरी निकाल्नुहोस्"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>मिति दायरा (Date Range)</span>
+              </button>
+
               {/* Monthly Export Trigger */}
               <button
-                onClick={() => setShowMonthlyModal(true)}
+                onClick={() => {
+                  setModalPeriodType('month');
+                  setShowMonthlyModal(true);
+                }}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white shadow-xs transition-colors cursor-pointer"
                 title="Open Monthly Report Generator"
               >
@@ -2531,187 +2646,339 @@ export default function AttendancePage() {
         )}
 
         {/* ================================================================= */}
-        {/* 8. MODAL: MONTHLY REPORT EXPORT (EXCEL & PDF)                     */}
+        {/* 8. MODAL: ATTENDANCE REPORT EXPORT (MONTH & DATE RANGE)            */}
         {/* ================================================================= */}
         {showMonthlyModal && (
-          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 my-8">
+              {/* Header */}
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-purple-100 text-purple-700 rounded-lg">
-                    <Calendar className="w-4 h-4" />
+                <div className="flex items-center gap-2.5">
+                  <div className={`p-2 rounded-xl ${modalPeriodType === 'range' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                    <Calendar className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900 text-sm">
-                      मासिक हाजिरी रिपोर्ट जेनेरेटर (Monthly Report)
+                    <h3 className="font-bold text-slate-900 text-base">
+                      {modalPeriodType === 'range' ? 'अनुकूल मिति दायरा हाजिरी रिपोर्ट' : 'मासिक हाजिरी रिपोर्ट जेनेरेटर'}
                     </h3>
                     <p className="text-[11px] text-slate-500">
-                      सम्पूर्ण महिनाको रङ्गीन Excel र औपचारिक PDF डाउनलोड गर्नुहोस्
+                      विक्रम संवत् (BS) नेपाली क्यालेन्डर अनुसार Excel र PDF रिपोर्ट निकाल्नुहोस्
                     </p>
                   </div>
                 </div>
-                <button onClick={() => setShowMonthlyModal(false)} className="text-slate-400 hover:text-slate-600">
+                <button 
+                  onClick={() => setShowMonthlyModal(false)} 
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <div className="mt-4 space-y-4 text-xs">
-                {/* Mode Selector: All Staff Summary vs Individual Staff Day-by-Day */}
-                <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => setMonthlyExportMode('all')}
-                    className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      monthlyExportMode === 'all'
-                        ? 'bg-white text-slate-900 shadow-xs'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    🏢 सबै कर्मचारी सारांश
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMonthlyExportMode('individual');
-                      if (!selectedIndividualStaffPin && staffList.length > 0) {
-                        setSelectedIndividualStaffPin(String(staffList[0].biometric_pin || staffList[0].id));
-                      }
-                    }}
-                    className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      monthlyExportMode === 'individual'
-                        ? 'bg-white text-purple-700 shadow-xs'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    👤 व्यक्तिगत दैनिक विवरण
-                  </button>
+                {/* 1. Period Switcher: Date Range vs Full Month */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+                    रिपोर्ट अवधि छनोट (Report Period):
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setModalPeriodType('range')}
+                      className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        modalPeriodType === 'range'
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>📆 मिति दायरा (Date Range)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModalPeriodType('month')}
+                      className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        modalPeriodType === 'month'
+                          ? 'bg-purple-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>📅 पूरा महिना (Full Month)</span>
+                    </button>
+                  </div>
                 </div>
 
-                {monthlyExportMode === 'individual' && (
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1.5">
-                      कर्मचारी छनोट गर्नुहोस्:
+                {/* 2. Scope Switcher: All Staff vs Department-wise vs Individual */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+                    कर्मचारी छनोट दायरा (Target Scope):
+                  </label>
+                  <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setModalScope('all')}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        modalScope === 'all'
+                          ? 'bg-white text-slate-900 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      🏢 सबै कर्मचारी
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModalScope('dept')}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        modalScope === 'dept'
+                          ? 'bg-white text-blue-700 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      🏛️ विभाग अनुसार
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModalScope('individual');
+                        if (!selectedIndividualStaffPin && staffList.length > 0) {
+                          setSelectedIndividualStaffPin(String(staffList[0].biometric_pin || staffList[0].id));
+                        }
+                      }}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        modalScope === 'individual'
+                          ? 'bg-white text-purple-700 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      👤 व्यक्तिगत
+                    </button>
+                  </div>
+                </div>
+
+                {/* Department Dropdown (when dept scope) */}
+                {modalScope === 'dept' && (
+                  <div className="p-2.5 bg-blue-50/70 border border-blue-200 rounded-xl">
+                    <label className="block font-bold text-blue-900 text-xs mb-1">
+                      विभाग छनोट गर्नुहोस् (Select Department):
+                    </label>
+                    <select
+                      value={modalSelectedDept}
+                      onChange={(e) => setModalSelectedDept(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-blue-200 rounded-lg focus:outline-none font-bold text-slate-900 cursor-pointer text-xs"
+                    >
+                      <option value="ALL">सबै विभागहरू (All Departments)</option>
+                      {uniqueDepartments.map(dept => (
+                        <option key={dept} value={dept}>{dept}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Individual Staff Dropdown (when individual scope) */}
+                {modalScope === 'individual' && (
+                  <div className="p-2.5 bg-purple-50/70 border border-purple-200 rounded-xl">
+                    <label className="block font-bold text-purple-900 text-xs mb-1">
+                      कर्मचारी छनोट गर्नुहोस् (Select Employee):
                     </label>
                     <select
                       value={selectedIndividualStaffPin}
                       onChange={(e) => setSelectedIndividualStaffPin(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-bold text-slate-900 cursor-pointer text-xs"
+                      className="w-full px-3 py-2 bg-white border border-purple-200 rounded-lg focus:outline-none font-bold text-slate-900 cursor-pointer text-xs"
                     >
-                      {staffList.map(s => (
-                        <option key={s.id} value={String(s.biometric_pin || s.id)}>
-                          #{s.biometric_pin || '-'} - {s.full_name} ({s.department_name || 'AP1'})
-                        </option>
-                      ))}
+                      {staffList
+                        .filter(s => String(s.biometric_pin) !== '999' && !s.is_master_admin)
+                        .map(s => (
+                          <option key={s.id} value={String(s.biometric_pin || s.id)}>
+                            PIN #{s.biometric_pin || '-'} - {s.full_name} ({s.department_name || 'AP1 Television'})
+                          </option>
+                        ))}
                     </select>
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1.5">
-                      साल (BS Year):
-                    </label>
-                    <select
-                      value={selectedMonthlyBsYear}
-                      onChange={(e) => setSelectedMonthlyBsYear(Number(e.target.value))}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-bold text-slate-900 cursor-pointer"
-                    >
-                      {AVAILABLE_BS_YEARS.map(y => (
-                        <option key={y} value={y}>{toNepaliDigits(y)} साल (BS)</option>
-                      ))}
-                    </select>
-                  </div>
+                {/* 3. Date Selectors */}
+                {modalPeriodType === 'month' ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">
+                          साल (BS Year):
+                        </label>
+                        <select
+                          value={selectedMonthlyBsYear}
+                          onChange={(e) => setSelectedMonthlyBsYear(Number(e.target.value))}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-bold text-slate-900 cursor-pointer text-xs"
+                        >
+                          {AVAILABLE_BS_YEARS.map(y => (
+                            <option key={y} value={y}>{toNepaliDigits(y)} साल (BS)</option>
+                          ))}
+                        </select>
+                      </div>
 
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1.5">
-                      महिना (BS Month):
-                    </label>
-                    <select
-                      value={selectedMonthlyBsMonth}
-                      onChange={(e) => setSelectedMonthlyBsMonth(Number(e.target.value))}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-bold text-slate-900 cursor-pointer"
-                    >
-                      {NEPALI_MONTHS_NP.map((m, idx) => (
-                        <option key={idx + 1} value={idx + 1}>{m} ({NEPALI_MONTHS_EN[idx]})</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Selected month preview banner */}
-                <div className="flex items-center justify-between px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg text-purple-900 font-bold">
-                  <span>छानिएको नेपाली महिना:</span>
-                  <span className="px-2.5 py-0.5 bg-purple-600 text-white rounded text-[11px]">
-                    {NEPALI_MONTHS_NP[selectedMonthlyBsMonth - 1]} {toNepaliDigits(selectedMonthlyBsYear)} (वि.सं.)
-                  </span>
-                </div>
-
-                {monthlyExportMode === 'all' ? (
-                  <>
-                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-slate-600 text-[11px] space-y-1">
-                      <p className="font-bold text-slate-800">📊 रिपोर्टमा समावेश हुने विवरणहरू:</p>
-                      <p>• कुल उपस्थित दिनहरू (Present Days) र हाजिरी दर (%)</p>
-                      <p>• ढिलो आएका दिनहरू (Late Days) र कुल ढिलो मिनेट</p>
-                      <p>• बिदा तथा अनुपस्थित दिनहरू र कार्य घण्टा (Worked Hours)</p>
-                      <p>• HR Manager तथा Managing Director को हस्ताक्षर ढाँचा</p>
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">
+                          महिना (BS Month):
+                        </label>
+                        <select
+                          value={selectedMonthlyBsMonth}
+                          onChange={(e) => setSelectedMonthlyBsMonth(Number(e.target.value))}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-bold text-slate-900 cursor-pointer text-xs"
+                        >
+                          {NEPALI_MONTHS_NP.map((m, idx) => (
+                            <option key={idx + 1} value={idx + 1}>{m} ({NEPALI_MONTHS_EN[idx]})</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
 
-                    <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={exportMonthlyExcel}
-                        className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer"
-                      >
-                        <FileSpreadsheet className="w-4 h-4" />
-                        <span>मासिक Excel (.xlsx)</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={exportMonthlyPdf}
-                        className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-bold bg-red-600 hover:bg-red-700 text-white shadow-xs cursor-pointer"
-                      >
-                        <Download className="w-4 h-4" />
-                        <span>मासिक PDF (.pdf)</span>
-                      </button>
+                    <div className="flex items-center justify-between px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg text-purple-900 font-bold text-xs">
+                      <span>छानिएको नेपाली महिना:</span>
+                      <span className="px-2.5 py-0.5 bg-purple-600 text-white rounded text-[11px]">
+                        {NEPALI_MONTHS_NP[selectedMonthlyBsMonth - 1]} {toNepaliDigits(selectedMonthlyBsYear)} (वि.सं.)
+                      </span>
                     </div>
-                  </>
+                  </div>
                 ) : (
-                  <>
-                    <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200 text-emerald-900 text-[11px] space-y-1">
-                      <p className="font-bold text-emerald-950">📋 व्यक्तिगत दैनिक हाजिरी विवरण:</p>
-                      <p>• यस महिनाको १ गतेदेखि मसान्तसम्मको प्रत्येक दिनको बार तथा स्थिति</p>
-                      <p>• आएको समय (In Time) र गएको समय (Out Time)</p>
-                      <p>• दैनिक काम गरेको घण्टा र ढिलो भएको मिनेट</p>
-                      <p>• साप्ताहिक बिदा, सार्वजनिक बिदा तथा स्वीकृत बिदाको विवरण</p>
+                  <div className="space-y-3">
+                    {/* From Date */}
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                      <span className="block font-bold text-blue-700 text-[11px] mb-1.5">
+                        ▶ सुरु मिति (From BS Date):
+                      </span>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">साल (Year)</label>
+                          <select
+                            value={modalRangeFromYear}
+                            onChange={(e) => setModalRangeFromYear(Number(e.target.value))}
+                            className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded font-bold text-slate-900 text-xs"
+                          >
+                            {AVAILABLE_BS_YEARS.map(y => (
+                              <option key={y} value={y}>{toNepaliDigits(y)}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">महिना (Month)</label>
+                          <select
+                            value={modalRangeFromMonth}
+                            onChange={(e) => setModalRangeFromMonth(Number(e.target.value))}
+                            className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded font-bold text-slate-900 text-xs"
+                          >
+                            {NEPALI_MONTHS_NP.map((m, idx) => (
+                              <option key={idx + 1} value={idx + 1}>{m}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">गते (Day)</label>
+                          <select
+                            value={modalRangeFromDay}
+                            onChange={(e) => setModalRangeFromDay(Number(e.target.value))}
+                            className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded font-bold text-slate-900 text-xs"
+                          >
+                            {Array.from({ length: modalDaysInFromMonth }, (_, i) => i + 1).map(d => (
+                              <option key={d} value={d}>{toNepaliDigits(d)} गते</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="pt-3 border-t border-slate-100 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const target = staffList.find(s => 
-                            String(s.biometric_pin) === String(selectedIndividualStaffPin) || s.id === selectedIndividualStaffPin
-                          ) || staffList[0];
-                          if (target) {
-                            exportIndividualStaffMonthlyExcel(
-                              target,
-                              selectedMonthlyBsYear,
-                              selectedMonthlyBsMonth,
-                              records,
-                              rawBiometricLogs
-                            );
-                            setShowMonthlyModal(false);
-                          }
-                        }}
-                        className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer text-xs"
-                      >
-                        <FileSpreadsheet className="w-4 h-4" />
-                        <span>व्यक्तिगत दैनिक Excel (.xlsx) डाउनलोड</span>
-                      </button>
+                    {/* To Date */}
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                      <span className="block font-bold text-blue-700 text-[11px] mb-1.5">
+                        ⏹ अन्तिम मिति (To BS Date):
+                      </span>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">साल (Year)</label>
+                          <select
+                            value={modalRangeToYear}
+                            onChange={(e) => setModalRangeToYear(Number(e.target.value))}
+                            className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded font-bold text-slate-900 text-xs"
+                          >
+                            {AVAILABLE_BS_YEARS.map(y => (
+                              <option key={y} value={y}>{toNepaliDigits(y)}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">महिना (Month)</label>
+                          <select
+                            value={modalRangeToMonth}
+                            onChange={(e) => setModalRangeToMonth(Number(e.target.value))}
+                            className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded font-bold text-slate-900 text-xs"
+                          >
+                            {NEPALI_MONTHS_NP.map((m, idx) => (
+                              <option key={idx + 1} value={idx + 1}>{m}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">गते (Day)</label>
+                          <select
+                            value={modalRangeToDay}
+                            onChange={(e) => setModalRangeToDay(Number(e.target.value))}
+                            className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded font-bold text-slate-900 text-xs"
+                          >
+                            {Array.from({ length: modalDaysInToMonth }, (_, i) => i + 1).map(d => (
+                              <option key={d} value={d}>{toNepaliDigits(d)} गते</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
                     </div>
-                  </>
+
+                    {/* Range preview badge */}
+                    <div className="flex items-center justify-between px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-950 font-bold text-xs">
+                      <span className="truncate">{modalRangeLabel}</span>
+                      <span className="px-2 py-0.5 bg-blue-600 text-white rounded text-[11px] whitespace-nowrap ml-2">
+                        कुल {toNepaliDigits(modalRangeCount)} दिन
+                      </span>
+                    </div>
+                  </div>
                 )}
+
+                {/* Scope Description Box */}
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-slate-600 text-[11px] space-y-1">
+                  <p className="font-bold text-slate-800">📊 रिपोर्ट ढाँचा विवरण:</p>
+                  {modalScope === 'individual' ? (
+                    <>
+                      <p>• छानिएको कर्मचारीको प्रत्येक दिनको इन/आउट समय र कार्य घण्टा</p>
+                      <p>• ढिलो आएको मिनेट, साप्ताहिक बिदा, र आधिकारिक हाजिरी स्थिति</p>
+                      <p>• Excel मा व्यक्तिगत विस्तृत लग तथा PDF मा आधिकारिक कार्य तालिका</p>
+                    </>
+                  ) : (
+                    <>
+                      <p>• {modalScope === 'dept' ? `छानिएको विभाग (${modalSelectedDept})` : 'सम्पूर्ण कम्पनीका सबै कर्मचारी'} को हाजिरी सारांश</p>
+                      <p>• उपस्थित, हप्ता बिदा, ढिलो, बिदा, र काम गरेको घण्टा विश्लेषण</p>
+                      <p>• Excel मा कर्मचारी सारांश + दैनिक विस्तृत लग (२ वटा Sheet)</p>
+                      <p>• PDF मा व्यवस्थापकीय हस्ताक्षर ढाँचा सहितको औपचारिक रिपोर्ट</p>
+                    </>
+                  )}
+                </div>
+
+                {/* Download Actions */}
+                <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => exportDateRangeReportModal('excel')}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer text-xs transition-colors"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    <span>Excel (.xlsx) डाउनलोड</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => exportDateRangeReportModal('pdf')}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-bold bg-red-600 hover:bg-red-700 text-white shadow-xs cursor-pointer text-xs transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>PDF (.pdf) डाउनलोड</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
