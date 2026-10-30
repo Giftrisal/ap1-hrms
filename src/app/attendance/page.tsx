@@ -50,6 +50,7 @@ import {
   exportDateRangeExcel, 
   exportDateRangePdf 
 } from '@/lib/date-range-export';
+import NepaliDatePicker from '@/components/common/NepaliDatePicker';
 
 interface HardwareStatus {
   online: boolean;
@@ -1844,18 +1845,12 @@ export default function AttendancePage() {
                 </button>
               </div>
 
-              {/* Date Input for Backdates */}
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-700">
-                <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                <span className="text-[11px] text-slate-400 font-semibold">मिति:</span>
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer text-xs"
-                  title="पुरानो मिति (Backdate) हेर्न यहाँ मिति छान्नुहोस्"
-                />
-              </div>
+              {/* Bikram Sambat (BS) Nepali Calendar Picker */}
+              <NepaliDatePicker
+                value={selectedDate}
+                onChange={(d) => setSelectedDate(d)}
+                showDayOfWeek={true}
+              />
 
               {/* Active Date Tag */}
               <span className={`text-xs px-2.5 py-1 rounded-lg font-bold border ${
@@ -2567,13 +2562,11 @@ export default function AttendancePage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">मिति</label>
-                    <input
-                      type="date"
+                    <label className="block font-semibold text-slate-700 mb-1">नेपाली मिति (Date)</label>
+                    <NepaliDatePicker
                       value={manualForm.date}
-                      onChange={(e) => setManualForm({ ...manualForm, date: e.target.value })}
-                      required
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none"
+                      onChange={(d) => setManualForm({ ...manualForm, date: d })}
+                      className="w-full"
                     />
                   </div>
                   <div>

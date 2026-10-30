@@ -12,6 +12,7 @@ import {
   getDaysInBsMonth, 
   bsToAd 
 } from '@/lib/nepali-date';
+import NepaliDatePicker from '@/components/common/NepaliDatePicker';
 import { 
   User, 
   Clock, 
@@ -4378,23 +4379,19 @@ export default function StaffPortalPage() {
 
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Start Date</label>
-                    <input
-                      type="date"
-                      required
+                    <label className="block text-slate-300 font-semibold mb-1">नेपाली मिति (सुरु / Start)</label>
+                    <NepaliDatePicker
                       value={leaveStartDate}
-                      onChange={e => setLeaveStartDate(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-medium"
+                      onChange={d => setLeaveStartDate(d)}
+                      className="w-full text-slate-900"
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1">End Date</label>
-                    <input
-                      type="date"
-                      required
+                    <label className="block text-slate-300 font-semibold mb-1">नेपाली मिति (अन्तिम / End)</label>
+                    <NepaliDatePicker
                       value={leaveEndDate}
-                      onChange={e => setLeaveEndDate(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-medium"
+                      onChange={d => setLeaveEndDate(d)}
+                      className="w-full text-slate-900"
                     />
                   </div>
                 </div>
@@ -4469,13 +4466,11 @@ export default function StaffPortalPage() {
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Date *</label>
-                  <input
-                    type="date"
-                    required
+                  <label className="block text-slate-300 font-semibold mb-1">नेपाली मिति (Date) *</label>
+                  <NepaliDatePicker
                     value={fdDate}
-                    onChange={e => setFdDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-medium"
+                    onChange={d => setFdDate(d)}
+                    className="w-full text-slate-900"
                   />
                 </div>
 

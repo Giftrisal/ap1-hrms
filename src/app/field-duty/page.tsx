@@ -7,6 +7,7 @@ import { FieldDutyRequest, FieldDutyType, Employee } from '@/lib/types';
 import { useLanguage } from '@/lib/i18n/context';
 import { useAuth } from '@/lib/auth/auth-context';
 import { getNepaliDate } from '@/lib/nepali-date';
+import NepaliDatePicker from '@/components/common/NepaliDatePicker';
 import { 
   MapPin, 
   Home, 
@@ -515,23 +516,19 @@ export default function FieldDutyPage() {
                 {/* Dates */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Start Date</label>
-                    <input
-                      type="date"
-                      required
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">सुरु मिति (Start Date - BS)</label>
+                    <NepaliDatePicker
                       value={formData.start_date}
-                      onChange={e => setFormData({ ...formData, start_date: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                      onChange={(d) => setFormData({ ...formData, start_date: d })}
+                      className="w-full"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">End Date</label>
-                    <input
-                      type="date"
-                      required
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">अन्तिम मिति (End Date - BS)</label>
+                    <NepaliDatePicker
                       value={formData.end_date}
-                      onChange={e => setFormData({ ...formData, end_date: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                      onChange={(d) => setFormData({ ...formData, end_date: d })}
+                      className="w-full"
                     />
                   </div>
                 </div>

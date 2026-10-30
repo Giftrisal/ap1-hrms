@@ -5,6 +5,7 @@ import DashboardShell from '@/components/layout/DashboardShell';
 import { useLanguage } from '@/lib/i18n/context';
 import { initialShifts, initialEmployees, initialOvertimePermissions } from '@/lib/mock-data';
 import { Shift, Employee, OvertimePermission } from '@/lib/types';
+import NepaliDatePicker from '@/components/common/NepaliDatePicker';
 import { 
   CalendarClock, 
   Plus, 
@@ -611,14 +612,12 @@ export default function ShiftsPage() {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Overtime Date *
+                    नेपाली मिति (Overtime Date) *
                   </label>
-                  <input
-                    type="date"
-                    required
+                  <NepaliDatePicker
                     value={otDate}
-                    onChange={e => setOtDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    onChange={(d) => setOtDate(d)}
+                    className="w-full"
                   />
                 </div>
               </div>
