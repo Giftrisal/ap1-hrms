@@ -186,7 +186,7 @@ export function generateStaffMonthlyDailyData(
 
     const bsMonthPadded = String(bsMonth).padStart(2, '0');
     const bsDayPadded = String(day).padStart(2, '0');
-    const bsDateStr = `${toNepaliDigits(bsYear)}/${toNepaliDigits(bsMonthPadded)}/${toNepaliDigits(bsDayPadded)}`;
+    const bsDateStr = `${bsYear}/${bsMonthPadded}/${bsDayPadded}`;
 
     const isAssignedWeeklyOff = weeklyOffDay.toLowerCase() === dayNameEn.toLowerCase();
     const isToday = adDateStr === todayAdStr;
@@ -205,7 +205,7 @@ export function generateStaffMonthlyDailyData(
     let lateMinutes = 0;
     let remarks = '';
     let statusKey: StaffDailyAttendanceRow['statusKey'] = 'ABSENT';
-    let statusNp = 'अनुपस्थित';
+    let statusNp = 'Absent';
 
     // 1. Resolve In / Out from punches or records
     if (dayPunches.length > 0) {
@@ -213,7 +213,7 @@ export function generateStaffMonthlyDailyData(
       if (dayPunches.length > 1) {
         outTimeRaw = dayPunches[dayPunches.length - 1].punch_time;
       }
-      remarks = `बायोमेट्रिक पञ्च (${toNepaliDigits(dayPunches.length)} पटक)`;
+      remarks = `Biometric punch (${dayPunches.length} times)`;
     }
 
     if (existingRec) {
@@ -240,48 +240,48 @@ export function generateStaffMonthlyDailyData(
     // 2. Resolve Status
     if (existingRec?.status === 'ON_LEAVE') {
       statusKey = 'LEAVE';
-      statusNp = 'स्वीकृत बिदा (LEAVE)';
+      statusNp = 'Leave';
       leaveDays += 1;
-      remarks = remarks || 'स्वीकृत बिदा';
+      remarks = remarks || 'Approved Leave';
     } else if (existingRec?.status === 'HALF_DAY') {
       statusKey = 'LEAVE';
-      statusNp = 'आधा दिन बिदा (HALF DAY)';
+      statusNp = 'Half Day';
       leaveDays += 0.5;
       presentDays += 0.5;
     } else if (hasPunched) {
       if (isAssignedWeeklyOff) {
         statusKey = 'WEEK_OFF_WORK';
-        statusNp = 'हप्ता बिदामा काम (OFF-DAY DUTY)';
+        statusNp = 'Off-Day Duty';
         presentDays += 1;
-        remarks = remarks || `साप्ताहिक बिदामा अतिरिक्त ड्युटी (${dayNameNp})`;
+        remarks = remarks || `Duty on Weekly Off (${dayNameEn})`;
       } else if (lateMinutes > 0 || existingRec?.status === 'LATE') {
         statusKey = 'LATE';
-        statusNp = 'ढिलो उपस्थित (LATE)';
+        statusNp = 'Late';
         presentDays += 1;
         lateDays += 1;
         totalLateMinutes += lateMinutes;
       } else {
         statusKey = 'PRESENT';
-        statusNp = 'उपस्थित (PRESENT)';
+        statusNp = 'Present';
         presentDays += 1;
       }
     } else {
       // Staff did NOT punch
       if (isAssignedWeeklyOff) {
         statusKey = 'WEEK_OFF';
-        statusNp = 'साप्ताहिक बिदा (WEEK OFF)';
+        statusNp = 'Week Off';
         weekOffDays += 1;
-        remarks = remarks || `तोकिएको साप्ताहिक बिदा (${dayNameNp})`;
+        remarks = remarks || `Weekly Off (${dayNameEn})`;
       } else if (isFuture) {
         statusKey = 'UPCOMING';
-        statusNp = 'आगामी दिन (UPCOMING)';
+        statusNp = 'Upcoming';
         upcomingDays += 1;
       } else if (isToday) {
         statusKey = 'PENDING';
-        statusNp = 'प्रतीक्षारत (NOT PUNCHED YET)';
+        statusNp = 'Pending';
       } else {
         statusKey = 'ABSENT';
-        statusNp = 'अनुपस्थित (ABSENT)';
+        statusNp = 'Absent';
         absentDays += 1;
       }
     }
@@ -290,8 +290,8 @@ export function generateStaffMonthlyDailyData(
 
     const inTimeStr = formatTime12h(inTimeRaw);
     const outTimeStr = formatTime12h(outTimeRaw);
-    const workedHoursStr = workedHours > 0 ? `${toNepaliDigits(workedHours.toFixed(1))} घण्टा` : '-';
-    const lateMinutesStr = lateMinutes > 0 ? `${toNepaliDigits(lateMinutes)} मिनेट` : '-';
+    const workedHoursStr = workedHours > 0 ? `${workedHours.toFixed(1)} hrs` : '-';
+    const lateMinutesStr = lateMinutes > 0 ? `${lateMinutes} mins` : '-';
 
     days.push({
       sn: day,
@@ -362,72 +362,72 @@ export function exportIndividualStaffMonthlyExcel(
 
   const rows: any[][] = [
     ['AP1 TELEVISION NETWORK PVT. LTD.'],
-    ['व्यक्तिगत मासिक दैनिक हाजिरी विवरण (INDIVIDUAL MONTHLY ATTENDANCE REGISTER)'],
-    [`नेपाली क्यालेन्डर (विक्रम संवत्) - ${data.monthNameNp} ${toNepaliDigits(bsYear)}`],
+    ['INDIVIDUAL MONTHLY ATTENDANCE REGISTER (Bikram Sambat Calendar)'],
+    [`BS Month: ${data.monthNameEn} ${bsYear} BS`, `Total Days: ${data.daysCount} Days`, `Report Date: ${todayBs.formattedEn}`],
     [],
     // Employee Info Card
-    ['कर्मचारीको विवरण:', '', '', '', 'मासिक हाजिरी सारांश:'],
+    ['Employee Details:', '', '', '', 'Monthly Summary:'],
     [
-      `कर्मचारीको नाम: ${data.staff.name}`,
-      `बायोमेट्रिक PIN: #${data.staff.pin}`,
-      `विभाग: ${data.staff.department}`,
+      `Staff Name: ${data.staff.name}`,
+      `Biometric PIN: #${data.staff.pin}`,
+      `Department: ${data.staff.department}`,
       '',
-      `महिना: ${data.monthNameNp} ${toNepaliDigits(bsYear)} (वि.सं.)`,
-      `कुल दिन: ${toNepaliDigits(data.daysCount)} दिन`
+      `Month: ${data.monthNameEn} ${bsYear} BS`,
+      `Total Days: ${data.daysCount} Days`
     ],
     [
-      `पद: ${data.staff.designation}`,
-      `साप्ताहिक बिदा: ${data.staff.weeklyOff}`,
-      `डाउनलोड मिति: ${todayBs.formattedNp}`,
+      `Designation: ${data.staff.designation}`,
+      `Weekly Off: ${data.staff.weeklyOff}`,
+      `Generated Date: ${todayBs.formattedEn}`,
       '',
-      `उपस्थित दिन: ${toNepaliDigits(data.summary.presentDays)} दिन`,
-      `साप्ताहिक बिदा: ${toNepaliDigits(data.summary.weekOffDays)} दिन`
-    ],
-    [
-      '',
-      '',
-      '',
-      '',
-      `ढिलो दिन: ${toNepaliDigits(data.summary.lateDays)} दिन`,
-      `अनुपस्थित दिन: ${toNepaliDigits(data.summary.absentDays)} दिन`
+      `Present Days: ${data.summary.presentDays} Days`,
+      `Weekly Off: ${data.summary.weekOffDays} Days`
     ],
     [
       '',
       '',
       '',
       '',
-      `स्वीकृत बिदा: ${toNepaliDigits(data.summary.leaveDays)} दिन`,
-      `कुल काम गरेको समय: ${toNepaliDigits(data.summary.totalWorkedHours.toFixed(1))} घण्टा`
+      `Late Days: ${data.summary.lateDays} Days`,
+      `Absent Days: ${data.summary.absentDays} Days`
     ],
     [
       '',
       '',
       '',
       '',
-      `कुल ढिलो समय: ${toNepaliDigits(data.summary.totalLateMinutes)} मिनेट`,
-      `हाजिरी दर: ${toNepaliDigits(data.summary.attendanceRate)}%`
+      `Approved Leaves: ${data.summary.leaveDays} Days`,
+      `Total Worked Hours: ${data.summary.totalWorkedHours.toFixed(1)} hrs`
+    ],
+    [
+      '',
+      '',
+      '',
+      '',
+      `Total Late Minutes: ${data.summary.totalLateMinutes} mins`,
+      `Attendance Rate: ${data.summary.attendanceRate}%`
     ],
     [],
     // Table Headers
     [
-      'क्र.सं.',
-      'मिति (वि.सं.)',
-      'बार',
-      'स्थिति (Status)',
-      'आएको समय (In Time)',
-      'गएको समय (Out Time)',
-      'काम गरेको समय',
-      'ढिलो समय',
-      'कैफियत / विवरण'
+      'S.N.',
+      'BS Date',
+      'Day',
+      'Status',
+      'In Time',
+      'Out Time',
+      'Worked Hours',
+      'Late Minutes',
+      'Remarks'
     ]
   ];
 
   // Table Data Rows
   data.days.forEach(d => {
     rows.push([
-      d.snNp,
+      d.sn,
       d.bsDateStr,
-      d.dayNameNp,
+      d.dayNameEn,
       d.statusNp,
       d.inTimeStr,
       d.outTimeStr,
@@ -440,34 +440,34 @@ export function exportIndividualStaffMonthlyExcel(
   // Table Summary Footer
   rows.push([]);
   rows.push([
-    'कुल / सारांश',
-    `${toNepaliDigits(data.daysCount)} दिन`,
+    'Total / Summary',
+    `${data.daysCount} Days`,
     '',
-    `उपस्थित: ${toNepaliDigits(data.summary.presentDays)} दिन`,
+    `Present: ${data.summary.presentDays} Days`,
     '',
     '',
-    `${toNepaliDigits(data.summary.totalWorkedHours.toFixed(1))} घण्टा`,
-    `${toNepaliDigits(data.summary.totalLateMinutes)} मिनेट`,
-    `हाजिरी दर: ${toNepaliDigits(data.summary.attendanceRate)}%`
+    `${data.summary.totalWorkedHours.toFixed(1)} hrs`,
+    `${data.summary.totalLateMinutes} mins`,
+    `Attendance Rate: ${data.summary.attendanceRate}%`
   ]);
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
 
   // Column Widths for comfortable readability in Excel
   ws['!cols'] = [
-    { wch: 8 },  // क्र.सं.
-    { wch: 16 }, // मिति (वि.सं.)
-    { wch: 14 }, // बार
-    { wch: 28 }, // स्थिति (Status)
-    { wch: 20 }, // आएको समय
-    { wch: 20 }, // गएको समय
-    { wch: 18 }, // काम गरेको समय
-    { wch: 16 }, // ढिलो समय
-    { wch: 32 }  // कैफियत / विवरण
+    { wch: 8 },  // S.N.
+    { wch: 16 }, // BS Date
+    { wch: 14 }, // Day
+    { wch: 20 }, // Status
+    { wch: 16 }, // In Time
+    { wch: 16 }, // Out Time
+    { wch: 16 }, // Worked Hours
+    { wch: 16 }, // Late Minutes
+    { wch: 32 }  // Remarks
   ];
 
   const wb = XLSX.utils.book_new();
-  const safeSheetName = `${data.monthNameNp} ${bsYear}`.slice(0, 31);
+  const safeSheetName = `${data.monthNameEn} ${bsYear}`.slice(0, 31);
   XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
 
   const cleanName = data.staff.name.replace(/[^a-zA-Z0-9_\u0900-\u097F]/g, '_');

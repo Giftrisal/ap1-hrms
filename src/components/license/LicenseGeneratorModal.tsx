@@ -36,7 +36,7 @@ export default function LicenseGeneratorModal() {
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!adminPin.trim()) {
-      setError('कृपया Master Admin PIN (999) प्रविष्ट गर्नुहोस्।');
+      setError('Please enter Master Admin PIN (999).');
       return;
     }
 
@@ -59,7 +59,7 @@ export default function LicenseGeneratorModal() {
 
       const data = await res.json();
       if (!data.success) {
-        setError(data.error || 'लाइसेन्स की बनाउन सकिएन।');
+        setError(data.error || 'Failed to generate license key.');
       } else {
         setGeneratedResult({
           key: data.key,
@@ -68,7 +68,7 @@ export default function LicenseGeneratorModal() {
         });
       }
     } catch (err: any) {
-      setError(err.message || 'नेटवर्क त्रुटि');
+      setError(err.message || 'Network error');
     } finally {
       setLoading(false);
     }
@@ -86,9 +86,9 @@ export default function LicenseGeneratorModal() {
     if (generatedResult?.key) {
       const res = await activate(generatedResult.key);
       if (res.success) {
-        setAppliedNotice('यो प्रणालीमा नयाँ लाइसेन्स तुरुन्त सक्रिय गरियो!');
+        setAppliedNotice('New license successfully activated on this system!');
       } else {
-        setError(res.error || 'सक्रिय गर्न सकिएन');
+        setError(res.error || 'Failed to activate');
       }
     }
   };
@@ -101,13 +101,13 @@ export default function LicenseGeneratorModal() {
         </div>
         <div>
           <h3 className="text-base font-bold text-white flex items-center gap-2">
-            <span>Master Admin: लाइसेन्स जेनेरेटर (License Generator Tool)</span>
+            <span>Master Admin: License Generator Tool</span>
             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase">
               Vendor Only (PIN: 999)
             </span>
           </h3>
           <p className="text-xs text-slate-400">
-            Goinfi Technologies बाट AP1 वा अन्य ग्राहकहरूको लागि नयाँ आधिकारिक डिजिटल लाइसेन्स की उत्पादन गर्नुहोस्।
+            Generate official cryptographic digital license keys for AP1 Television and other enterprise clients.
           </p>
         </div>
       </div>
@@ -116,7 +116,7 @@ export default function LicenseGeneratorModal() {
         {/* Tier selection */}
         <div>
           <label className="block text-xs font-semibold text-slate-300 mb-2">
-            लाइसेन्स अवधि छान्नुहोस् (Select Duration Tier):
+            Select Duration Tier:
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2.5">
             {(Object.keys(LICENSE_TIERS) as LicenseTier[]).map((tierKey) => {
@@ -139,8 +139,8 @@ export default function LicenseGeneratorModal() {
                     </span>
                     <Clock className="w-3.5 h-3.5 opacity-60" />
                   </div>
-                  <div className="text-xs font-bold text-white">{info.labelNp}</div>
-                  <div className="text-[10px] text-slate-400 mt-1">{info.days} दिन ({info.label})</div>
+                  <div className="text-xs font-bold text-white">{info.label}</div>
+                  <div className="text-[10px] text-slate-400 mt-1">{info.days} Days</div>
                 </button>
               );
             })}
@@ -151,7 +151,7 @@ export default function LicenseGeneratorModal() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">
-              क्लाइन्ट कोड (Client Code):
+              Client Code:
             </label>
             <input
               type="text"
@@ -164,7 +164,7 @@ export default function LicenseGeneratorModal() {
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">
-              क्लाइन्ट नाम (Client Name):
+              Client Name:
             </label>
             <input
               type="text"
@@ -177,7 +177,7 @@ export default function LicenseGeneratorModal() {
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">
-              Master Admin PIN (आवश्यक):
+              Master Admin PIN (Required):
             </label>
             <input
               type="password"
@@ -202,7 +202,7 @@ export default function LicenseGeneratorModal() {
           className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-purple-600/20"
         >
           {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-          <span>नयाँ लाइसेन्स की बनाउनुहोस् (Generate License Key)</span>
+          <span>Generate License Key</span>
         </button>
       </form>
 
@@ -212,10 +212,10 @@ export default function LicenseGeneratorModal() {
           <div className="flex items-center justify-between pb-3 border-b border-slate-800">
             <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
               <ShieldCheck className="w-4 h-4" />
-              <span>प्रमाणीकृत नयाँ लाइसेन्स की (Generated & Signed):</span>
+              <span>Cryptographically Signed License Key:</span>
             </div>
             <span className="text-[11px] text-slate-400">
-              अवधि: <strong className="text-white">{generatedResult.tierInfo.labelNp}</strong> ({generatedResult.tierInfo.days} दिन)
+              Duration: <strong className="text-white">{generatedResult.tierInfo.label}</strong> ({generatedResult.tierInfo.days} Days)
             </span>
           </div>
 
@@ -229,7 +229,7 @@ export default function LicenseGeneratorModal() {
               className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shrink-0 transition-all cursor-pointer"
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? 'कपी गरियो' : 'Copy Key'}</span>
+              <span>{copied ? 'Copied' : 'Copy Key'}</span>
             </button>
           </div>
 
@@ -241,7 +241,7 @@ export default function LicenseGeneratorModal() {
                 onClick={applyNow}
                 className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 cursor-pointer bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-lg"
               >
-                <span>यसै सिस्टममा तुरुन्त लागु गर्नुहोस्</span>
+                <span>Apply Instantly to System</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>

@@ -204,7 +204,7 @@ export default function ShiftsPage() {
           <div>
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <CalendarClock className="w-5 h-5 text-purple-600" />
-              <span>Official AP1 Television Work Shifts ({shifts.length} सिफ्टहरू)</span>
+              <span>Official AP1 Television Work Shifts ({shifts.length} Shifts)</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               Flexible 24/7 Rotational & Standard 8-Hour Broadcast Cycles
@@ -268,7 +268,7 @@ export default function ShiftsPage() {
                     </div>
                     <div>
                       <span className="text-slate-500 font-medium text-[11px] block">{t.gracePeriod}</span>
-                      <p className="text-xs font-bold text-emerald-600 mt-0.5">हटाएको (शुद्ध इन-आउट)</p>
+                      <p className="text-xs font-bold text-emerald-600 mt-0.5">Removed (Pure In-Out)</p>
                     </div>
                     <div>
                       <span className="text-slate-500 font-medium text-[11px] block">{t.halfDayHours}</span>
@@ -303,14 +303,14 @@ export default function ShiftsPage() {
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <h4 className="font-extrabold text-slate-900 text-base">
-                Strict Overtime Policy (सख्त ओभरटाइम नियम - एडमिन पूर्व स्वीकृति अनिवार्य)
+                Strict Overtime Policy (Mandatory Admin Pre-Approval)
               </h4>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-200 text-amber-900 border border-amber-300 uppercase">
                 Enforced
               </span>
             </div>
             <p className="text-xs text-slate-700 mt-1 leading-relaxed">
-              कर्मचारीहरू सिफ्ट समय भन्दा अगाडि (Early Arrival) आएर वा सिफ्ट सकिएपछि (Late Departure) बसेर <strong>स्वतः ओभरटाइम दाबी गर्न पाउने छैनन्</strong>। ओभरटाइम दाबी गर्नका लागि <strong>एडमिन / एचआरको आधिकारिक पूर्व स्वीकृति (Admin Pre-Approval Permission) अनिवार्य</strong> हुनेछ।
+              Employees arriving early or departing late <strong>cannot automatically claim overtime</strong>. All overtime claims strictly require <strong>official Admin / HR pre-approval authorization</strong>.
             </p>
           </div>
         </div>
@@ -369,7 +369,7 @@ export default function ShiftsPage() {
           <div>
             <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
               <UserCheck className="w-5 h-5 text-emerald-600" />
-              <span>Admin Overtime Authorizations (स्वीकृत ओभरटाइम अनुमतिहरू)</span>
+              <span>Admin Overtime Authorizations</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               Official register of staff authorized by HR/Admin to perform paid overtime duties
@@ -382,7 +382,7 @@ export default function ShiftsPage() {
             className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-700 via-purple-600 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-500 text-white text-xs font-bold rounded-xl shadow-md shadow-purple-600/20 transition-transform active:scale-95 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Grant Overtime Permission (+ अनुमति दिनुहोस्)</span>
+            <span>Grant Overtime Permission (+ Authorize)</span>
           </button>
         </div>
 
@@ -496,37 +496,37 @@ export default function ShiftsPage() {
         <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-2">
           <p className="font-bold text-slate-900 flex items-center gap-1.5 text-sm">
             <ShieldCheck className="w-4 h-4 text-purple-700" />
-            <span>कार्य घण्टा तथा ढिलो आगमन कट्टी नियम (Accounts Hours Policy):</span>
+            <span>Working Hours & Shortfall Deduction Policy (Accounts Hours Policy):</span>
           </p>
           <ul className="list-disc list-inside space-y-1 text-slate-600 pl-1 leading-relaxed">
-            <li><strong>मासिक कुल कार्य घण्टा (Monthly Target Hours):</strong> प्रत्येक महिना क्यालेन्डरमा परेका कुल कार्य दिन अनुसार Accounts शाखाले आवश्यक कुल कार्य घण्टा (उदा. २६ दिन × ८ घण्टा = <strong>२०८ घण्टा</strong>) प्रणालीमा प्रविष्टि गर्दछ।</li>
-            <li><strong>वास्तविक हाजिरी गणना (Biometric Logged Hours):</strong> कर्मचारीले बायोमेट्रिक मेसिनमा गरेको दैनिक Check-In र Check-Out अनुसार महिनाभरको कुल काम गरेको घण्टा स्वतः जोडिएर आउँछ।</li>
-            <li><strong>ढिलो आगमन तथा समय नपुगेको कट्टी (Shortfall Deduction):</strong> १५ मिनेटको ग्रेस पिरियड कटेपछि ढिलो आउँदा वा कार्य अवधि नपुग्दा कुल घण्टा घट्न जान्छ। नपुगेको घण्टालाई <code className="px-1.5 py-0.5 bg-slate-200 text-slate-800 rounded font-mono">प्रति घण्टा तलब दर (Hourly Rate)</code> अनुसार हिसाब गरी Payslip मा कट्टी गरिन्छ।</li>
+            <li><strong>Monthly Target Hours:</strong> Based on the calendar working days in the month, Accounts defines the total required work hours (e.g., 26 days × 8 hours = <strong>208 hours</strong>).</li>
+            <li><strong>Biometric Logged Hours:</strong> Total monthly worked hours are calculated automatically based on biometric machine Check-In and Check-Out records.</li>
+            <li><strong>Shortfall Deduction:</strong> Arriving late after the grace period or working fewer hours than target reduces total monthly hours. Any shortfall is deducted from the payslip based on the employee&apos;s <code className="px-1.5 py-0.5 bg-slate-200 text-slate-800 rounded font-mono">Hourly Rate</code>.</li>
           </ul>
         </div>
 
         {/* Calculation Formula Card */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
           <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
-            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">१. प्रति घण्टा तलब दर</p>
+            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">1. Hourly Wage Rate</p>
             <p className="font-bold text-slate-900 mt-1 text-sm font-mono">
               Hourly Rate = Base Salary ÷ Target Monthly Hours
             </p>
-            <p className="text-[11px] text-slate-500 mt-0.5">आधारभूत तलबलाई कुल तोकिएको घण्टाले भाग गर्दा</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">Base salary divided by required target monthly hours</p>
           </div>
           <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
-            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">२. नपुगेको घण्टा (Shortfall)</p>
+            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">2. Shortfall Hours</p>
             <p className="font-bold text-amber-700 mt-1 text-sm font-mono">
               Shortfall = Target Hours − Actual Worked Hours
             </p>
-            <p className="text-[11px] text-slate-500 mt-0.5">तोकिएको घण्टाबाट बायोमेट्रिकमा काम गरेको घण्टा घटाउँदा</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">Target hours minus total biometric hours worked</p>
           </div>
           <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
-            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">३. पेरोल कट्टी (Late Deduction)</p>
+            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">3. Payroll Deduction</p>
             <p className="font-bold text-red-600 mt-1 text-sm font-mono">
               Late Deduction = Shortfall Hours × Hourly Rate
             </p>
-            <p className="text-[11px] text-slate-500 mt-0.5">नपुगेको घण्टालाई प्रति घण्टा दरले गुणा गरी Payslip मा कट्टी</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">Shortfall hours multiplied by hourly rate and deducted from Payslip</p>
           </div>
         </div>
 
@@ -612,7 +612,7 @@ export default function ShiftsPage() {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    नेपाली मिति (Overtime Date) *
+                    Overtime Date (BS) *
                   </label>
                   <NepaliDatePicker
                     value={otDate}

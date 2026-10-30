@@ -58,18 +58,18 @@ export default function LicenseStatusCard() {
       if (data.success && data.result?.dispatched) {
         setSmsFeedback({
           type: 'success',
-          text: `लाइसेन्स म्याद सूचना SMS सफलतापूर्वक +977-${alertPhone} मा पठाइयो!`
+          text: `License expiry notification SMS successfully dispatched to +977-${alertPhone}!`
         });
       } else {
         setSmsFeedback({
           type: 'error',
-          text: data.result?.gatewayResult?.error || data.result?.reason || 'SMS पठाउन सकिएन।'
+          text: data.result?.gatewayResult?.error || data.result?.reason || 'Failed to dispatch SMS.'
         });
       }
     } catch (err: any) {
       setSmsFeedback({
         type: 'error',
-        text: err.message || 'नेटवर्क त्रुटि'
+        text: err.message || 'Network error'
       });
     } finally {
       setIsSendingTestSms(false);
@@ -81,7 +81,7 @@ export default function LicenseStatusCard() {
 
   const handleActivate = async () => {
     if (!activationKey.trim()) {
-      setMessage({ type: 'error', text: 'कृपया लाइसेन्स की प्रविष्ट गर्नुहोस्।' });
+      setMessage({ type: 'error', text: 'Please enter a valid license key.' });
       return;
     }
 
@@ -92,7 +92,7 @@ export default function LicenseStatusCard() {
     setIsActivating(false);
 
     if (res.success) {
-      setMessage({ type: 'success', text: res.message || 'लाइसेन्स सफलतापूर्वक सक्रिय भयो!' });
+      setMessage({ type: 'success', text: res.message || 'License activated successfully!' });
       setActivationKey('');
       reload();
       setTimeout(() => {
@@ -100,7 +100,7 @@ export default function LicenseStatusCard() {
         setMessage(null);
       }, 2500);
     } else {
-      setMessage({ type: 'error', text: res.error || 'लाइसेन्स प्रमाणीकरण हुन सकेन।' });
+      setMessage({ type: 'error', text: res.error || 'License verification failed.' });
     }
   };
 
@@ -114,11 +114,7 @@ export default function LicenseStatusCard() {
 
   const formatDate = (ms?: number) => {
     if (!ms) return 'N/A';
-    return new Date(ms).toLocaleDateString('ne-NP', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    }) + ` (${new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })})`;
+    return new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
   return (
@@ -135,9 +131,9 @@ export default function LicenseStatusCard() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-lg font-bold text-white">सफ्टवेयर लाइसेन्स तथा सदस्यता (Software License)</h3>
+              <h3 className="text-lg font-bold text-white">Software License & Subscription</h3>
               <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide ${isExpired ? 'bg-red-500/20 text-red-400 border border-red-500/30' : isExpiringSoon ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>
-                {isExpired ? 'म्याद सकिएको (Expired)' : isExpiringSoon ? 'चाँडै सकिने (Expiring Soon)' : 'सक्रिय (Active)'}
+                {isExpired ? 'Expired' : isExpiringSoon ? 'Expiring Soon' : 'Active'}
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
@@ -152,7 +148,7 @@ export default function LicenseStatusCard() {
           className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/20 transition-all cursor-pointer"
         >
           <KeyRound className="w-4 h-4" />
-          <span>{showActivateBox ? 'रद्द गर्नुहोस्' : 'लाइसेन्स नवीकरण / नयाँ Key हाल्नुहोस्'}</span>
+          <span>{showActivateBox ? 'Cancel' : 'Renew License / Enter Key'}</span>
         </button>
       </div>
 
@@ -161,7 +157,7 @@ export default function LicenseStatusCard() {
         <div className="mt-4 p-3.5 bg-red-600 border border-red-700 rounded-xl flex items-center gap-3 text-white text-xs font-semibold shadow-md">
           <AlertTriangle className="w-5 h-5 text-yellow-300 shrink-0 animate-bounce" />
           <div>
-            <span className="font-bold">चेतावनी:</span> तपाईंको लाइसेन्सको म्याद अब <strong>{timeRemainingLabel}</strong> मात्र बाँकी छ। सेवा अवरुद्ध हुन नदिन कृपया समयमै नवीकरण गर्नुहोस्।
+            <span className="font-bold">Warning:</span> Your software license will expire in <strong>{timeRemainingLabel}</strong>. Please renew promptly to prevent service interruptions.
           </div>
         </div>
       )}
@@ -170,7 +166,7 @@ export default function LicenseStatusCard() {
         <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center gap-3 text-red-300 text-xs">
           <ShieldAlert className="w-5 h-5 shrink-0" />
           <div>
-            <span className="font-bold">लाइसेन्स समाप्त:</span> तपाईंको लाइसेन्सको म्याद सकिएको छ। नयाँ Key प्राप्त गर्न Goinfi Labs मा सम्पर्क गर्नुहोस्।
+            <span className="font-bold">License Expired:</span> Your software license has expired. Please contact Goinfi Labs to obtain a renewal key.
           </div>
         </div>
       )}
@@ -181,10 +177,10 @@ export default function LicenseStatusCard() {
         <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5">
           <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
             <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-            <span>लाइसेन्स योजना (Plan)</span>
+            <span>License Plan</span>
           </div>
           <p className="text-sm font-bold text-white">
-            {tierInfo?.labelNp || tierInfo?.label || '१ वर्ष वार्षिक लाइसेन्स'}
+            {tierInfo?.label || '1-Year Annual License'}
           </p>
           <span className="text-[11px] text-purple-400 font-medium">Enterprise Unlimited</span>
         </div>
@@ -193,19 +189,19 @@ export default function LicenseStatusCard() {
         <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5">
           <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
             <Clock className="w-3.5 h-3.5 text-emerald-400" />
-            <span>बाँकी समय (Time Remaining)</span>
+            <span>Time Remaining</span>
           </div>
           <p className={`text-base font-black ${isExpired ? 'text-red-400' : isExpiringSoon ? 'text-amber-400' : 'text-emerald-400'}`}>
             {timeRemainingLabel}
           </p>
-          <span className="text-[11px] text-slate-500">२४/७ स्वतः गणना</span>
+          <span className="text-[11px] text-slate-500">24/7 Automated Monitor</span>
         </div>
 
         {/* Expiry Date */}
         <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5">
           <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
             <Calendar className="w-3.5 h-3.5 text-blue-400" />
-            <span>म्याद सकिने मिति (Expires On)</span>
+            <span>Expires On</span>
           </div>
           <p className="text-xs font-semibold text-slate-200">
             {formatDate(license?.expiresAt)}
@@ -217,7 +213,7 @@ export default function LicenseStatusCard() {
           <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
             <div className="flex items-center gap-1.5">
               <KeyRound className="w-3.5 h-3.5 text-indigo-400" />
-              <span>सक्रिय Key</span>
+              <span>Active Key</span>
             </div>
             <button
               type="button"
@@ -231,7 +227,7 @@ export default function LicenseStatusCard() {
           <p className="text-[11px] font-mono text-slate-300 truncate select-all">
             {license?.key || 'GFHR-AP1-1Y-...'}
           </p>
-          <span className="text-[10px] text-slate-500">HMAC-SHA256 सुरक्षित</span>
+          <span className="text-[10px] text-slate-500">HMAC-SHA256 Protected</span>
         </div>
       </div>
 
@@ -240,7 +236,7 @@ export default function LicenseStatusCard() {
         <div className="mt-5 p-4 bg-slate-950/90 border border-purple-500/30 rounded-xl animate-in fade-in slide-in-from-top-2 duration-200">
           <h4 className="text-xs font-bold text-purple-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <KeyRound className="w-3.5 h-3.5" />
-            <span>नयाँ लाइसेन्स की हाल्नुहोस् (Enter License Key):</span>
+            <span>Enter License Key:</span>
           </h4>
 
           <div className="flex flex-col sm:flex-row items-center gap-2">
@@ -265,7 +261,7 @@ export default function LicenseStatusCard() {
               className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shrink-0 transition-all cursor-pointer shadow-lg shadow-emerald-600/20"
             >
               {isActivating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-              <span>{isActivating ? 'प्रमाणीकरण हुँदैछ...' : 'सक्रिय गर्नुहोस् (Activate)'}</span>
+              <span>{isActivating ? 'Verifying...' : 'Activate License'}</span>
             </button>
           </div>
 
@@ -277,7 +273,7 @@ export default function LicenseStatusCard() {
           )}
 
           <p className="text-[11px] text-slate-400 mt-2">
-            नयाँ लाइसेन्स की का लागि <strong>Goinfi Labs</strong> (+977-9715300300 | support@goinfi.biz) मा सम्पर्क गर्नुहोस्।
+            For official license keys, please contact <strong>Goinfi Labs</strong> (+977-9715300300 | support@goinfi.biz).
           </p>
         </div>
       )}
@@ -289,21 +285,21 @@ export default function LicenseStatusCard() {
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                स्वतः म्याद पूर्व SMS सूचना (Automated Expiry SMS Notification)
+                Automated Expiry SMS Notification
               </h4>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                Active / दैनिक निगरानी
+                Active / Daily Monitor
               </span>
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              लाइसेन्स समाप्त हुनु अगाडि प्रणालीले स्वतः क्लाइन्टको दर्ता नम्बर (<strong>+977-{alertPhone}</strong>) मा SMS पठाउँछ।
+              Before license expiration, the system automatically dispatches automated SMS alerts to the registered mobile (<strong>+977-{alertPhone}</strong>).
             </p>
             <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[10px] text-slate-400">
-              <span className="text-slate-500 font-semibold">सूचना तालिका:</span>
-              <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700/80 text-amber-300 font-medium">⚠️ ७ दिन अगाडि</span>
-              <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700/80 text-orange-300 font-medium">⏰ ३ दिन अगाडि</span>
-              <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700/80 text-red-300 font-medium">🚨 २४ घण्टा अगाडि</span>
-              <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700/80 text-purple-300 font-medium">🔒 म्याद सकिँदा</span>
+              <span className="text-slate-500 font-semibold">Alert Schedule:</span>
+              <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700/80 text-amber-300 font-medium">⚠️ 7 Days Prior</span>
+              <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700/80 text-orange-300 font-medium">⏰ 3 Days Prior</span>
+              <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700/80 text-red-300 font-medium">🚨 24 Hours Prior</span>
+              <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700/80 text-purple-300 font-medium">🔒 On Expiration</span>
             </div>
           </div>
 
@@ -313,10 +309,10 @@ export default function LicenseStatusCard() {
               onClick={handleSendTestSms}
               disabled={isSendingTestSms}
               className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white disabled:opacity-50 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer border border-slate-700 shadow-sm"
-              title="क्लाइन्टको नम्बरमा तुरुन्त टेस्ट सूचना SMS पठाएर हेर्नुहोस्"
+              title="Send an instant test notification SMS to registered client number"
             >
               {isSendingTestSms ? <RefreshCw className="w-3.5 h-3.5 animate-spin text-purple-400" /> : <Sparkles className="w-3.5 h-3.5 text-purple-400" />}
-              <span>{isSendingTestSms ? 'SMS पठाउँदै...' : 'अलर्ट SMS परीक्षण (Test SMS)'}</span>
+              <span>{isSendingTestSms ? 'Sending SMS...' : 'Test Alert SMS'}</span>
             </button>
           </div>
         </div>

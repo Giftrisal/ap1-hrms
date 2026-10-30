@@ -29,7 +29,6 @@ import {
   getDaysInBsMonth, 
   NEPALI_MONTHS_NP, 
   NEPALI_MONTHS_EN, 
-  toNepaliDigits, 
   AVAILABLE_BS_YEARS,
   getBsDateRange,
   formatBsDateRangeLabel
@@ -45,7 +44,7 @@ import {
 } from '@/lib/date-range-export';
 
 export default function ReportsPage() {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const [reportType, setReportType] = useState<'monthly_attendance' | 'date_range' | 'department_matrix' | 'leave_summary'>('monthly_attendance');
 
   // Current Bikram Sambat date
@@ -239,21 +238,17 @@ export default function ReportsPage() {
     return getDaysInBsMonth(selectedBsYear, selectedBsMonth);
   }, [selectedBsYear, selectedBsMonth]);
 
-  const selectedBsMonthName = NEPALI_MONTHS_NP[selectedBsMonth - 1] || 'बैशाख';
   const selectedBsMonthNameEn = NEPALI_MONTHS_EN[selectedBsMonth - 1] || 'Baishakh';
 
   // Calculate actual attendance statistics per staff for the selected Bikram Sambat Month
   const staffMonthlyStats = useMemo(() => {
-    // Create a fast lookup set of AD dates that belong to this BS month
     const validDatesSet = new Set(monthAdDates);
 
-    // Filter all records that occurred on any of these BS month dates
     const relevantRecords = records.filter(r => {
       const rDate = r.date || (r.in_time ? r.in_time.split('T')[0] : '');
       return validDatesSet.has(rDate);
     });
 
-    // Map by pin or employee_id
     const statsMap = new Map<string, {
       pin: string;
       name: string;
@@ -287,7 +282,6 @@ export default function ReportsPage() {
       });
     });
 
-    // Aggregate records
     relevantRecords.forEach(r => {
       const pin = String(r.employee_pin || r.biometric_pin || r.employee_id || '');
       const entry = statsMap.get(pin);
@@ -313,10 +307,8 @@ export default function ReportsPage() {
       }
     });
 
-    // Calculate attendance percentage based on standard 26 working days
     const totalWorkingDays = 26;
     return Array.from(statsMap.values()).map(s => {
-      // If no records at all were found in system, provide sensible baseline
       const effectivePresent = s.presentDays;
       const effectiveAbsent = Math.max(0, totalWorkingDays - effectivePresent - s.leaveDays);
       const attendancePct = Math.min(100, Math.round(((effectivePresent + s.weekOffDays) / 30) * 100));
@@ -350,30 +342,30 @@ export default function ReportsPage() {
     return Array.from(set);
   }, [employees]);
 
-  // Export to Excel with pure Nepali Bikram Sambat headings
+  // Export to Excel with Bikram Sambat headings
   const exportExcelReport = () => {
-    const rows = [
+    const rows: (string | number)[][] = [
       ['AP1 TELEVISION NETWORK PVT. LTD.'],
-      ['मासिक हाजिरी तथा पेरोल अडिट रिपोर्ट (MONTHLY ATTENDANCE REGISTER)'],
-      [`महिना: ${selectedBsMonthName} ${toNepaliDigits(selectedBsYear)} (वि.सं.)`, `कुल दिन: ${toNepaliDigits(daysInBsMonth)} दिन`, `रिपोर्ट मिति: ${todayBs.formattedNp}`],
+      ['MONTHLY ATTENDANCE REGISTER (Bikram Sambat Calendar)'],
+      [`Month: ${selectedBsMonthNameEn} ${selectedBsYear} BS`, `Total Days: ${daysInBsMonth} Days`, `Report Date: ${todayBs.formattedEn}`],
       [],
-      ['क्र.सं.', 'PIN', 'कर्मचारीको नाम', 'विभाग', 'पद', 'उपस्थित दिन', 'ढिलो दिन', 'अनुपस्थित दिन', 'बिदा दिन', 'ओभरटाइम (घण्टा)', 'कुल काम गरेको घण्टा', 'हाजिरी दर %']
+      ['S.N.', 'PIN', 'Staff Name', 'Department', 'Designation', 'Present Days', 'Late Days', 'Absent Days', 'Leave Days', 'Overtime (Hrs)', 'Total Worked Hours', 'Attendance Rate %']
     ];
 
     filteredStats.forEach((s, idx) => {
       rows.push([
-        toNepaliDigits(idx + 1),
+        idx + 1,
         s.pin,
         s.name,
         s.department,
         s.designation,
-        `${toNepaliDigits(s.presentDays)} दिन`,
-        `${toNepaliDigits(s.lateDays)} दिन`,
-        `${toNepaliDigits(s.absentDays)} दिन`,
-        `${toNepaliDigits(s.leaveDays)} दिन`,
-        `${toNepaliDigits(s.overtimeHours)} घ`,
-        `${toNepaliDigits(s.totalWorkedHours)} घ`,
-        `${toNepaliDigits(s.attendancePct)}%`
+        `${s.presentDays} Days`,
+        `${s.lateDays} Days`,
+        `${s.absentDays} Days`,
+        `${s.leaveDays} Days`,
+        `${s.overtimeHours} hrs`,
+        `${s.totalWorkedHours} hrs`,
+        `${s.attendancePct}%`
       ]);
     });
 
@@ -383,11 +375,11 @@ export default function ReportsPage() {
       { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 14 }
     ];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, `${selectedBsMonthName} ${selectedBsYear}`);
-    XLSX.writeFile(wb, `AP1_Hajiri_Report_${selectedBsYear}_${selectedBsMonthNameEn}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, `${selectedBsMonthNameEn} ${selectedBsYear}`);
+    XLSX.writeFile(wb, `AP1_Attendance_Report_${selectedBsYear}_${selectedBsMonthNameEn}.xlsx`);
   };
 
-  // Export to PDF with Bikram Sambat Nepali Date format
+  // Export to PDF with Bikram Sambat format
   const exportPdfReport = () => {
     const doc = new jsPDF('landscape');
     
@@ -401,8 +393,8 @@ export default function ReportsPage() {
     doc.text('AP1 TELEVISION NETWORK', 14, 11);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text(`MONTHLY ATTENDANCE REGISTER - ${selectedBsMonthNameEn.toUpperCase()} ${selectedBsYear} BS (NEPALI CALENDAR)`, 14, 18);
-    doc.text(`Total Staff: ${filteredStats.length} | Generated: ${todayBs.formattedNp}`, 175, 18);
+    doc.text(`MONTHLY ATTENDANCE REGISTER - ${selectedBsMonthNameEn.toUpperCase()} ${selectedBsYear} BS`, 14, 18);
+    doc.text(`Total Staff: ${filteredStats.length} | Generated: ${todayBs.formattedEn}`, 175, 18);
 
     const body = filteredStats.map((s, idx) => [
       String(idx + 1),
@@ -429,7 +421,7 @@ export default function ReportsPage() {
   return (
     <DashboardShell
       title={t.navReports}
-      subtitle="नेपाली क्यालेन्डर (विक्रम संवत्) अनुसार मासिक हाजिरी सारांश, विभाग विश्लेषण तथा रिपोर्ट"
+      subtitle="Executive monthly attendance summaries, custom date-range registers and department analytics in Bikram Sambat (BS) calendar"
     >
       {/* Top Report Type & Bikram Sambat Month-Year Selector Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
@@ -443,7 +435,7 @@ export default function ReportsPage() {
                 : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
-            मासिक हाजिरी रिपोर्ट (Monthly)
+            Monthly Attendance
           </button>
           <button
             onClick={() => setReportType('date_range')}
@@ -454,7 +446,7 @@ export default function ReportsPage() {
             }`}
           >
             <Calendar className="w-3.5 h-3.5" />
-            <span>मिति दायरा रिपोर्ट (Date Range)</span>
+            <span>Date Range Report</span>
           </button>
           <button
             onClick={() => setReportType('department_matrix')}
@@ -464,7 +456,7 @@ export default function ReportsPage() {
                 : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
-            विभागगत विश्लेषण (Department)
+            Department Matrix
           </button>
         </div>
 
@@ -472,7 +464,7 @@ export default function ReportsPage() {
         <div className="flex items-center flex-wrap gap-2 bg-red-50/80 p-2 rounded-xl border border-red-200">
           <div className="flex items-center gap-1.5 text-xs font-bold text-red-900">
             <Calendar className="w-4 h-4 text-red-600" />
-            <span>नेपाली क्यालेन्डर:</span>
+            <span>BS Calendar:</span>
           </div>
 
           {/* BS Year Selector */}
@@ -482,7 +474,7 @@ export default function ReportsPage() {
             className="px-2.5 py-1 text-xs font-bold bg-white border border-red-300 rounded-lg text-red-950 focus:outline-none cursor-pointer"
           >
             {AVAILABLE_BS_YEARS.map(year => (
-              <option key={year} value={year}>{toNepaliDigits(year)} साल (BS)</option>
+              <option key={year} value={year}>{year} BS</option>
             ))}
           </select>
 
@@ -492,16 +484,16 @@ export default function ReportsPage() {
             onChange={(e) => setSelectedBsMonth(Number(e.target.value))}
             className="px-2.5 py-1 text-xs font-bold bg-white border border-red-300 rounded-lg text-red-950 focus:outline-none cursor-pointer"
           >
-            {NEPALI_MONTHS_NP.map((monthName, idx) => (
+            {NEPALI_MONTHS_EN.map((monthName, idx) => (
               <option key={idx + 1} value={idx + 1}>
-                {monthName} ({NEPALI_MONTHS_EN[idx]})
+                {monthName} ({NEPALI_MONTHS_NP[idx]})
               </option>
             ))}
           </select>
 
           {/* Active Month Tag */}
           <span className="hidden sm:inline-block text-[11px] font-bold px-2 py-0.5 bg-red-600 text-white rounded-md">
-            {selectedBsMonthName} {toNepaliDigits(selectedBsYear)}
+            {selectedBsMonthNameEn} {selectedBsYear} BS
           </span>
         </div>
 
@@ -515,10 +507,10 @@ export default function ReportsPage() {
               setShowIndividualModal(true);
             }}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 transition-colors cursor-pointer"
-            title="कुनै एक कर्मचारीको व्यक्तिगत महिनाभरिको दैनिक हाजिरी विवरण हेर्नुहोस् तथा Excel डाउनलोड गर्नुहोस्"
+            title="View individual employee monthly attendance and export Excel register"
           >
             <Users className="w-3.5 h-3.5 text-indigo-600" />
-            <span>व्यक्तिगत हाजिरी Excel</span>
+            <span>Individual Staff Excel</span>
           </button>
           <button
             onClick={exportExcelReport}
@@ -526,7 +518,7 @@ export default function ReportsPage() {
             title="Download Bikram Sambat Excel Register"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-            <span>मासिक Excel</span>
+            <span>Monthly Excel</span>
           </button>
           <button
             onClick={exportPdfReport}
@@ -534,7 +526,7 @@ export default function ReportsPage() {
             title="Download Bikram Sambat PDF Register"
           >
             <Download className="w-3.5 h-3.5 text-red-600" />
-            <span>PDF डाउनलोड</span>
+            <span>Download PDF</span>
           </button>
         </div>
       </div>
@@ -546,15 +538,15 @@ export default function ReportsPage() {
           <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
               <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <span>मासिक हाजिरी विवरण - {selectedBsMonthName} {toNepaliDigits(selectedBsYear)}</span>
+                <span>Monthly Attendance Register - {selectedBsMonthNameEn} {selectedBsYear} BS</span>
                 <span className="text-[11px] font-normal px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-full">
-                  विक्रम संवत् {toNepaliDigits(selectedBsYear)}
+                  {selectedBsYear} BS
                 </span>
               </h4>
               <p className="text-xs text-slate-500 font-medium mt-0.5">
-                यस महिनाको कुल दिन: <span className="font-bold text-slate-800">{toNepaliDigits(daysInBsMonth)} दिन</span> | 
-                मानक कार्य दिन: <span className="font-bold text-slate-800">२६ दिन</span> | 
-                कुल कर्मचारी: <span className="font-bold text-slate-800">{toNepaliDigits(filteredStats.length)} जना</span>
+                Total Days: <span className="font-bold text-slate-800">{daysInBsMonth} Days</span> | 
+                Standard Working Days: <span className="font-bold text-slate-800">26 Days</span> | 
+                Total Staff: <span className="font-bold text-slate-800">{filteredStats.length}</span>
               </p>
             </div>
 
@@ -564,7 +556,7 @@ export default function ReportsPage() {
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="कर्मचारी वा PIN खोज्नुहोस्..."
+                  placeholder="Search staff by name or PIN..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500 font-medium"
@@ -576,7 +568,7 @@ export default function ReportsPage() {
                 onChange={(e) => setDeptFilter(e.target.value)}
                 className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-medium text-slate-700 focus:outline-none cursor-pointer"
               >
-                <option value="ALL">सबै विभागहरू</option>
+                <option value="ALL">All Departments</option>
                 {uniqueDepartments.map(d => (
                   <option key={d} value={d}>{d}</option>
                 ))}
@@ -590,14 +582,14 @@ export default function ReportsPage() {
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
                   <th className="py-3 px-4">PIN</th>
-                  <th className="py-3 px-4">कर्मचारी</th>
-                  <th className="py-3 px-4">विभाग</th>
-                  <th className="py-3 px-4 text-emerald-800 font-bold">उपस्थित (Present)</th>
-                  <th className="py-3 px-4 text-amber-800 font-bold">ढिलो (Late)</th>
-                  <th className="py-3 px-4 text-red-800 font-bold">अनुपस्थित (Absent)</th>
-                  <th className="py-3 px-4 text-blue-800 font-bold">ओभरटाइम (OT)</th>
-                  <th className="py-3 px-4">हाजिरी दर %</th>
-                  <th className="py-3 px-4 text-center">व्यक्तिगत Excel</th>
+                  <th className="py-3 px-4">Staff Member</th>
+                  <th className="py-3 px-4">Department</th>
+                  <th className="py-3 px-4 text-emerald-800 font-bold">Present</th>
+                  <th className="py-3 px-4 text-amber-800 font-bold">Late</th>
+                  <th className="py-3 px-4 text-red-800 font-bold">Absent</th>
+                  <th className="py-3 px-4 text-blue-800 font-bold">Overtime (OT)</th>
+                  <th className="py-3 px-4">Attendance %</th>
+                  <th className="py-3 px-4 text-center">Individual Excel</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -606,19 +598,19 @@ export default function ReportsPage() {
                     <td className="py-3 px-4 font-mono font-bold text-slate-700">#{s.pin}</td>
                     <td className="py-3 px-4 font-bold text-slate-900">{s.name}</td>
                     <td className="py-3 px-4 text-slate-700 font-medium">{s.department}</td>
-                    <td className="py-3 px-4 font-bold text-emerald-700">{toNepaliDigits(s.presentDays)} दिन</td>
+                    <td className="py-3 px-4 font-bold text-emerald-700">{s.presentDays} Days</td>
                     <td className="py-3 px-4 font-semibold text-amber-700">
-                      {s.lateDays > 0 ? `${toNepaliDigits(s.lateDays)} दिन` : '-'}
+                      {s.lateDays > 0 ? `${s.lateDays} Days` : '-'}
                     </td>
                     <td className="py-3 px-4 font-semibold text-red-600">
-                      {s.absentDays > 0 ? `${toNepaliDigits(s.absentDays)} दिन` : '-'}
+                      {s.absentDays > 0 ? `${s.absentDays} Days` : '-'}
                     </td>
                     <td className="py-3 px-4 font-semibold text-blue-700">
-                      {s.overtimeHours > 0 ? `${toNepaliDigits(s.overtimeHours)} घ` : '-'}
+                      {s.overtimeHours > 0 ? `${s.overtimeHours} hrs` : '-'}
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-800">{toNepaliDigits(s.attendancePct)}%</span>
+                        <span className="font-bold text-slate-800">{s.attendancePct}%</span>
                         <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full ${s.attendancePct >= 90 ? 'bg-emerald-500' : 'bg-amber-500'}`}
@@ -632,10 +624,10 @@ export default function ReportsPage() {
                         <button
                           onClick={() => handleExportIndividual(s.pin)}
                           className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors cursor-pointer"
-                          title={`${s.name} को ${selectedBsMonthName} महिनाको दैनिक हाजिरी Excel डाउनलोड गर्नुहोस्`}
+                          title={`Download ${s.name} daily attendance Excel for ${selectedBsMonthNameEn}`}
                         >
                           <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>दैनिक Excel</span>
+                          <span>Daily Excel</span>
                         </button>
                         <button
                           onClick={() => {
@@ -643,7 +635,7 @@ export default function ReportsPage() {
                             setShowIndividualModal(true);
                           }}
                           className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors cursor-pointer"
-                          title="दैनिक विवरण पूर्वावलोकन (Preview)"
+                          title="Preview daily details"
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
@@ -667,13 +659,13 @@ export default function ReportsPage() {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
               <div>
                 <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <span>नेपाली क्यालेन्डर मिति दायरा (Custom BS Date Range)</span>
+                  <span>Bikram Sambat (BS) Date Range Report</span>
                   <span className="text-xs px-2.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full font-bold">
                     {dateRangeData.rangeLabel}
                   </span>
                 </h4>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  कुनै पनि निश्चित मिति दायरा (जस्तै कार्तिक २ देखि ५ गते सम्म) छानेर सबै वा निश्चित विभाग/कर्मचारीको हाजिरी निकाल्नुहोस्
+                  Filter and export attendance records by custom Bikram Sambat date range, department, or individual staff.
                 </p>
               </div>
 
@@ -682,18 +674,18 @@ export default function ReportsPage() {
                 <button
                   onClick={handleExportDateRangeExcel}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-colors cursor-pointer"
-                  title="छानिएको मिति दायराको हाजिरी Excel फाइल डाउनलोड गर्नुहोस्"
+                  title="Download attendance Excel for selected date range"
                 >
                   <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
-                  <span>दायरा Excel (.xlsx)</span>
+                  <span>Date Range Excel (.xlsx)</span>
                 </button>
                 <button
                   onClick={handleExportDateRangePdf}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white shadow-xs transition-colors cursor-pointer"
-                  title="छानिएको मिति दायराको औपचारिक PDF डाउनलोड गर्नुहोस्"
+                  title="Download attendance PDF for selected date range"
                 >
                   <Download className="w-4 h-4 text-red-100" />
-                  <span>दायरा PDF (.pdf)</span>
+                  <span>Date Range PDF (.pdf)</span>
                 </button>
               </div>
             </div>
@@ -704,9 +696,9 @@ export default function ReportsPage() {
               <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
-                    <span>🟢 सुरु मिति (From Date):</span>
+                    <span>🟢 From BS Date:</span>
                   </span>
-                  <span className="text-[10px] font-bold text-slate-500">वि.सं.</span>
+                  <span className="text-[10px] font-bold text-slate-500">BS</span>
                 </div>
                 <div className="grid grid-cols-3 gap-1.5 text-xs">
                   {/* Year */}
@@ -716,7 +708,7 @@ export default function ReportsPage() {
                     className="px-1.5 py-1.5 bg-slate-50 border border-slate-200 rounded font-bold text-slate-900 cursor-pointer"
                   >
                     {AVAILABLE_BS_YEARS.map(y => (
-                      <option key={y} value={y}>{toNepaliDigits(y)}</option>
+                      <option key={y} value={y}>{y}</option>
                     ))}
                   </select>
                   {/* Month */}
@@ -725,7 +717,7 @@ export default function ReportsPage() {
                     onChange={(e) => setRangeFromMonth(Number(e.target.value))}
                     className="px-1.5 py-1.5 bg-slate-50 border border-slate-200 rounded font-bold text-slate-900 cursor-pointer"
                   >
-                    {NEPALI_MONTHS_NP.map((m, idx) => (
+                    {NEPALI_MONTHS_EN.map((m, idx) => (
                       <option key={idx + 1} value={idx + 1}>{m}</option>
                     ))}
                   </select>
@@ -736,7 +728,7 @@ export default function ReportsPage() {
                     className="px-1.5 py-1.5 bg-slate-50 border border-slate-200 rounded font-bold text-slate-900 cursor-pointer"
                   >
                     {Array.from({ length: daysInFromMonth }, (_, i) => i + 1).map(d => (
-                      <option key={d} value={d}>{toNepaliDigits(d)} गते</option>
+                      <option key={d} value={d}>Day {d}</option>
                     ))}
                   </select>
                 </div>
@@ -746,9 +738,9 @@ export default function ReportsPage() {
               <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
-                    <span>🔴 अन्तिम मिति (To Date):</span>
+                    <span>🔴 To BS Date:</span>
                   </span>
-                  <span className="text-[10px] font-bold text-slate-500">वि.सं.</span>
+                  <span className="text-[10px] font-bold text-slate-500">BS</span>
                 </div>
                 <div className="grid grid-cols-3 gap-1.5 text-xs">
                   {/* Year */}
@@ -758,7 +750,7 @@ export default function ReportsPage() {
                     className="px-1.5 py-1.5 bg-slate-50 border border-slate-200 rounded font-bold text-slate-900 cursor-pointer"
                   >
                     {AVAILABLE_BS_YEARS.map(y => (
-                      <option key={y} value={y}>{toNepaliDigits(y)}</option>
+                      <option key={y} value={y}>{y}</option>
                     ))}
                   </select>
                   {/* Month */}
@@ -767,7 +759,7 @@ export default function ReportsPage() {
                     onChange={(e) => setRangeToMonth(Number(e.target.value))}
                     className="px-1.5 py-1.5 bg-slate-50 border border-slate-200 rounded font-bold text-slate-900 cursor-pointer"
                   >
-                    {NEPALI_MONTHS_NP.map((m, idx) => (
+                    {NEPALI_MONTHS_EN.map((m, idx) => (
                       <option key={idx + 1} value={idx + 1}>{m}</option>
                     ))}
                   </select>
@@ -778,7 +770,7 @@ export default function ReportsPage() {
                     className="px-1.5 py-1.5 bg-slate-50 border border-slate-200 rounded font-bold text-slate-900 cursor-pointer"
                   >
                     {Array.from({ length: daysInToMonth }, (_, i) => i + 1).map(d => (
-                      <option key={d} value={d}>{toNepaliDigits(d)} गते</option>
+                      <option key={d} value={d}>Day {d}</option>
                     ))}
                   </select>
                 </div>
@@ -787,14 +779,14 @@ export default function ReportsPage() {
               {/* Department Filter */}
               <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
                 <span className="text-[11px] font-bold text-slate-700 block">
-                  🏛️ विभाग छनोट (Department):
+                  🏛️ Department:
                 </span>
                 <select
                   value={rangeDeptFilter}
                   onChange={(e) => setRangeDeptFilter(e.target.value)}
                   className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-900 cursor-pointer"
                 >
-                  <option value="ALL">सबै विभागहरू (All Departments)</option>
+                  <option value="ALL">All Departments</option>
                   {uniqueDepartments.map(d => (
                     <option key={d} value={d}>{d}</option>
                   ))}
@@ -804,14 +796,14 @@ export default function ReportsPage() {
               {/* Staff Filter (Individual vs All) */}
               <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
                 <span className="text-[11px] font-bold text-slate-700 block">
-                  👤 कर्मचारी छनोट (Staff):
+                  👤 Select Staff:
                 </span>
                 <select
                   value={rangeStaffFilter}
                   onChange={(e) => setRangeStaffFilter(e.target.value)}
                   className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-900 cursor-pointer"
                 >
-                  <option value="ALL">सबै कर्मचारीहरू (All Staff)</option>
+                  <option value="ALL">All Staff</option>
                   {employees.map(e => (
                     <option key={e.id} value={String(e.biometric_pin || e.id)}>
                       #{e.biometric_pin || '-'} - {e.full_name} ({e.department_name || 'AP1'})
@@ -833,7 +825,7 @@ export default function ReportsPage() {
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
-                  📋 कर्मचारी सारांश तालिका
+                  📋 Staff Summary Register
                 </button>
                 <button
                   type="button"
@@ -844,7 +836,7 @@ export default function ReportsPage() {
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
-                  📅 दैनिक विस्तृत विवरण ({toNepaliDigits(dateRangeData.dailyEntries.length)} पञ्च/दिन)
+                  📅 Daily Attendance Logs ({dateRangeData.dailyEntries.length} entries)
                 </button>
               </div>
 
@@ -852,7 +844,7 @@ export default function ReportsPage() {
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="कर्मचारी, PIN वा विभाग खोज्नुहोस्..."
+                  placeholder="Search staff, PIN or department..."
                   value={rangeSearchQuery}
                   onChange={(e) => setRangeSearchQuery(e.target.value)}
                   className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 font-medium"
@@ -865,8 +857,8 @@ export default function ReportsPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
               <div>
-                <span className="text-[11px] font-medium text-slate-500 block">दायराको कुल दिन</span>
-                <span className="text-xl font-bold text-slate-900 mt-0.5 block">{toNepaliDigits(dateRangeData.totalDays)} दिन</span>
+                <span className="text-[11px] font-medium text-slate-500 block">Total Days in Range</span>
+                <span className="text-xl font-bold text-slate-900 mt-0.5 block">{dateRangeData.totalDays} Days</span>
               </div>
               <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
                 <Calendar className="w-5 h-5" />
@@ -875,8 +867,8 @@ export default function ReportsPage() {
 
             <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
               <div>
-                <span className="text-[11px] font-medium text-slate-500 block">समावेश कर्मचारी</span>
-                <span className="text-xl font-bold text-slate-900 mt-0.5 block">{toNepaliDigits(dateRangeData.totalEmployees)} जना</span>
+                <span className="text-[11px] font-medium text-slate-500 block">Included Staff</span>
+                <span className="text-xl font-bold text-slate-900 mt-0.5 block">{dateRangeData.totalEmployees}</span>
               </div>
               <div className="p-2.5 bg-purple-50 text-purple-600 rounded-lg">
                 <Users className="w-5 h-5" />
@@ -885,8 +877,8 @@ export default function ReportsPage() {
 
             <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
               <div>
-                <span className="text-[11px] font-medium text-slate-500 block">औसत हाजिरी दर</span>
-                <span className="text-xl font-bold text-emerald-600 mt-0.5 block">{toNepaliDigits(dateRangeData.overallAttendanceRate)}%</span>
+                <span className="text-[11px] font-medium text-slate-500 block">Avg Attendance Rate</span>
+                <span className="text-xl font-bold text-emerald-600 mt-0.5 block">{dateRangeData.overallAttendanceRate}%</span>
               </div>
               <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg">
                 <CheckCircle2 className="w-5 h-5" />
@@ -895,8 +887,8 @@ export default function ReportsPage() {
 
             <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
               <div>
-                <span className="text-[11px] font-medium text-slate-500 block">काम गरेको कुल समय</span>
-                <span className="text-xl font-bold text-slate-900 mt-0.5 block">{toNepaliDigits(dateRangeData.overallWorkedHours.toFixed(1))} घ</span>
+                <span className="text-[11px] font-medium text-slate-500 block">Total Worked Hours</span>
+                <span className="text-xl font-bold text-slate-900 mt-0.5 block">{dateRangeData.overallWorkedHours.toFixed(1)} hrs</span>
               </div>
               <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
                 <Clock className="w-5 h-5" />
@@ -909,10 +901,10 @@ export default function ReportsPage() {
             <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
               <div className="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
                 <h5 className="font-bold text-xs text-slate-800">
-                  कर्मचारी सारांश तालिका ({dateRangeData.rangeLabel})
+                  Staff Summary Register ({dateRangeData.rangeLabel})
                 </h5>
                 <span className="text-[11px] text-slate-500">
-                  कुल {toNepaliDigits(filteredRangeSummaries.length)} जना कर्मचारी
+                  Total {filteredRangeSummaries.length} Staff Members
                 </span>
               </div>
               <div className="overflow-x-auto">
@@ -920,16 +912,16 @@ export default function ReportsPage() {
                   <thead>
                     <tr className="bg-slate-100/70 border-b border-slate-200 text-slate-600 font-semibold text-[11px]">
                       <th className="py-2.5 px-3">PIN</th>
-                      <th className="py-2.5 px-3">कर्मचारी</th>
-                      <th className="py-2.5 px-3">विभाग</th>
-                      <th className="py-2.5 px-3">पद</th>
-                      <th className="py-2.5 px-3 text-emerald-800 font-bold">उपस्थित</th>
-                      <th className="py-2.5 px-3 text-amber-800 font-bold">ढिलो</th>
-                      <th className="py-2.5 px-3 text-indigo-800 font-bold">हप्ता बिदा</th>
-                      <th className="py-2.5 px-3 text-blue-800 font-bold">बिदा</th>
-                      <th className="py-2.5 px-3 text-red-800 font-bold">अनुपस्थित</th>
-                      <th className="py-2.5 px-3">काम गरेको घण्टा</th>
-                      <th className="py-2.5 px-3">हाजिरी दर %</th>
+                      <th className="py-2.5 px-3">Staff Member</th>
+                      <th className="py-2.5 px-3">Department</th>
+                      <th className="py-2.5 px-3">Designation</th>
+                      <th className="py-2.5 px-3 text-emerald-800 font-bold">Present</th>
+                      <th className="py-2.5 px-3 text-amber-800 font-bold">Late</th>
+                      <th className="py-2.5 px-3 text-indigo-800 font-bold">Week-Off</th>
+                      <th className="py-2.5 px-3 text-blue-800 font-bold">Leaves</th>
+                      <th className="py-2.5 px-3 text-red-800 font-bold">Absent</th>
+                      <th className="py-2.5 px-3">Worked Hours</th>
+                      <th className="py-2.5 px-3">Attendance %</th>
                       <th className="py-2.5 px-3 text-center">Excel</th>
                     </tr>
                   </thead>
@@ -940,21 +932,21 @@ export default function ReportsPage() {
                         <td className="py-2.5 px-3 font-bold text-slate-900">{s.name}</td>
                         <td className="py-2.5 px-3 text-slate-600">{s.department}</td>
                         <td className="py-2.5 px-3 text-slate-500">{s.designation}</td>
-                        <td className="py-2.5 px-3 font-bold text-emerald-700">{toNepaliDigits(s.presentDays)} दिन</td>
+                        <td className="py-2.5 px-3 font-bold text-emerald-700">{s.presentDays} Days</td>
                         <td className="py-2.5 px-3 font-semibold text-amber-700">
-                          {s.lateDays > 0 ? `${toNepaliDigits(s.lateDays)} दिन` : '-'}
+                          {s.lateDays > 0 ? `${s.lateDays} Days` : '-'}
                         </td>
                         <td className="py-2.5 px-3 font-semibold text-indigo-700">
-                          {s.weekOffDays > 0 ? `${toNepaliDigits(s.weekOffDays)} दिन` : '-'}
+                          {s.weekOffDays > 0 ? `${s.weekOffDays} Days` : '-'}
                         </td>
                         <td className="py-2.5 px-3 font-semibold text-blue-700">
-                          {s.leaveDays > 0 ? `${toNepaliDigits(s.leaveDays)} दिन` : '-'}
+                          {s.leaveDays > 0 ? `${s.leaveDays} Days` : '-'}
                         </td>
                         <td className="py-2.5 px-3 font-semibold text-red-600">
-                          {s.absentDays > 0 ? `${toNepaliDigits(s.absentDays)} दिन` : '-'}
+                          {s.absentDays > 0 ? `${s.absentDays} Days` : '-'}
                         </td>
-                        <td className="py-2.5 px-3 font-medium text-slate-800">{toNepaliDigits(s.totalWorkedHours.toFixed(1))} घ</td>
-                        <td className="py-2.5 px-3 font-bold text-emerald-700">{toNepaliDigits(s.attendancePct)}%</td>
+                        <td className="py-2.5 px-3 font-medium text-slate-800">{s.totalWorkedHours.toFixed(1)} hrs</td>
+                        <td className="py-2.5 px-3 font-bold text-emerald-700">{s.attendancePct}%</td>
                         <td className="py-2.5 px-3 text-center">
                           <button
                             onClick={() => {
@@ -969,7 +961,7 @@ export default function ReportsPage() {
                               }
                             }}
                             className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors cursor-pointer"
-                            title="यो कर्मचारीको मिति दायरा Excel डाउनलोड"
+                            title="Download date range Excel for this employee"
                           >
                             <FileSpreadsheet className="w-3 h-3 text-emerald-600" />
                             <span>Excel</span>
@@ -985,34 +977,34 @@ export default function ReportsPage() {
             <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
               <div className="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
                 <h5 className="font-bold text-xs text-slate-800">
-                  दैनिक विस्तृत हाजिरी पञ्चहरू ({dateRangeData.rangeLabel})
+                  Daily Attendance Logs ({dateRangeData.rangeLabel})
                 </h5>
                 <span className="text-[11px] text-slate-500">
-                  कुल {toNepaliDigits(filteredRangeDailyEntries.length)} वटा प्रविष्टि
+                  Total {filteredRangeDailyEntries.length} Entries
                 </span>
               </div>
               <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead className="sticky top-0 bg-slate-100 border-b border-slate-200 text-slate-700 font-semibold text-[11px]">
                     <tr>
-                      <th className="py-2.5 px-3">क्र.सं.</th>
-                      <th className="py-2.5 px-3">मिति (वि.सं.)</th>
-                      <th className="py-2.5 px-3">बार</th>
+                      <th className="py-2.5 px-3">S.N.</th>
+                      <th className="py-2.5 px-3">BS Date</th>
+                      <th className="py-2.5 px-3">Day</th>
                       <th className="py-2.5 px-3">PIN</th>
-                      <th className="py-2.5 px-3">कर्मचारीको नाम</th>
-                      <th className="py-2.5 px-3">विभाग</th>
-                      <th className="py-2.5 px-3">स्थिति</th>
-                      <th className="py-2.5 px-3">आएको (In)</th>
-                      <th className="py-2.5 px-3">गएको (Out)</th>
-                      <th className="py-2.5 px-3">काम गरेको समय</th>
-                      <th className="py-2.5 px-3">ढिलो</th>
-                      <th className="py-2.5 px-3">कैफियत</th>
+                      <th className="py-2.5 px-3">Staff Member</th>
+                      <th className="py-2.5 px-3">Department</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3">In Time</th>
+                      <th className="py-2.5 px-3">Out Time</th>
+                      <th className="py-2.5 px-3">Worked Hours</th>
+                      <th className="py-2.5 px-3">Late</th>
+                      <th className="py-2.5 px-3">Remarks</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredRangeDailyEntries.map((d) => (
                       <tr key={`${d.employeePin}_${d.adDateStr}_${d.sn}`} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="py-2 px-3 font-mono font-bold text-slate-500">{d.snNp}</td>
+                        <td className="py-2 px-3 font-mono font-bold text-slate-500">{d.sn}</td>
                         <td className="py-2 px-3 font-semibold text-slate-900">{d.bsDateStr}</td>
                         <td className="py-2 px-3 text-slate-600 font-medium">{d.dayNameNp}</td>
                         <td className="py-2 px-3 font-mono text-slate-700">#{d.employeePin}</td>
@@ -1065,17 +1057,17 @@ export default function ReportsPage() {
                 </div>
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between py-1 border-b border-slate-100">
-                    <span className="text-slate-500 font-medium">कर्मचारी संख्या</span>
-                    <span className="font-bold text-slate-800">{toNepaliDigits(staffInDept.length)} जना</span>
+                    <span className="text-slate-500 font-medium">Total Staff</span>
+                    <span className="font-bold text-slate-800">{staffInDept.length}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-slate-100">
-                    <span className="text-slate-500 font-medium">विभागको औसत हाजिरी दर</span>
-                    <span className="font-bold text-emerald-600">{toNepaliDigits(avgAttendance)}%</span>
+                    <span className="text-slate-500 font-medium">Average Attendance Rate</span>
+                    <span className="font-bold text-emerald-600">{avgAttendance}%</span>
                   </div>
                   <div className="flex justify-between py-1">
-                    <span className="text-slate-500 font-medium">{selectedBsMonthName} महिनाको कुल ढिलो</span>
+                    <span className="text-slate-500 font-medium">Total Late in {selectedBsMonthNameEn}</span>
                     <span className="font-bold text-amber-600">
-                      {toNepaliDigits(staffInDept.reduce((acc, s) => acc + s.lateDays, 0))} पटक
+                      {staffInDept.reduce((acc, s) => acc + s.lateDays, 0)} times
                     </span>
                   </div>
                 </div>
@@ -1099,13 +1091,13 @@ export default function ReportsPage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-                    <span>व्यक्तिगत मासिक दैनिक हाजिरी विवरण (Individual Attendance)</span>
+                    <span>Individual Monthly Attendance Register (Bikram Sambat)</span>
                     <span className="text-[11px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md font-semibold">
                       Excel (.xlsx)
                     </span>
                   </h3>
                   <p className="text-xs text-slate-500 font-medium">
-                    कुनै एक कर्मचारीको छनोट गरिएको महिनाको १ गतेदेखि मसान्तसम्मको सम्पूर्ण दैनिक हाजिरी विवरण
+                    Complete daily attendance register for selected employee from 1st to end of month
                   </p>
                 </div>
               </div>
@@ -1122,7 +1114,7 @@ export default function ReportsPage() {
               {/* Staff Selector */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  कर्मचारी छनोट गर्नुहोस्:
+                  Select Employee:
                 </label>
                 <select
                   value={selectedStaffPin}
@@ -1140,7 +1132,7 @@ export default function ReportsPage() {
               {/* BS Year */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  साल (वि.सं.):
+                  BS Year:
                 </label>
                 <select
                   value={selectedBsYear}
@@ -1148,7 +1140,7 @@ export default function ReportsPage() {
                   className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-900 focus:outline-none cursor-pointer"
                 >
                   {AVAILABLE_BS_YEARS.map(y => (
-                    <option key={y} value={y}>{toNepaliDigits(y)} साल (BS)</option>
+                    <option key={y} value={y}>{y} BS</option>
                   ))}
                 </select>
               </div>
@@ -1156,16 +1148,16 @@ export default function ReportsPage() {
               {/* BS Month */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  महिना:
+                  BS Month:
                 </label>
                 <select
                   value={selectedBsMonth}
                   onChange={(e) => setSelectedBsMonth(Number(e.target.value))}
                   className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-900 focus:outline-none cursor-pointer"
                 >
-                  {NEPALI_MONTHS_NP.map((m, idx) => (
+                  {NEPALI_MONTHS_EN.map((m, idx) => (
                     <option key={idx + 1} value={idx + 1}>
-                      {m} ({NEPALI_MONTHS_EN[idx]})
+                      {m} ({NEPALI_MONTHS_NP[idx]})
                     </option>
                   ))}
                 </select>
@@ -1178,36 +1170,36 @@ export default function ReportsPage() {
                 {/* Employee Profile & Stat Cards */}
                 <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2.5 text-center">
                   <div className="bg-white p-2 rounded-lg border border-slate-100">
-                    <span className="block text-[10px] text-slate-500 font-medium">कुल दिन</span>
-                    <span className="font-bold text-xs text-slate-900">{toNepaliDigits(individualStaffData.summary.totalDays)} दिन</span>
+                    <span className="block text-[10px] text-slate-500 font-medium">Total Days</span>
+                    <span className="font-bold text-xs text-slate-900">{individualStaffData.summary.totalDays} Days</span>
                   </div>
                   <div className="bg-white p-2 rounded-lg border border-slate-100">
-                    <span className="block text-[10px] text-emerald-600 font-medium">उपस्थित</span>
-                    <span className="font-bold text-xs text-emerald-700">{toNepaliDigits(individualStaffData.summary.presentDays)} दिन</span>
+                    <span className="block text-[10px] text-emerald-600 font-medium">Present</span>
+                    <span className="font-bold text-xs text-emerald-700">{individualStaffData.summary.presentDays} Days</span>
                   </div>
                   <div className="bg-white p-2 rounded-lg border border-slate-100">
-                    <span className="block text-[10px] text-amber-600 font-medium">ढिलो</span>
-                    <span className="font-bold text-xs text-amber-700">{toNepaliDigits(individualStaffData.summary.lateDays)} दिन</span>
+                    <span className="block text-[10px] text-amber-600 font-medium">Late</span>
+                    <span className="font-bold text-xs text-amber-700">{individualStaffData.summary.lateDays} Days</span>
                   </div>
                   <div className="bg-white p-2 rounded-lg border border-slate-100">
-                    <span className="block text-[10px] text-indigo-600 font-medium">हप्ता बिदा</span>
-                    <span className="font-bold text-xs text-indigo-700">{toNepaliDigits(individualStaffData.summary.weekOffDays)} दिन</span>
+                    <span className="block text-[10px] text-indigo-600 font-medium">Weekly Off</span>
+                    <span className="font-bold text-xs text-indigo-700">{individualStaffData.summary.weekOffDays} Days</span>
                   </div>
                   <div className="bg-white p-2 rounded-lg border border-slate-100">
-                    <span className="block text-[10px] text-blue-600 font-medium">बिदा</span>
-                    <span className="font-bold text-xs text-blue-700">{toNepaliDigits(individualStaffData.summary.leaveDays)} दिन</span>
+                    <span className="block text-[10px] text-blue-600 font-medium">Leaves</span>
+                    <span className="font-bold text-xs text-blue-700">{individualStaffData.summary.leaveDays} Days</span>
                   </div>
                   <div className="bg-white p-2 rounded-lg border border-slate-100">
-                    <span className="block text-[10px] text-red-600 font-medium">अनुपस्थित</span>
-                    <span className="font-bold text-xs text-red-700">{toNepaliDigits(individualStaffData.summary.absentDays)} दिन</span>
+                    <span className="block text-[10px] text-red-600 font-medium">Absent</span>
+                    <span className="font-bold text-xs text-red-700">{individualStaffData.summary.absentDays} Days</span>
                   </div>
                   <div className="bg-white p-2 rounded-lg border border-slate-100">
-                    <span className="block text-[10px] text-slate-500 font-medium">कुल समय</span>
-                    <span className="font-bold text-xs text-slate-800">{toNepaliDigits(individualStaffData.summary.totalWorkedHours.toFixed(1))} घ</span>
+                    <span className="block text-[10px] text-slate-500 font-medium">Total Hours</span>
+                    <span className="font-bold text-xs text-slate-800">{individualStaffData.summary.totalWorkedHours.toFixed(1)} hrs</span>
                   </div>
                   <div className="bg-white p-2 rounded-lg border border-slate-100">
-                    <span className="block text-[10px] text-emerald-600 font-medium">हाजिरी दर</span>
-                    <span className="font-bold text-xs text-emerald-700">{toNepaliDigits(individualStaffData.summary.attendanceRate)}%</span>
+                    <span className="block text-[10px] text-emerald-600 font-medium">Attendance %</span>
+                    <span className="font-bold text-xs text-emerald-700">{individualStaffData.summary.attendanceRate}%</span>
                   </div>
                 </div>
 
@@ -1217,21 +1209,21 @@ export default function ReportsPage() {
                     <table className="w-full text-left border-collapse text-xs">
                       <thead className="sticky top-0 bg-slate-100 border-b border-slate-200 text-slate-700 font-semibold text-[11px]">
                         <tr>
-                          <th className="py-2.5 px-3">क्र.सं.</th>
-                          <th className="py-2.5 px-3">मिति (वि.सं.)</th>
-                          <th className="py-2.5 px-3">बार</th>
-                          <th className="py-2.5 px-3">स्थिति</th>
-                          <th className="py-2.5 px-3">आएको (In)</th>
-                          <th className="py-2.5 px-3">गएको (Out)</th>
-                          <th className="py-2.5 px-3">काम गरेको समय</th>
-                          <th className="py-2.5 px-3">ढिलो</th>
-                          <th className="py-2.5 px-3">कैफियत</th>
+                          <th className="py-2.5 px-3">S.N.</th>
+                          <th className="py-2.5 px-3">BS Date</th>
+                          <th className="py-2.5 px-3">Day</th>
+                          <th className="py-2.5 px-3">Status</th>
+                          <th className="py-2.5 px-3">In Time</th>
+                          <th className="py-2.5 px-3">Out Time</th>
+                          <th className="py-2.5 px-3">Worked Hours</th>
+                          <th className="py-2.5 px-3">Late</th>
+                          <th className="py-2.5 px-3">Remarks</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {individualStaffData.days.map(d => (
                           <tr key={d.sn} className="hover:bg-slate-50/70 transition-colors">
-                            <td className="py-2 px-3 font-mono font-bold text-slate-500">{d.snNp}</td>
+                            <td className="py-2 px-3 font-mono font-bold text-slate-500">{d.sn}</td>
                             <td className="py-2 px-3 font-semibold text-slate-900">{d.bsDateStr}</td>
                             <td className="py-2 px-3 text-slate-600 font-medium">{d.dayNameNp}</td>
                             <td className="py-2 px-3">
@@ -1260,7 +1252,7 @@ export default function ReportsPage() {
                 </div>
               </div>
             ) : (
-              <div className="p-8 text-center text-slate-400">कर्मचारी चयन गर्नुहोस्...</div>
+              <div className="p-8 text-center text-slate-400">Please select an employee...</div>
             )}
 
             {/* Modal Footer */}
@@ -1270,7 +1262,7 @@ export default function ReportsPage() {
                 onClick={() => setShowIndividualModal(false)}
                 className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
               >
-                बन्द गर्नुहोस्
+                Close
               </button>
 
               <button
@@ -1289,399 +1281,10 @@ export default function ReportsPage() {
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-colors cursor-pointer text-xs"
               >
                 <FileSpreadsheet className="w-4 h-4" />
-                <span>दैनिक हाजिरी Excel डाउनलोड गर्नुहोस् (.xlsx)</span>
+                <span>Download Daily Attendance Excel (.xlsx)</span>
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* ================================================================= */}
-      {/* 2. CUSTOM BIKRAM SAMBAT DATE RANGE ATTENDANCE REPORT              */}
-      {/* ================================================================= */}
-      {reportType === 'date_range' && (
-        <div className="space-y-4">
-          {/* Main Filter & BS Date Range Selector Box */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <span>नेपाली क्यालेन्डर मिति दायरा (Custom BS Date Range)</span>
-                  <span className="text-xs px-2.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full font-bold">
-                    {dateRangeData.rangeLabel}
-                  </span>
-                </h4>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  कुनै पनि निश्चित मिति दायरा (जस्तै कार्तिक २ देखि ५ गते सम्म) छानेर सबै वा निश्चित विभाग/कर्मचारीको हाजिरी निकाल्नुहोस्
-                </p>
-              </div>
-
-              {/* Export Buttons */}
-              <div className="flex items-center gap-2 justify-end">
-                <button
-                  onClick={handleExportDateRangeExcel}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-colors cursor-pointer"
-                  title="छानिएको मिति दायराको हाजिरी Excel फाइल डाउनलोड गर्नुहोस्"
-                >
-                  <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
-                  <span>दायरा Excel (.xlsx)</span>
-                </button>
-                <button
-                  onClick={handleExportDateRangePdf}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white shadow-xs transition-colors cursor-pointer"
-                  title="छानिएको मिति दायराको औपचारिक PDF डाउनलोड गर्नुहोस्"
-                >
-                  <Download className="w-4 h-4 text-red-100" />
-                  <span>दायरा PDF (.pdf)</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Date Range Pickers Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
-              {/* FROM BS DATE */}
-              <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
-                    <span>🟢 सुरु मिति (From Date):</span>
-                  </span>
-                  <span className="text-[10px] font-bold text-slate-500">वि.सं.</span>
-                </div>
-                <div className="grid grid-cols-3 gap-1.5 text-xs">
-                  {/* Year */}
-                  <select
-                    value={rangeFromYear}
-                    onChange={(e) => setRangeFromYear(Number(e.target.value))}
-                    className="px-1.5 py-1.5 bg-slate-50 border border-slate-200 rounded font-bold text-slate-900 cursor-pointer"
-                  >
-                    {AVAILABLE_BS_YEARS.map(y => (
-                      <option key={y} value={y}>{toNepaliDigits(y)}</option>
-                    ))}
-                  </select>
-                  {/* Month */}
-                  <select
-                    value={rangeFromMonth}
-                    onChange={(e) => setRangeFromMonth(Number(e.target.value))}
-                    className="px-1.5 py-1.5 bg-slate-50 border border-slate-200 rounded font-bold text-slate-900 cursor-pointer"
-                  >
-                    {NEPALI_MONTHS_NP.map((m, idx) => (
-                      <option key={idx + 1} value={idx + 1}>{m}</option>
-                    ))}
-                  </select>
-                  {/* Day */}
-                  <select
-                    value={rangeFromDay}
-                    onChange={(e) => setRangeFromDay(Number(e.target.value))}
-                    className="px-1.5 py-1.5 bg-slate-50 border border-slate-200 rounded font-bold text-slate-900 cursor-pointer"
-                  >
-                    {Array.from({ length: daysInFromMonth }, (_, i) => i + 1).map(d => (
-                      <option key={d} value={d}>{toNepaliDigits(d)} गते</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* TO BS DATE */}
-              <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
-                    <span>🔴 अन्तिम मिति (To Date):</span>
-                  </span>
-                  <span className="text-[10px] font-bold text-slate-500">वि.सं.</span>
-                </div>
-                <div className="grid grid-cols-3 gap-1.5 text-xs">
-                  {/* Year */}
-                  <select
-                    value={rangeToYear}
-                    onChange={(e) => setRangeToYear(Number(e.target.value))}
-                    className="px-1.5 py-1.5 bg-slate-50 border border-slate-200 rounded font-bold text-slate-900 cursor-pointer"
-                  >
-                    {AVAILABLE_BS_YEARS.map(y => (
-                      <option key={y} value={y}>{toNepaliDigits(y)}</option>
-                    ))}
-                  </select>
-                  {/* Month */}
-                  <select
-                    value={rangeToMonth}
-                    onChange={(e) => setRangeToMonth(Number(e.target.value))}
-                    className="px-1.5 py-1.5 bg-slate-50 border border-slate-200 rounded font-bold text-slate-900 cursor-pointer"
-                  >
-                    {NEPALI_MONTHS_NP.map((m, idx) => (
-                      <option key={idx + 1} value={idx + 1}>{m}</option>
-                    ))}
-                  </select>
-                  {/* Day */}
-                  <select
-                    value={rangeToDay}
-                    onChange={(e) => setRangeToDay(Number(e.target.value))}
-                    className="px-1.5 py-1.5 bg-slate-50 border border-slate-200 rounded font-bold text-slate-900 cursor-pointer"
-                  >
-                    {Array.from({ length: daysInToMonth }, (_, i) => i + 1).map(d => (
-                      <option key={d} value={d}>{toNepaliDigits(d)} गते</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Department Filter */}
-              <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
-                <span className="text-[11px] font-bold text-slate-700 block">
-                  🏛️ विभाग छनोट (Department):
-                </span>
-                <select
-                  value={rangeDeptFilter}
-                  onChange={(e) => setRangeDeptFilter(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-900 cursor-pointer"
-                >
-                  <option value="ALL">सबै विभागहरू (All Departments)</option>
-                  {uniqueDepartments.map(d => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Staff Filter (Individual vs All) */}
-              <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
-                <span className="text-[11px] font-bold text-slate-700 block">
-                  👤 कर्मचारी छनोट (Staff):
-                </span>
-                <select
-                  value={rangeStaffFilter}
-                  onChange={(e) => setRangeStaffFilter(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-900 cursor-pointer"
-                >
-                  <option value="ALL">सबै कर्मचारीहरू (All Staff)</option>
-                  {employees.map(e => (
-                    <option key={e.id} value={String(e.biometric_pin || e.id)}>
-                      #{e.biometric_pin || '-'} - {e.full_name} ({e.department_name || 'AP1'})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Sub-bar: Search & View Mode Switcher */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setRangeSubView('summary')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    rangeSubView === 'summary'
-                      ? 'bg-slate-900 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  📋 कर्मचारी सारांश तालिका
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRangeSubView('daily')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    rangeSubView === 'daily'
-                      ? 'bg-slate-900 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  📅 दैनिक विस्तृत विवरण ({toNepaliDigits(dateRangeData.dailyEntries.length)} पञ्च/दिन)
-                </button>
-              </div>
-
-              <div className="relative max-w-xs w-full">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="कर्मचारी, PIN वा विभाग खोज्नुहोस्..."
-                  value={rangeSearchQuery}
-                  onChange={(e) => setRangeSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 font-medium"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* KPI Stat Cards for Date Range */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
-              <div>
-                <span className="text-[11px] font-medium text-slate-500 block">दायराको कुल दिन</span>
-                <span className="text-xl font-bold text-slate-900 mt-0.5 block">{toNepaliDigits(dateRangeData.totalDays)} दिन</span>
-              </div>
-              <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
-                <Calendar className="w-5 h-5" />
-              </div>
-            </div>
-
-            <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
-              <div>
-                <span className="text-[11px] font-medium text-slate-500 block">समावेश कर्मचारी</span>
-                <span className="text-xl font-bold text-slate-900 mt-0.5 block">{toNepaliDigits(dateRangeData.totalEmployees)} जना</span>
-              </div>
-              <div className="p-2.5 bg-purple-50 text-purple-600 rounded-lg">
-                <Users className="w-5 h-5" />
-              </div>
-            </div>
-
-            <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
-              <div>
-                <span className="text-[11px] font-medium text-slate-500 block">औसत हाजिरी दर</span>
-                <span className="text-xl font-bold text-emerald-600 mt-0.5 block">{toNepaliDigits(dateRangeData.overallAttendanceRate)}%</span>
-              </div>
-              <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-            </div>
-
-            <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
-              <div>
-                <span className="text-[11px] font-medium text-slate-500 block">काम गरेको कुल समय</span>
-                <span className="text-xl font-bold text-slate-900 mt-0.5 block">{toNepaliDigits(dateRangeData.overallWorkedHours.toFixed(1))} घ</span>
-              </div>
-              <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
-                <Clock className="w-5 h-5" />
-              </div>
-            </div>
-          </div>
-
-          {/* Data Tables */}
-          {rangeSubView === 'summary' ? (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-              <div className="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
-                <h5 className="font-bold text-xs text-slate-800">
-                  कर्मचारी सारांश तालिका ({dateRangeData.rangeLabel})
-                </h5>
-                <span className="text-[11px] text-slate-500">
-                  कुल {toNepaliDigits(filteredRangeSummaries.length)} जना कर्मचारी
-                </span>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-slate-100/70 border-b border-slate-200 text-slate-600 font-semibold text-[11px]">
-                      <th className="py-2.5 px-3">PIN</th>
-                      <th className="py-2.5 px-3">कर्मचारी</th>
-                      <th className="py-2.5 px-3">विभाग</th>
-                      <th className="py-2.5 px-3">पद</th>
-                      <th className="py-2.5 px-3 text-emerald-800 font-bold">उपस्थित</th>
-                      <th className="py-2.5 px-3 text-amber-800 font-bold">ढिलो</th>
-                      <th className="py-2.5 px-3 text-indigo-800 font-bold">हप्ता बिदा</th>
-                      <th className="py-2.5 px-3 text-blue-800 font-bold">बिदा</th>
-                      <th className="py-2.5 px-3 text-red-800 font-bold">अनुपस्थित</th>
-                      <th className="py-2.5 px-3">काम गरेको घण्टा</th>
-                      <th className="py-2.5 px-3">हाजिरी दर %</th>
-                      <th className="py-2.5 px-3 text-center">Excel</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredRangeSummaries.map((s) => (
-                      <tr key={s.pin} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="py-2.5 px-3 font-mono font-bold text-slate-700">#{s.pin}</td>
-                        <td className="py-2.5 px-3 font-bold text-slate-900">{s.name}</td>
-                        <td className="py-2.5 px-3 text-slate-600">{s.department}</td>
-                        <td className="py-2.5 px-3 text-slate-500">{s.designation}</td>
-                        <td className="py-2.5 px-3 font-bold text-emerald-700">{toNepaliDigits(s.presentDays)} दिन</td>
-                        <td className="py-2.5 px-3 font-semibold text-amber-700">
-                          {s.lateDays > 0 ? `${toNepaliDigits(s.lateDays)} दिन` : '-'}
-                        </td>
-                        <td className="py-2.5 px-3 font-semibold text-indigo-700">
-                          {s.weekOffDays > 0 ? `${toNepaliDigits(s.weekOffDays)} दिन` : '-'}
-                        </td>
-                        <td className="py-2.5 px-3 font-semibold text-blue-700">
-                          {s.leaveDays > 0 ? `${toNepaliDigits(s.leaveDays)} दिन` : '-'}
-                        </td>
-                        <td className="py-2.5 px-3 font-semibold text-red-600">
-                          {s.absentDays > 0 ? `${toNepaliDigits(s.absentDays)} दिन` : '-'}
-                        </td>
-                        <td className="py-2.5 px-3 font-medium text-slate-800">{toNepaliDigits(s.totalWorkedHours.toFixed(1))} घ</td>
-                        <td className="py-2.5 px-3 font-bold text-emerald-700">{toNepaliDigits(s.attendancePct)}%</td>
-                        <td className="py-2.5 px-3 text-center">
-                          <button
-                            onClick={() => {
-                              const emp = employees.find(e => String(e.biometric_pin || e.id) === s.pin);
-                              if (emp) {
-                                exportDateRangeExcel({
-                                  ...dateRangeData,
-                                  isIndividual: true,
-                                  summaries: [s],
-                                  dailyEntries: dateRangeData.dailyEntries.filter(d => d.employeePin === s.pin)
-                                });
-                              }
-                            }}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors cursor-pointer"
-                            title="यो कर्मचारीको मिति दायरा Excel डाउनलोड"
-                          >
-                            <FileSpreadsheet className="w-3 h-3 text-emerald-600" />
-                            <span>Excel</span>
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-              <div className="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
-                <h5 className="font-bold text-xs text-slate-800">
-                  दैनिक विस्तृत हाजिरी पञ्चहरू ({dateRangeData.rangeLabel})
-                </h5>
-                <span className="text-[11px] text-slate-500">
-                  कुल {toNepaliDigits(filteredRangeDailyEntries.length)} वटा प्रविष्टि
-                </span>
-              </div>
-              <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead className="sticky top-0 bg-slate-100 border-b border-slate-200 text-slate-700 font-semibold text-[11px]">
-                    <tr>
-                      <th className="py-2.5 px-3">क्र.सं.</th>
-                      <th className="py-2.5 px-3">मिति (वि.सं.)</th>
-                      <th className="py-2.5 px-3">बार</th>
-                      <th className="py-2.5 px-3">PIN</th>
-                      <th className="py-2.5 px-3">कर्मचारीको नाम</th>
-                      <th className="py-2.5 px-3">विभाग</th>
-                      <th className="py-2.5 px-3">स्थिति</th>
-                      <th className="py-2.5 px-3">आएको (In)</th>
-                      <th className="py-2.5 px-3">गएको (Out)</th>
-                      <th className="py-2.5 px-3">काम गरेको समय</th>
-                      <th className="py-2.5 px-3">ढिलो</th>
-                      <th className="py-2.5 px-3">कैफियत</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredRangeDailyEntries.map((d) => (
-                      <tr key={`${d.employeePin}_${d.adDateStr}_${d.sn}`} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="py-2 px-3 font-mono font-bold text-slate-500">{d.snNp}</td>
-                        <td className="py-2 px-3 font-semibold text-slate-900">{d.bsDateStr}</td>
-                        <td className="py-2 px-3 text-slate-600 font-medium">{d.dayNameNp}</td>
-                        <td className="py-2 px-3 font-mono text-slate-700">#{d.employeePin}</td>
-                        <td className="py-2 px-3 font-bold text-slate-900">{d.employeeName}</td>
-                        <td className="py-2 px-3 text-slate-600">{d.department}</td>
-                        <td className="py-2 px-3">
-                          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            d.statusKey === 'PRESENT' ? 'bg-emerald-100 text-emerald-800' :
-                            d.statusKey === 'LATE' ? 'bg-amber-100 text-amber-800' :
-                            d.statusKey === 'WEEK_OFF' ? 'bg-indigo-100 text-indigo-800' :
-                            d.statusKey === 'WEEK_OFF_WORK' ? 'bg-purple-100 text-purple-800' :
-                            d.statusKey === 'LEAVE' ? 'bg-blue-100 text-blue-800' :
-                            d.statusKey === 'ABSENT' ? 'bg-rose-100 text-rose-800' :
-                            'bg-slate-100 text-slate-600'
-                          }`}>
-                            {d.statusNp}
-                          </span>
-                        </td>
-                        <td className="py-2 px-3 font-mono text-slate-700">{d.inTimeStr}</td>
-                        <td className="py-2 px-3 font-mono text-slate-700">{d.outTimeStr}</td>
-                        <td className="py-2 px-3 font-medium text-slate-800">{d.workedHoursStr}</td>
-                        <td className="py-2 px-3 font-medium text-amber-700">{d.lateMinutesStr}</td>
-                        <td className="py-2 px-3 text-slate-500 text-[11px]">{d.remarks}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
         </div>
       )}
     </DashboardShell>

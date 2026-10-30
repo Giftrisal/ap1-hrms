@@ -109,13 +109,13 @@ export function useLicense(): UseLicenseResult {
   const hoursRemaining = Math.ceil(msRemaining / (1000 * 60 * 60));
   const daysRemaining = Math.ceil(msRemaining / (1000 * 60 * 60 * 24));
   
-  let timeRemainingLabel = `${daysRemaining} दिन (Days)`;
+  let timeRemainingLabel = `${daysRemaining} Days`;
   if (hoursRemaining <= 24) {
     const hours = Math.floor(msRemaining / (1000 * 60 * 60));
     const mins = Math.floor((msRemaining % (1000 * 60 * 60)) / (1000 * 60));
-    timeRemainingLabel = `${hours} घण्टा ${mins} मिनेट (${hours}h ${mins}m)`;
-  } else if (daysRemaining <= 7) {
-    timeRemainingLabel = `${daysRemaining} दिन (${daysRemaining} Days)`;
+    timeRemainingLabel = `${hours}h ${mins}m`;
+  } else {
+    timeRemainingLabel = `${daysRemaining} Days`;
   }
 
   const isExpired = license ? now > expiresAt : false;
@@ -137,7 +137,7 @@ export function useLicense(): UseLicenseResult {
 
       const data = await res.json();
       if (!data.success) {
-        return { success: false, error: data.error || 'लाइसेन्स सक्रिय हुन सकेन' };
+        return { success: false, error: data.error || 'Failed to activate license' };
       }
 
       const newPayload: LicensePayload = data.payload;
@@ -151,7 +151,7 @@ export function useLicense(): UseLicenseResult {
 
       return { success: true, message: data.message };
     } catch (err: any) {
-      return { success: false, error: err.message || 'नेटवर्क त्रुटि' };
+      return { success: false, error: err.message || 'Network error' };
     }
   };
 

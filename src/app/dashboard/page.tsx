@@ -312,7 +312,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <h4 className="font-bold text-amber-950 dark:text-amber-200 text-sm flex items-center gap-2">
-                <span>🔔 {pendingRegistrations.length} जना कर्मचारीको दर्ता अनुरोध आएको छ (Awaiting HR Approval)</span>
+                <span>🔔 {pendingRegistrations.length} staff registration request(s) awaiting HR approval</span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] bg-red-600 text-white font-black animate-bounce">NEW</span>
               </h4>
               <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
@@ -324,7 +324,7 @@ export default function DashboardPage() {
             href="/staff"
             className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-600/20 active:scale-95 transition-all shrink-0 cursor-pointer"
           >
-            <span>Portal Approvals खोल्नुहोस् &rarr;</span>
+            <span>Open Portal Approvals &rarr;</span>
           </Link>
         </div>
       )}
@@ -367,7 +367,7 @@ export default function DashboardPage() {
         {/* Completed Today */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">ड्युटी पूरा (Completed)</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Shift Completed</p>
             <h3 className="text-2xl font-bold text-indigo-600 mt-1">{completedCount}</h3>
             <span className="text-[11px] text-indigo-600 font-medium mt-0.5 block">
               {completedCount > 0 ? 'Punched Out & Verified' : 'Currently in office'}

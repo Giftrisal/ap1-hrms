@@ -516,7 +516,7 @@ export default function FieldDutyPage() {
                 {/* Dates */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">सुरु मिति (Start Date - BS)</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Start Date (BS)</label>
                     <NepaliDatePicker
                       value={formData.start_date}
                       onChange={(d) => setFormData({ ...formData, start_date: d })}
@@ -524,7 +524,7 @@ export default function FieldDutyPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">अन्तिम मिति (End Date - BS)</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">End Date (BS)</label>
                     <NepaliDatePicker
                       value={formData.end_date}
                       onChange={(d) => setFormData({ ...formData, end_date: d })}

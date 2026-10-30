@@ -16,10 +16,10 @@ export interface DateRangeDailyEntry {
   employeeName: string;
   department: string;
   designation: string;
-  bsDateStr: string;        // "२०८३/०७/०२"
+  bsDateStr: string;        // "2083/07/02"
   adDateStr: string;        // "2026-10-19"
-  dayNameNp: string;        // "सोमबार"
-  statusNp: string;         // "उपस्थित (PRESENT)"
+  dayNameNp: string;        // "Monday"
+  statusNp: string;         // "Present"
   statusKey: 'PRESENT' | 'LATE' | 'WEEK_OFF' | 'LEAVE' | 'ABSENT' | 'UPCOMING' | 'PENDING' | 'WEEK_OFF_WORK';
   inTimeStr: string;
   outTimeStr: string;
@@ -164,14 +164,14 @@ export function buildDateRangeReportData(options: {
       let lateMinutes = 0;
       let remarks = '';
       let statusKey: DateRangeDailyEntry['statusKey'] = 'ABSENT';
-      let statusNp = 'अनुपस्थित';
+      let statusNp = 'Absent';
 
       if (dayPunches.length > 0) {
         inTimeRaw = dayPunches[0].punch_time;
         if (dayPunches.length > 1) {
           outTimeRaw = dayPunches[dayPunches.length - 1].punch_time;
         }
-        remarks = `बायोमेट्रिक (${toNepaliDigits(dayPunches.length)} पञ्च)`;
+        remarks = `Biometric (${dayPunches.length} punches)`;
       }
 
       if (existingRec) {
@@ -195,46 +195,46 @@ export function buildDateRangeReportData(options: {
 
       if (existingRec?.status === 'ON_LEAVE') {
         statusKey = 'LEAVE';
-        statusNp = 'स्वीकृत बिदा (LEAVE)';
+        statusNp = 'Leave';
         leaveDays += 1;
-        remarks = remarks || 'स्वीकृत बिदा';
+        remarks = remarks || 'Approved Leave';
       } else if (existingRec?.status === 'HALF_DAY') {
         statusKey = 'LEAVE';
-        statusNp = 'आधा दिन बिदा (HALF DAY)';
+        statusNp = 'Half Day';
         leaveDays += 0.5;
         presentDays += 0.5;
       } else if (hasPunched) {
         if (isAssignedWeeklyOff) {
           statusKey = 'WEEK_OFF_WORK';
-          statusNp = 'हप्ता बिदामा काम (OFF-DAY DUTY)';
+          statusNp = 'Off-Day Duty';
           presentDays += 1;
-          remarks = remarks || `साप्ताहिक बिदामा ड्युटी (${dateItem.dayNameNp})`;
+          remarks = remarks || `Duty on Weekly Off (${dateItem.dayNameEn})`;
         } else if (lateMinutes > 0 || existingRec?.status === 'LATE') {
           statusKey = 'LATE';
-          statusNp = 'ढिलो उपस्थित (LATE)';
+          statusNp = 'Late';
           presentDays += 1;
           lateDays += 1;
           staffLateMinutes += lateMinutes;
         } else {
           statusKey = 'PRESENT';
-          statusNp = 'उपस्थित (PRESENT)';
+          statusNp = 'Present';
           presentDays += 1;
         }
       } else {
         if (isAssignedWeeklyOff) {
           statusKey = 'WEEK_OFF';
-          statusNp = 'साप्ताहिक बिदा (WEEK OFF)';
+          statusNp = 'Week Off';
           weekOffDays += 1;
-          remarks = remarks || `तोकिएको साप्ताहिक बिदा (${dateItem.dayNameNp})`;
+          remarks = remarks || `Weekly Off (${dateItem.dayNameEn})`;
         } else if (isFuture) {
           statusKey = 'UPCOMING';
-          statusNp = 'आगामी दिन (UPCOMING)';
+          statusNp = 'Upcoming';
         } else if (isToday) {
           statusKey = 'PENDING';
-          statusNp = 'प्रतीक्षारत (NOT PUNCHED)';
+          statusNp = 'Not Punched';
         } else {
           statusKey = 'ABSENT';
-          statusNp = 'अनुपस्थित (ABSENT)';
+          statusNp = 'Absent';
           absentDays += 1;
         }
       }
@@ -243,22 +243,22 @@ export function buildDateRangeReportData(options: {
 
       dailyEntries.push({
         sn: snCounter++,
-        snNp: toNepaliDigits(snCounter - 1),
+        snNp: String(snCounter - 1),
         employeePin: pin,
         employeeName: name,
         department: dept,
         designation: desig,
         bsDateStr: dateItem.bsDateStr,
         adDateStr: dateItem.adDateStr,
-        dayNameNp: dateItem.dayNameNp,
+        dayNameNp: dateItem.dayNameEn,
         statusNp,
         statusKey,
         inTimeStr: formatTime12h(inTimeRaw),
         outTimeStr: formatTime12h(outTimeRaw),
         workedHours,
-        workedHoursStr: workedHours > 0 ? `${toNepaliDigits(workedHours.toFixed(1))} घ` : '-',
+        workedHoursStr: workedHours > 0 ? `${workedHours.toFixed(1)} hrs` : '-',
         lateMinutes,
-        lateMinutesStr: lateMinutes > 0 ? `${toNepaliDigits(lateMinutes)} मि` : '-',
+        lateMinutesStr: lateMinutes > 0 ? `${lateMinutes} mins` : '-',
         remarks: remarks || '-'
       });
     });
@@ -320,48 +320,48 @@ export function exportDateRangeExcel(data: DateRangeReportData): void {
     const staff = data.summaries[0];
     const rows: any[][] = [
       ['AP1 TELEVISION NETWORK PVT. LTD.'],
-      ['कर्मचारी मिति दायरा हाजिरी विवरण (STAFF DATE RANGE ATTENDANCE REGISTER)'],
-      [`नेपाली क्यालेन्डर (विक्रम संवत्) - ${data.rangeLabel}`],
+      ['STAFF DATE RANGE ATTENDANCE REGISTER (Bikram Sambat Calendar)'],
+      [`BS Date Range: ${data.rangeLabel}`],
       [],
-      ['कर्मचारीको विवरण:', '', '', '', 'दायरा सारांश:'],
+      ['Employee Details:', '', '', '', 'Range Summary:'],
       [
-        `कर्मचारीको नाम: ${staff.name}`,
-        `बायोमेट्रिक PIN: #${staff.pin}`,
-        `विभाग: ${staff.department}`,
+        `Staff Name: ${staff.name}`,
+        `Biometric PIN: #${staff.pin}`,
+        `Department: ${staff.department}`,
         '',
-        `छानिएको मिति: ${data.rangeLabel}`,
-        `कुल दिन: ${toNepaliDigits(data.totalDays)} दिन`
+        `BS Date Range: ${data.rangeLabel}`,
+        `Total Days: ${data.totalDays} Days`
       ],
       [
-        `पद: ${staff.designation}`,
-        `डाउनलोड मिति: ${todayBs.formattedNp}`,
+        `Designation: ${staff.designation}`,
+        `Generated Date: ${todayBs.formattedEn}`,
         '',
         '',
-        `उपस्थित दिन: ${toNepaliDigits(staff.presentDays)} दिन`,
-        `साप्ताहिक बिदा: ${toNepaliDigits(staff.weekOffDays)} दिन`
+        `Present Days: ${staff.presentDays} Days`,
+        `Weekly Off: ${staff.weekOffDays} Days`
       ],
       [
         '', '', '', '',
-        `ढिलो दिन: ${toNepaliDigits(staff.lateDays)} दिन`,
-        `अनुपस्थित दिन: ${toNepaliDigits(staff.absentDays)} दिन`
+        `Late Days: ${staff.lateDays} Days`,
+        `Absent Days: ${staff.absentDays} Days`
       ],
       [
         '', '', '', '',
-        `स्वीकृत बिदा: ${toNepaliDigits(staff.leaveDays)} दिन`,
-        `कुल काम गरेको समय: ${toNepaliDigits(staff.totalWorkedHours.toFixed(1))} घण्टा`
+        `Approved Leaves: ${staff.leaveDays} Days`,
+        `Total Worked Hours: ${staff.totalWorkedHours.toFixed(1)} hrs`
       ],
       [
         '', '', '', '',
-        `कुल ढिलो समय: ${toNepaliDigits(staff.totalLateMinutes)} मिनेट`,
-        `हाजिरी दर: ${toNepaliDigits(staff.attendancePct)}%`
+        `Total Late Minutes: ${staff.totalLateMinutes} mins`,
+        `Attendance Rate: ${staff.attendancePct}%`
       ],
       [],
-      ['क्र.सं.', 'मिति (वि.सं.)', 'बार', 'स्थिति (Status)', 'आएको समय (In Time)', 'गएको समय (Out Time)', 'काम गरेको समय', 'ढिलो समय', 'कैफियत / विवरण']
+      ['S.N.', 'BS Date', 'Day', 'Status', 'In Time', 'Out Time', 'Worked Hours', 'Late Minutes', 'Remarks']
     ];
 
     data.dailyEntries.forEach(d => {
       rows.push([
-        d.snNp,
+        d.sn,
         d.bsDateStr,
         d.dayNameNp,
         d.statusNp,
@@ -375,24 +375,24 @@ export function exportDateRangeExcel(data: DateRangeReportData): void {
 
     rows.push([]);
     rows.push([
-      'कुल / सारांश',
-      `${toNepaliDigits(data.totalDays)} दिन`,
+      'Total / Summary',
+      `${data.totalDays} Days`,
       '',
-      `उपस्थित: ${toNepaliDigits(staff.presentDays)} दिन`,
+      `Present: ${staff.presentDays} Days`,
       '',
       '',
-      `${toNepaliDigits(staff.totalWorkedHours.toFixed(1))} घण्टा`,
-      `${toNepaliDigits(staff.totalLateMinutes)} मिनेट`,
-      `हाजिरी दर: ${toNepaliDigits(staff.attendancePct)}%`
+      `${staff.totalWorkedHours.toFixed(1)} hrs`,
+      `${staff.totalLateMinutes} mins`,
+      `Attendance Rate: ${staff.attendancePct}%`
     ]);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws['!cols'] = [
-      { wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 28 }, { wch: 20 },
-      { wch: 20 }, { wch: 18 }, { wch: 16 }, { wch: 32 }
+      { wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 20 }, { wch: 16 },
+      { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 32 }
     ];
 
-    XLSX.utils.book_append_sheet(wb, ws, 'व्यक्तिगत हाजिरी');
+    XLSX.utils.book_append_sheet(wb, ws, 'Individual Attendance');
     const safeName = staff.name.replace(/[^a-zA-Z0-9_\u0900-\u097F]/g, '_');
     XLSX.writeFile(wb, `AP1_Staff_${staff.pin}_${safeName}_DateRange.xlsx`);
   } else {
@@ -401,29 +401,29 @@ export function exportDateRangeExcel(data: DateRangeReportData): void {
     // ----------------------------------------------------
     const summaryRows: any[][] = [
       ['AP1 TELEVISION NETWORK PVT. LTD.'],
-      ['मिति दायरा हाजिरी तथा अडिट रिपोर्ट (DATE RANGE ATTENDANCE REGISTER)'],
-      [`नेपाली क्यालेन्डर (विक्रम संवत्) - ${data.rangeLabel}`],
-      [`विभाग: ${data.department === 'ALL' ? 'सबै विभागहरू' : data.department}`, `कुल दिन: ${toNepaliDigits(data.totalDays)} दिन`, `कर्मचारी संख्या: ${toNepaliDigits(data.totalEmployees)} जना`, `डाउनलोड मिति: ${todayBs.formattedNp}`],
+      ['DATE RANGE ATTENDANCE & AUDIT REPORT (Bikram Sambat Calendar)'],
+      [`BS Date Range: ${data.rangeLabel}`],
+      [`Department: ${data.department === 'ALL' ? 'All Departments' : data.department}`, `Total Days: ${data.totalDays} Days`, `Total Staff: ${data.totalEmployees}`, `Report Date: ${todayBs.formattedEn}`],
       [],
-      ['क्र.सं.', 'PIN', 'कर्मचारीको नाम', 'विभाग', 'पद', 'कुल दिन', 'उपस्थित दिन', 'ढिलो दिन', 'हप्ता बिदा', 'बिदा दिन', 'अनुपस्थित दिन', 'काम गरेको घण्टा', 'ढिलो मिनेट', 'हाजिरी दर %']
+      ['S.N.', 'PIN', 'Staff Name', 'Department', 'Designation', 'Total Days', 'Present Days', 'Late Days', 'Weekly Off', 'Leaves', 'Absent Days', 'Worked Hours', 'Late Mins', 'Attendance Rate %']
     ];
 
     data.summaries.forEach((s, idx) => {
       summaryRows.push([
-        toNepaliDigits(idx + 1),
+        idx + 1,
         s.pin,
         s.name,
         s.department,
         s.designation,
-        `${toNepaliDigits(s.totalDays)} दिन`,
-        `${toNepaliDigits(s.presentDays)} दिन`,
-        `${toNepaliDigits(s.lateDays)} दिन`,
-        `${toNepaliDigits(s.weekOffDays)} दिन`,
-        `${toNepaliDigits(s.leaveDays)} दिन`,
-        `${toNepaliDigits(s.absentDays)} दिन`,
-        `${toNepaliDigits(s.totalWorkedHours.toFixed(1))} घ`,
-        `${toNepaliDigits(s.totalLateMinutes)} मि`,
-        `${toNepaliDigits(s.attendancePct)}%`
+        `${s.totalDays} Days`,
+        `${s.presentDays} Days`,
+        `${s.lateDays} Days`,
+        `${s.weekOffDays} Days`,
+        `${s.leaveDays} Days`,
+        `${s.absentDays} Days`,
+        `${s.totalWorkedHours.toFixed(1)} hrs`,
+        `${s.totalLateMinutes} mins`,
+        `${s.attendancePct}%`
       ]);
     });
 
@@ -433,20 +433,20 @@ export function exportDateRangeExcel(data: DateRangeReportData): void {
       { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
       { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 14 }
     ];
-    XLSX.utils.book_append_sheet(wb, wsSummary, 'कर्मचारी सारांश');
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Staff Summary');
 
     // Sheet 2: Detailed Daily Rows
     const detailRows: any[][] = [
       ['AP1 TELEVISION NETWORK PVT. LTD.'],
-      ['मिति दायरा दैनिक विस्तृत हाजिरी (DATE RANGE DAILY ATTENDANCE LOGS)'],
-      [`दायरा: ${data.rangeLabel}`, `विभाग: ${data.department === 'ALL' ? 'सबै विभाग' : data.department}`],
+      ['DATE RANGE DAILY ATTENDANCE LOGS'],
+      [`BS Range: ${data.rangeLabel}`, `Department: ${data.department === 'ALL' ? 'All Departments' : data.department}`],
       [],
-      ['क्र.सं.', 'मिति (वि.सं.)', 'बार', 'PIN', 'कर्मचारीको नाम', 'विभाग', 'स्थिति (Status)', 'आएको समय', 'गएको समय', 'काम गरेको समय', 'ढिलो समय', 'कैफियत']
+      ['S.N.', 'BS Date', 'Day', 'PIN', 'Staff Name', 'Department', 'Status', 'In Time', 'Out Time', 'Worked Hours', 'Late Mins', 'Remarks']
     ];
 
     data.dailyEntries.forEach(d => {
       detailRows.push([
-        d.snNp,
+        d.sn,
         d.bsDateStr,
         d.dayNameNp,
         d.employeePin,
@@ -464,10 +464,10 @@ export function exportDateRangeExcel(data: DateRangeReportData): void {
     const wsDetail = XLSX.utils.aoa_to_sheet(detailRows);
     wsDetail['!cols'] = [
       { wch: 8 }, { wch: 15 }, { wch: 12 }, { wch: 10 }, { wch: 22 },
-      { wch: 18 }, { wch: 25 }, { wch: 16 }, { wch: 16 }, { wch: 16 },
+      { wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 16 },
       { wch: 14 }, { wch: 26 }
     ];
-    XLSX.utils.book_append_sheet(wb, wsDetail, 'दैनिक विवरण');
+    XLSX.utils.book_append_sheet(wb, wsDetail, 'Daily Attendance Logs');
 
     const cleanDept = data.department.replace(/[^a-zA-Z0-9_\u0900-\u097F]/g, '_');
     XLSX.writeFile(wb, `AP1_DateRange_Attendance_${cleanDept}_Report.xlsx`);
@@ -493,7 +493,7 @@ export function exportDateRangePdf(data: DateRangeReportData): void {
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
   doc.text(`DATE RANGE ATTENDANCE REGISTER - ${data.rangeLabel.toUpperCase()}`, 14, 17);
-  doc.text(`Staff: ${data.totalEmployees} | Dept: ${data.department} | Generated: ${todayBs.formattedNp}`, 175, 17);
+  doc.text(`Staff: ${data.totalEmployees} | Dept: ${data.department} | Generated: ${todayBs.formattedEn}`, 175, 17);
 
   if (data.isIndividual && data.dailyEntries.length > 0) {
     // Individual Day-by-Day PDF Table

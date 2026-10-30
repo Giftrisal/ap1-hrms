@@ -258,7 +258,7 @@ export default function PayrollPage() {
           recipientPhone: phone,
           payload: {
             employeeName: payroll.employee_name,
-            month: `${NEPALI_MONTHS_NP[Number(selectedMonth) - 1] || 'महिना'} (${NEPALI_MONTHS_EN[Number(selectedMonth) - 1] || ''})`,
+            month: `${NEPALI_MONTHS_EN[Number(selectedMonth) - 1] || 'Month'} (${selectedYear} BS)`,
             year: `${selectedYear} BS`,
             netSalary: payroll.net_salary,
             targetHours: payroll.target_monthly_hours,
@@ -327,13 +327,13 @@ export default function PayrollPage() {
           <div className="space-y-1.5 max-w-xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/20 border border-purple-400/30 text-purple-200 text-xs font-bold uppercase tracking-wider">
               <Sliders className="w-3.5 h-3.5 text-purple-300" />
-              <span>Accounts Monthly Hours Engine (अकाउन्ट कार्य घण्टा इन्जिन)</span>
+              <span>Accounts Monthly Hours Engine</span>
             </div>
             <h2 className="text-xl font-black tracking-tight text-white">
               Monthly Target Working Hours & Late Arrival Penalty
             </h2>
             <p className="text-xs text-purple-200/80 leading-relaxed">
-              प्रत्येक महिना Accounts ले कुल कार्य दिन अनुसार आवश्यक कुल कार्य घण्टा (Monthly Target Hours) प्रविष्टि गर्दछ। बायोमेट्रिक मेसिनको हाजिरी अनुसार नपुगेको घण्टा (Shortfall/Late Arrival) हिसाब गरी सोही अनुपातमा Payslip मा तलब कट्टी गरिन्छ।
+              Each month Accounts configures the total required working hours (Monthly Target Hours) based on working days. Any shortfall/late arrivals logged by the biometric terminal are deducted proportionally on the payslip.
             </p>
           </div>
 
@@ -341,7 +341,7 @@ export default function PayrollPage() {
           <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/15 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div>
               <label className="text-[11px] font-bold text-purple-200 block mb-1">
-                कुल कार्य दिन (Working Days)
+                Working Days
               </label>
               <input
                 type="number"
@@ -355,7 +355,7 @@ export default function PayrollPage() {
 
             <div>
               <label className="text-[11px] font-bold text-purple-200 block mb-1">
-                कुल कार्य घण्टा (Target Hours)
+                Target Hours
               </label>
               <div className="relative">
                 <input
@@ -379,7 +379,7 @@ export default function PayrollPage() {
                 className="w-full sm:w-auto px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
               >
                 <Calculator className="w-4 h-4" />
-                <span>लागू & Recalculate</span>
+                <span>Apply & Recalculate</span>
               </button>
             </div>
           </div>
@@ -388,16 +388,16 @@ export default function PayrollPage() {
         {/* Live Formula Strip */}
         <div className="mt-5 pt-4 border-t border-white/10 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
           <div className="flex items-center gap-2 text-purple-200">
-            <span className="w-5 h-5 rounded-full bg-purple-500/30 flex items-center justify-center text-[10px] font-bold">१</span>
-            <span>प्रति घण्टा दर = Base Salary ÷ {targetMonthlyHours} hrs</span>
+            <span className="w-5 h-5 rounded-full bg-purple-500/30 flex items-center justify-center text-[10px] font-bold">1</span>
+            <span>Hourly Rate = Base Salary ÷ {targetMonthlyHours} hrs</span>
           </div>
           <div className="flex items-center gap-2 text-purple-200">
-            <span className="w-5 h-5 rounded-full bg-amber-500/30 flex items-center justify-center text-[10px] font-bold text-amber-300">२</span>
-            <span>नपुगेको घण्टा = {targetMonthlyHours} hrs − बायोमेट्रिक घण्टा</span>
+            <span className="w-5 h-5 rounded-full bg-amber-500/30 flex items-center justify-center text-[10px] font-bold text-amber-300">2</span>
+            <span>Shortfall = {targetMonthlyHours} hrs − Biometric Logged Hrs</span>
           </div>
           <div className="flex items-center gap-2 text-purple-200">
-            <span className="w-5 h-5 rounded-full bg-red-500/30 flex items-center justify-center text-[10px] font-bold text-red-300">३</span>
-            <span>कट्टी रकम = नपुगेको घण्टा × प्रति घण्टा दर</span>
+            <span className="w-5 h-5 rounded-full bg-red-500/30 flex items-center justify-center text-[10px] font-bold text-red-300">3</span>
+            <span>Deduction = Shortfall Hours × Hourly Rate</span>
           </div>
         </div>
       </div>
@@ -483,7 +483,7 @@ export default function PayrollPage() {
               className="py-1.5 px-2.5 text-xs bg-white border border-red-300 rounded-lg font-bold text-red-950 focus:outline-none cursor-pointer"
             >
               {AVAILABLE_BS_YEARS.map(y => (
-                <option key={y} value={String(y)}>{toNepaliDigits(y)} साल (BS)</option>
+                <option key={y} value={String(y)}>{y} BS</option>
               ))}
             </select>
 
@@ -492,9 +492,9 @@ export default function PayrollPage() {
               onChange={(e) => setSelectedMonth(e.target.value)}
               className="py-1.5 px-2.5 text-xs bg-white border border-red-300 rounded-lg font-bold text-red-950 focus:outline-none cursor-pointer"
             >
-              {NEPALI_MONTHS_NP.map((m, idx) => (
+              {NEPALI_MONTHS_EN.map((m, idx) => (
                 <option key={idx + 1} value={String(idx + 1)}>
-                  {m} ({NEPALI_MONTHS_EN[idx]})
+                  {m}
                 </option>
               ))}
             </select>
@@ -529,7 +529,7 @@ export default function PayrollPage() {
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
                 <th className="py-3.5 px-4">{t.colStaff}</th>
-                <th className="py-3.5 px-4">कार्य घण्टा (Target vs Logged)</th>
+                <th className="py-3.5 px-4">Working Hours (Target vs Logged)</th>
                 <th className="py-3.5 px-4">{t.colBaseSalary}</th>
                 <th className="py-3.5 px-4">Hourly Rate</th>
                 <th className="py-3.5 px-4">Late Shortfall Deduct</th>
@@ -711,7 +711,7 @@ export default function PayrollPage() {
 
               <div>
                 <label className="block text-slate-700 font-bold mb-1.5">
-                  Actual Logged Monthly Hours (बायोमेट्रिक अनुसार काम गरेको घण्टा)
+                  Actual Logged Monthly Hours (Biometric Worked Hours)
                 </label>
                 <input
                   type="number"
@@ -775,7 +775,7 @@ export default function PayrollPage() {
                 <div>
                   <h3 className="font-bold text-white text-base">AP1 Television - Payslip Detail</h3>
                   <p className="text-xs text-purple-200">
-                    {NEPALI_MONTHS_NP[Number(selectedMonth) - 1] || ''} {toNepaliDigits(selectedYear)} (वि.सं.)
+                    {NEPALI_MONTHS_EN[Number(selectedMonth) - 1] || ''} {selectedYear} BS
                   </p>
                 </div>
               </div>
@@ -805,7 +805,7 @@ export default function PayrollPage() {
               <div className="p-3.5 bg-purple-50/70 rounded-2xl border border-purple-200/80 space-y-2">
                 <p className="font-bold text-purple-900 flex items-center gap-1.5">
                   <Clock className="w-4 h-4 text-purple-700" />
-                  <span>कार्य घण्टा गणना (Accounts Working Hours Calculation)</span>
+                  <span>Accounts Working Hours Calculation</span>
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-purple-200/60">
                   <div>

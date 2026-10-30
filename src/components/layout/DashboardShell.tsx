@@ -85,7 +85,7 @@ export default function DashboardShell({
                   <div className="flex items-center gap-2.5 text-xs font-bold text-white">
                     <AlertTriangle className="w-5 h-5 text-yellow-300 shrink-0" />
                     <span>
-                      सूचना: AP1 Television HRMS सफ्टवेयर लाइसेन्सको म्याद अब केवल <strong>{daysRemaining} दिन</strong> बाँकी छ।
+                      Notice: AP1 Television HRMS software license will expire in <strong>{daysRemaining} days</strong>.
                     </span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
@@ -95,14 +95,14 @@ export default function DashboardShell({
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-800/90 hover:bg-red-900 text-white rounded-xl text-xs font-bold transition-all border border-red-400/40 cursor-pointer shadow-xs"
                     >
                       <Eye className="w-3.5 h-3.5 text-yellow-300" />
-                      <span>डेमो हेर्नुहोस् (Preview Lock)</span>
+                      <span>Preview Lock Screen</span>
                     </button>
                     <Link
                       href="/settings"
                       className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-red-50 text-red-700 rounded-xl text-xs font-black transition-all shadow-md shrink-0"
                     >
                       <KeyRound className="w-3.5 h-3.5 text-red-600" />
-                      <span>लाइसेन्स नवीकरण गर्नुहोस्</span>
+                      <span>Renew License</span>
                     </Link>
                   </div>
                 </div>

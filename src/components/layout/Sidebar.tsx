@@ -215,7 +215,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
               </div>
               <button
                 onClick={logout}
-                title="Sign Out / Logout (लगआउट गर्नुहोस्)"
+                title="Sign Out / Logout"
                 className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-950/40 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-red-900/50 shrink-0"
               >
                 <LogOut className="w-4 h-4" />

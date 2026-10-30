@@ -201,20 +201,16 @@ export async function checkAndDispatchLicenseExpirySms(options?: {
   const hoursRemaining = Math.ceil(msRemaining / (1000 * 60 * 60));
   const daysRemaining = Math.ceil(msRemaining / (1000 * 60 * 60 * 24));
 
-  let timeRemainingLabel = `${daysRemaining} दिन`;
+  let timeRemainingLabel = `${daysRemaining} Days`;
   if (hoursRemaining <= 24 && hoursRemaining > 0) {
     const hours = Math.floor(msRemaining / (1000 * 60 * 60));
     const mins = Math.floor((msRemaining % (1000 * 60 * 60)) / (1000 * 60));
-    timeRemainingLabel = `${hours} घण्टा ${mins} मिनेट`;
+    timeRemainingLabel = `${hours}h ${mins}m`;
   } else if (msRemaining <= 0) {
-    timeRemainingLabel = 'म्याद समाप्त (Expired)';
+    timeRemainingLabel = 'Expired';
   }
 
-  const expiryDate = new Date(expiresAt).toLocaleDateString('ne-NP', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  }) + ` (${new Date(expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})`;
+  const expiryDate = new Date(expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
   let milestone: '7_DAYS' | '3_DAYS' | '1_DAY' | 'EXPIRED' | 'TEST' | null = null;
 

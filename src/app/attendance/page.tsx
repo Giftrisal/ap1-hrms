@@ -76,13 +76,13 @@ export function extractDateStr(dateOrTime?: string | null): string {
 
 export const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
 export const NEPALI_DAY_NAMES: Record<string, string> = {
-  Sunday: 'आइतबार (Sunday)',
-  Monday: 'सोमबार (Monday)',
-  Tuesday: 'मंगलबार (Tuesday)',
-  Wednesday: 'बुधबार (Wednesday)',
-  Thursday: 'बिहीबार (Thursday)',
-  Friday: 'शुक्रबार (Friday)',
-  Saturday: 'शनिबार (Saturday)'
+  Sunday: 'Sunday',
+  Monday: 'Monday',
+  Tuesday: 'Tuesday',
+  Wednesday: 'Wednesday',
+  Thursday: 'Thursday',
+  Friday: 'Friday',
+  Saturday: 'Saturday'
 };
 
 export function getWeekDates(dateStr: string): string[] {
@@ -149,7 +149,7 @@ export function resolveStaffWeekStatus(
         isWeekOff: true,
         isSwapped: false,
         isHolidayWork: false,
-        remarks: `तोकिएको साप्ताहिक बिदा (${NEPALI_DAY_NAMES[assignedDay] || assignedDay})`
+        remarks: `Scheduled Weekly Off (${NEPALI_DAY_NAMES[assignedDay] || assignedDay})`
       };
     }
     if (workedOnTarget) {
@@ -167,7 +167,7 @@ export function resolveStaffWeekStatus(
         isWeekOff: false,
         isSwapped: false,
         isHolidayWork: false,
-        remarks: targetRecord.remarks || 'बिदामा'
+        remarks: targetRecord.remarks || 'On Leave'
       };
     }
     return {
@@ -175,7 +175,7 @@ export function resolveStaffWeekStatus(
       isWeekOff: false,
       isSwapped: false,
       isHolidayWork: false,
-      remarks: 'हाजिरी नभएको (Absent)'
+      remarks: 'Absent'
     };
   }
 
@@ -195,7 +195,7 @@ export function resolveStaffWeekStatus(
         isWeekOff: true,
         isSwapped: true,
         isHolidayWork: false,
-        remarks: `${assignedNpName} काम गरेको सट्टामा आज स्वतः साप्ताहिक बिदा (Auto Swapped Week-Off)`
+        remarks: `Compensatory off for working on ${assignedNpName} (Auto-Swapped Week-Off)`
       };
     }
 
@@ -205,7 +205,7 @@ export function resolveStaffWeekStatus(
         isWeekOff: false,
         isSwapped: false,
         isHolidayWork: false,
-        remarks: 'सट्टा बिदा मिलाइएको नियमित ड्युटी (Compensated Shift)'
+        remarks: 'Compensated Shift (Worked on Off Day)'
       };
     }
 
@@ -216,7 +216,7 @@ export function resolveStaffWeekStatus(
         isWeekOff: false,
         isSwapped: false,
         isHolidayWork: false,
-        remarks: targetRecord?.status === 'ON_LEAVE' ? (targetRecord.remarks || 'बिदामा') : 'हाजिरी नभएको (Absent)'
+        remarks: targetRecord?.status === 'ON_LEAVE' ? (targetRecord.remarks || 'On Leave') : 'Absent'
       };
     }
 
@@ -238,7 +238,7 @@ export function resolveStaffWeekStatus(
       isSwapped: false,
       isHolidayWork: true,
       holidayStatus: targetRecord?.holiday_work_status || 'PENDING_APPROVAL',
-      remarks: 'साप्ताहिक बिदामा अतिरिक्त काम (7 Days Duty - Approval Required)'
+      remarks: 'Worked on Weekly Off (7 Days Duty - Approval Required)'
     };
   }
 
@@ -361,7 +361,7 @@ export default function AttendancePage() {
     inTime: '09:00',
     outTime: '17:30',
     status: 'PRESENT',
-    remarks: 'फिल्ड ड्युटी / म्यानुअल हाजिरी'
+    remarks: 'Field Duty / Manual Attendance'
   });
 
   // Monthly & Date Range Report Modal State
@@ -457,9 +457,9 @@ export default function AttendancePage() {
       }
 
       setShowRosterModal(false);
-      alert('साप्ताहिक बिदा तालिका (Weekly Off Roster) सफलतापूर्वक सुरक्षित गरियो!');
+      alert('Weekly Off Roster saved successfully!');
     } catch (e: any) {
-      alert(`त्रुटि: ${e?.message || 'रोस्टर सेभ हुन सकेन।'}`);
+      alert(`Error: ${e?.message || 'Failed to save roster.'}`);
     } finally {
       setIsSavingRoster(false);
     }
@@ -587,9 +587,9 @@ export default function AttendancePage() {
               }
             }
 
-            const empName = matchedEmp?.full_name || `कर्मचारी (PIN #${pin})`;
+            const empName = matchedEmp?.full_name || `Staff (PIN #${pin})`;
             const deptName = matchedEmp?.department_name || 'AP1 Television';
-            const designation = matchedEmp?.designation || (matchedEmp ? 'Staff' : 'नयाँ औंठा पञ्च');
+            const designation = matchedEmp?.designation || (matchedEmp ? 'Staff' : 'New Punch');
             const photo = matchedEmp?.photo_url;
             const punchTime = log.punch_time;
             const punchDate = extractDateStr(punchTime) || getLocalDateStr();
@@ -651,8 +651,8 @@ export default function AttendancePage() {
                   late_minutes: 0,
                   worked_hours: workedHours,
                   remarks: wasWeekOff
-                    ? (holidayStatus === 'APPROVED' ? 'बिदामा काम स्वीकृत (Approved Overtime)' : '⚠️ बिदाको दिन काम (Admin Approval Pending)')
-                    : (matchedEmp ? 'ZKTeco Live Machine' : '⚠️ अनरजिस्टर्ड PIN')
+                    ? (holidayStatus === 'APPROVED' ? 'Approved Overtime' : '⚠️ Holiday Work (Pending Approval)')
+                    : (matchedEmp ? 'ZKTeco Live Machine' : '⚠️ Unregistered PIN')
                 };
                 hasChanges = true;
               }
@@ -675,7 +675,7 @@ export default function AttendancePage() {
                 overtime_minutes: 0,
                 worked_hours: 0, // 0 until checked out!
                 source: 'biometric',
-                remarks: matchedEmp ? 'ZKTeco Live Machine' : '⚠️ अनरजिस्टर्ड PIN'
+                remarks: matchedEmp ? 'ZKTeco Live Machine' : '⚠️ Unregistered PIN'
               };
               updated.unshift(newRec);
               hasChanges = true;
@@ -692,7 +692,7 @@ export default function AttendancePage() {
 
         setUnassignedPins(foundUnassigned);
         if (showFeedback) {
-          setSyncFeedback(`मेशिनबाट ${data.recent_logs.length} वटा पञ्च सफलतापूर्वक सिङ्क भयो!`);
+          setSyncFeedback(`Successfully synced ${data.recent_logs.length} punches from device!`);
           setTimeout(() => setSyncFeedback(null), 3500);
         }
       }
@@ -727,14 +727,14 @@ export default function AttendancePage() {
   const handleAssignPin = async () => {
     if (!assignPinModal) return;
     if (!assignStaffId) {
-      alert('कृपया सूचीबाट कर्मचारी छान्नुहोस् (Please select an employee)');
+      alert('Please select an employee');
       return;
     }
 
     const cleanPin = String(assignPinModal).trim();
     const targetStaff = staffList.find(s => s.id === assignStaffId);
     if (!targetStaff) {
-      alert('कर्मचारी फेला परेन। कृपया पुनः प्रयास गर्नुहोस्।');
+      alert('Employee not found. Please try again.');
       return;
     }
 
@@ -765,7 +765,7 @@ export default function AttendancePage() {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'सर्भरमा सेभ हुन सकेन।');
+        throw new Error(errData.error || 'Failed to save to server.');
       }
 
       // 3. Immediately update local staffList state & localStorage
@@ -819,10 +819,10 @@ export default function AttendancePage() {
       // 7. Refresh in background
       fetchStaffDirectory();
 
-      alert(`मेशिन PIN #${assignedPinNum} सफलतापूर्वक ${assignedStaffName} सँग जोडिएको छ!`);
+      alert(`Machine PIN #${assignedPinNum} successfully assigned to ${assignedStaffName}!`);
     } catch (e: any) {
       console.error('Failed to assign PIN:', e);
-      alert(`त्रुटि: ${e?.message || 'PIN जोड्न असफल भयो।'}`);
+      alert(`Error: ${e?.message || 'Failed to assign PIN.'}`);
     } finally {
       setIsAssigningPin(false);
     }
@@ -832,7 +832,7 @@ export default function AttendancePage() {
   const handleAddManualPunch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualForm.staffId) {
-      alert('कृपया कर्मचारी छान्नुहोस्');
+      alert('Please select an employee');
       return;
     }
 
@@ -865,7 +865,7 @@ export default function AttendancePage() {
     const updated = [newRecord, ...records.filter(r => !(r.employee_id === emp.id && r.date === manualForm.date))];
     saveRecordsList(updated);
     setShowManualModal(false);
-    alert('म्यानुअल हाजिरी सफलतापूर्वक थपियो!');
+    alert('Manual attendance added successfully!');
   };
 
   // Delete & Clear handlers
@@ -889,7 +889,7 @@ export default function AttendancePage() {
     const updated = records.map(r => r.id === editRecord.id ? editRecord : r);
     saveRecordsList(updated);
     setEditRecord(null);
-    alert('हाजिरी विवरण सफलतापूर्वक सच्याइयो!');
+    alert('Attendance record updated successfully!');
   };
 
   // 1-Click Approve / Reject Holiday & Week-Off Duty
@@ -903,14 +903,14 @@ export default function AttendancePage() {
           approved_by: 'Master Admin',
           approved_at: new Date().toISOString(),
           remarks: approve 
-            ? `${r.remarks || ''} [बिदामा काम स्वीकृत - Approved Overtime]`.trim() 
-            : `${r.remarks || ''} [बिदामा काम अस्वीकृत - Rejected]`.trim()
+            ? `${r.remarks || ''} [Approved Overtime]`.trim() 
+            : `${r.remarks || ''} [Rejected]`.trim()
         };
       }
       return r;
     });
     saveRecordsList(updated);
-    alert(approve ? 'बिदाको दिन काम गरेको हाजिरी सफलतापूर्वक स्वीकृत (Approved) भयो!' : 'बिदाको दिनको हाजिरी अस्वीकृत (Rejected) गरियो।');
+    alert(approve ? 'Holiday work duty approved successfully!' : 'Holiday work duty rejected.');
   };
 
   // 1-Click Quick Mark Rotational Week-Off for any staff
@@ -927,7 +927,7 @@ export default function AttendancePage() {
         is_holiday_work: false,
         holiday_work_status: undefined,
         worked_hours: 0,
-        remarks: 'रोटेसनल साप्ताहिक बिदा (Rotational Week-Off)'
+        remarks: 'Rotational Week-Off'
       } : r);
     } else {
       const newRec: DailyAttendance = {
@@ -945,24 +945,24 @@ export default function AttendancePage() {
         overtime_minutes: 0,
         worked_hours: 0,
         source: 'manual',
-        remarks: 'रोटेसनल साप्ताहिक बिदा (Rotational Week-Off)'
+        remarks: 'Rotational Week-Off'
       };
       updated = [newRec, ...records];
     }
     saveRecordsList(updated);
-    alert(`${emp.full_name} को मिति ${selectedDate} मा साप्ताहिक बिदा (Week-Off) सफलतापूर्वक मार्क भयो!`);
+    alert(`Week-Off marked successfully for ${emp.full_name} on date ${selectedDate}!`);
   };
 
   // Assign Rotational Week-Off via Modal Form
   const handleAssignWeekOffSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!weekOffStaffId) {
-      alert('कृपया कर्मचारी छान्नुहोस् (Please select an employee)');
+      alert('Please select an employee');
       return;
     }
     const staff = staffList.find(s => s.id === weekOffStaffId);
     if (!staff) {
-      alert('कर्मचारी फेला परेन।');
+      alert('Employee not found.');
       return;
     }
     handleQuickMarkWeekOff(staff);
@@ -1166,10 +1166,10 @@ export default function AttendancePage() {
   // EXPORT 1: Rich Colored DAILY Excel (.xlsx)
   // =========================================================================
   const exportDailyExcel = () => {
-    const rows = [
+    const rows: (string | number)[][] = [
       ['AP1 TELEVISION NETWORK PVT. LTD.'],
       ['DAILY BIOMETRIC ATTENDANCE REPORT'],
-      [`नेपाली मिति (BS): ${bsDate?.formattedNp || selectedDate}`, `रिपोर्ट तयार गरिएको समय: ${new Date().toLocaleTimeString()}`],
+      [`BS Date: ${bsDate?.formattedEn || selectedDate}`, `Generated At: ${new Date().toLocaleTimeString()}`],
       [`Total Staff: ${kpiTotal}`, `Present: ${kpiPresent}`, `Shift Completed: ${kpiCompleted}`, `Currently In Office: ${kpiInOffice}`, `Absent: ${kpiAbsent}`],
       [], // blank line
       ['S.N.', 'PIN', 'Staff Name', 'Department', 'Designation', 'Status', 'In Time', 'Out Time', 'Worked Hours', 'Remarks']
@@ -1376,33 +1376,32 @@ export default function AttendancePage() {
 
   const exportMonthlyExcel = () => {
     const summary = generateMonthlySummary();
-    const monthNameNp = NEPALI_MONTHS_NP[selectedMonthlyBsMonth - 1] || 'बैशाख';
     const monthNameEn = NEPALI_MONTHS_EN[selectedMonthlyBsMonth - 1] || 'Baishakh';
     const daysInMonth = getDaysInBsMonth(selectedMonthlyBsYear, selectedMonthlyBsMonth);
 
-    const rows = [
+    const rows: (string | number)[][] = [
       ['AP1 TELEVISION NETWORK PVT. LTD.'],
-      ['MONTHLY ATTENDANCE & PAYROLL SUMMARY REPORT (विक्रम संवत् क्यालेन्डर)'],
-      [`महिना: ${monthNameNp} ${toNepaliDigits(selectedMonthlyBsYear)} (वि.सं.)`, `कुल दिन: ${toNepaliDigits(daysInMonth)} दिन`, `रिपोर्ट मिति: ${getNepaliDate().formattedNp}`],
+      ['MONTHLY ATTENDANCE & PAYROLL SUMMARY REPORT (Bikram Sambat Calendar)'],
+      [`Month: ${monthNameEn} ${selectedMonthlyBsYear} BS`, `Total Days: ${daysInMonth} Days`, `Report Date: ${getNepaliDate().formattedEn}`],
       [],
-      ['क्र.सं.', 'PIN', 'कर्मचारीको नाम', 'विभाग', 'पद', 'उपस्थित दिन', 'हप्ता बिदा', 'ढिलो दिन', 'कुल ढिलो (मिनेट)', 'बिदा दिन', 'काम गरेको घण्टा', 'हाजिरी दर %']
+      ['S.N.', 'PIN', 'Staff Name', 'Department', 'Designation', 'Present Days', 'Weekly Off', 'Late Days', 'Late (Mins)', 'Leave Days', 'Worked Hours', 'Attendance Rate %']
     ];
 
     summary.forEach((item, idx) => {
       const rate = Math.min(100, Math.round(((item.presentDays + item.weekOffDays) / 30) * 100));
       rows.push([
-        toNepaliDigits(idx + 1),
+        idx + 1,
         item.pin,
         item.name,
         item.dept,
         item.desig,
-        `${toNepaliDigits(item.presentDays)} दिन`,
-        `${toNepaliDigits(item.weekOffDays)} दिन`,
-        `${toNepaliDigits(item.lateDays)} दिन`,
-        `${toNepaliDigits(item.totalLateMinutes)} मि`,
-        `${toNepaliDigits(item.leaveDays)} दिन`,
-        `${toNepaliDigits(Math.round(item.workedHours * 10) / 10)} घ`,
-        `${toNepaliDigits(rate)}%`
+        `${item.presentDays} Days`,
+        `${item.weekOffDays} Days`,
+        `${item.lateDays} Days`,
+        `${item.totalLateMinutes} Mins`,
+        `${item.leaveDays} Days`,
+        `${Math.round(item.workedHours * 10) / 10} Hrs`,
+        `${rate}%`
       ]);
     });
 
@@ -1412,14 +1411,13 @@ export default function AttendancePage() {
       { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 12 }, { wch: 16 }, { wch: 16 }
     ];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, `${monthNameNp} ${selectedMonthlyBsYear}`);
+    XLSX.utils.book_append_sheet(wb, ws, `${monthNameEn} ${selectedMonthlyBsYear}`);
     XLSX.writeFile(wb, `AP1_Monthly_Attendance_${selectedMonthlyBsYear}_${monthNameEn}.xlsx`);
     setShowMonthlyModal(false);
   };
 
   const exportMonthlyPdf = () => {
     const summary = generateMonthlySummary();
-    const monthNameNp = NEPALI_MONTHS_NP[selectedMonthlyBsMonth - 1] || 'बैशाख';
     const monthNameEn = NEPALI_MONTHS_EN[selectedMonthlyBsMonth - 1] || 'Baishakh';
     const doc = new jsPDF('landscape', 'mm', 'a4');
 
@@ -1433,8 +1431,8 @@ export default function AttendancePage() {
     doc.text('AP1 TELEVISION NETWORK', 14, 11);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text(`EXECUTIVE MONTHLY ATTENDANCE REGISTER - ${monthNameEn.toUpperCase()} ${selectedMonthlyBsYear} BS (${monthNameNp})`, 14, 18);
-    doc.text(`Total Staff: ${summary.length} | Generated: ${getNepaliDate().formattedNp}`, 175, 18);
+    doc.text(`EXECUTIVE MONTHLY ATTENDANCE REGISTER - ${monthNameEn.toUpperCase()} ${selectedMonthlyBsYear} BS`, 14, 18);
+    doc.text(`Total Staff: ${summary.length} | Generated: ${getNepaliDate().formattedEn}`, 175, 18);
 
     const tableBody = summary.map((s, i) => {
       const rate = Math.min(100, Math.round(((s.presentDays + s.weekOffDays) / 30) * 100));
@@ -1527,8 +1525,8 @@ export default function AttendancePage() {
         selectedMonthlyBsMonth,
         daysCount
       );
-      const mName = NEPALI_MONTHS_NP[selectedMonthlyBsMonth - 1] || 'बैशाख';
-      rangeLabel = `${mName} ${toNepaliDigits(selectedMonthlyBsYear)} वि.सं. (पूरा महिना)`;
+      const mName = NEPALI_MONTHS_EN[selectedMonthlyBsMonth - 1] || 'Baishakh';
+      rangeLabel = `${mName} ${selectedMonthlyBsYear} BS (Full Month)`;
     }
 
     const deptFilter = modalScope === 'dept' ? modalSelectedDept : 'ALL';
@@ -1583,7 +1581,7 @@ export default function AttendancePage() {
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                अन्तिम सिङ्क: {hwStatus.lastSync ? new Date(hwStatus.lastSync).toLocaleTimeString() : 'भर्खरै'} | कुल रेकर्डहरू: {hwStatus.totalLogs}
+                Last Sync: {hwStatus.lastSync ? new Date(hwStatus.lastSync).toLocaleTimeString() : 'Just now'} | Total Records: {hwStatus.totalLogs}
               </p>
             </div>
           </div>
@@ -1603,7 +1601,7 @@ export default function AttendancePage() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-xs disabled:opacity-50 cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'सिङ्क हुँदैछ...' : 'Sync Machine Now'}</span>
+              <span>{isSyncing ? 'Syncing...' : 'Sync Machine Now'}</span>
             </button>
 
             {/* Manual Punch Button */}
@@ -1612,19 +1610,19 @@ export default function AttendancePage() {
                 <button
                   onClick={openRosterModal}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white transition-all shadow-xs cursor-pointer"
-                  title="सबै कर्मचारीको साप्ताहिक बिदा तालिका (Week-Off Roster Management)"
+                  title="Weekly Off Roster Management for all staff"
                 >
                   <Calendar className="w-3.5 h-3.5" />
-                  <span>साप्ताहिक बिदा तालिका (Roster)</span>
+                  <span>Roster Schedule</span>
                 </button>
 
                 <button
                   onClick={() => setShowWeekOffModal(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-xs cursor-pointer"
-                  title="रोटेसनल साप्ताहिक बिदा तोक्नुहोस् (Assign Rotational Week-Off)"
+                  title="Assign Rotational Week-Off"
                 >
                   <Calendar className="w-3.5 h-3.5" />
-                  <span>+ साप्ताहिक बिदा (Week-Off)</span>
+                  <span>+ Assign Week-Off</span>
                 </button>
 
                 <button
@@ -1632,7 +1630,7 @@ export default function AttendancePage() {
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-xs cursor-pointer"
                 >
                   <PlusCircle className="w-3.5 h-3.5" />
-                  <span>+ नयाँ हाजिरी थप्नुहोस्</span>
+                  <span>+ Manual Punch</span>
                 </button>
               </>
             )}
@@ -1644,7 +1642,7 @@ export default function AttendancePage() {
               title="Print Daily Sheet"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>प्रिन्ट (A4)</span>
+              <span>Print (A4)</span>
             </button>
           </div>
         </div>
@@ -1660,7 +1658,7 @@ export default function AttendancePage() {
               </div>
               <div>
                 <p className="text-xs font-bold text-amber-900">
-                  मेशिनबाट नयाँ औंठा पञ्चहरू आएका छन् तर कुनै कर्मचारीसँग जोडिएको छैन:
+                  Unregistered biometric punches detected from device:
                 </p>
                 <div className="flex items-center gap-2 mt-1">
                   {unassignedPins.map(pin => (
@@ -1669,7 +1667,7 @@ export default function AttendancePage() {
                     </span>
                   ))}
                   <span className="text-[11px] text-amber-700">
-                    (यी PIN हरू वेबसाइटको Staff लिस्टमा दर्ता गर्न बाँकी छ)
+                    (These biometric PINs are not linked to any registered employee profile)
                   </span>
                 </div>
               </div>
@@ -1680,7 +1678,7 @@ export default function AttendancePage() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-xs cursor-pointer whitespace-nowrap"
             >
               <LinkIcon className="w-3.5 h-3.5" />
-              <span>कर्मचारीसँग जोड्नुहोस्</span>
+              <span>Assign to Staff</span>
             </button>
           </div>
         )}
@@ -1699,11 +1697,11 @@ export default function AttendancePage() {
             }`}
           >
             <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
-              <span>कुल कर्मचारी</span>
+              <span>Total Staff</span>
               <Users className="w-4 h-4 text-blue-600" />
             </div>
             <p className="text-2xl font-black text-slate-900 mt-1">{kpiTotal}</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">सबै सूची हेर्न क्लिक गर्नुहोस्</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">Click to view all</p>
           </div>
 
           {/* Currently In Office */}
@@ -1718,12 +1716,12 @@ export default function AttendancePage() {
             <div className="flex items-center justify-between text-purple-600 text-xs font-semibold">
               <span className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
-                अहिले अफिसमा
+                In Office Now
               </span>
               <Building2 className="w-4 h-4 text-purple-600" />
             </div>
             <p className="text-2xl font-black text-purple-900 mt-1">{kpiInOffice}</p>
-            <p className="text-[11px] text-purple-600 mt-0.5">आउट हुन बाँकी स्टाफ</p>
+            <p className="text-[11px] text-purple-600 mt-0.5">Active on duty</p>
           </div>
 
           {/* Present */}
@@ -1736,11 +1734,11 @@ export default function AttendancePage() {
             }`}
           >
             <div className="flex items-center justify-between text-emerald-600 text-xs font-semibold">
-              <span>कुल उपस्थित</span>
+              <span>Total Present</span>
               <UserCheck className="w-4 h-4 text-emerald-600" />
             </div>
             <p className="text-2xl font-black text-emerald-900 mt-1">{kpiPresent}</p>
-            <p className="text-[11px] text-emerald-600 mt-0.5">आज पञ्च गरेका कर्मचारी</p>
+            <p className="text-[11px] text-emerald-600 mt-0.5">Punched today</p>
           </div>
 
           {/* Shift Completed (Out) */}
@@ -1753,11 +1751,11 @@ export default function AttendancePage() {
             }`}
           >
             <div className="flex items-center justify-between text-blue-600 text-xs font-semibold">
-              <span>ड्युटी पूरा (Out)</span>
+              <span>Checked Out</span>
               <CheckCircle2 className="w-4 h-4 text-blue-600" />
             </div>
             <p className="text-2xl font-black text-blue-900 mt-1">{kpiCompleted}</p>
-            <p className="text-[11px] text-blue-600 mt-0.5">पञ्च आउट भइसकेका</p>
+            <p className="text-[11px] text-blue-600 mt-0.5">Shift completed</p>
           </div>
 
           {/* Rotational Week-Off */}
@@ -1770,11 +1768,11 @@ export default function AttendancePage() {
             }`}
           >
             <div className="flex items-center justify-between text-indigo-600 text-xs font-semibold">
-              <span>साप्ताहिक बिदा</span>
+              <span>Weekly Off</span>
               <Calendar className="w-4 h-4 text-indigo-600" />
             </div>
             <p className="text-2xl font-black text-indigo-900 mt-1">{kpiWeekOff}</p>
-            <p className="text-[11px] text-indigo-600 mt-0.5">रोटेसनल अफ (Week-Off)</p>
+            <p className="text-[11px] text-indigo-600 mt-0.5">Scheduled rest day</p>
           </div>
 
           {/* Absent / Leave */}
@@ -1787,11 +1785,11 @@ export default function AttendancePage() {
             }`}
           >
             <div className="flex items-center justify-between text-rose-600 text-xs font-semibold">
-              <span>अनुपस्थित / बिदा</span>
+              <span>Absent / Leave</span>
               <UserX className="w-4 h-4 text-rose-600" />
             </div>
             <p className="text-2xl font-black text-rose-900 mt-1">{kpiAbsent}</p>
-            <p className="text-[11px] text-rose-600 mt-0.5">हाजिरी नभएका (गयल)</p>
+            <p className="text-[11px] text-rose-600 mt-0.5">Not punched today</p>
           </div>
         </div>
 
@@ -1801,14 +1799,14 @@ export default function AttendancePage() {
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
               <span>
-                सूचना: {kpiHolidayPending} जना कर्मचारीले आज बिदा / Week-Off को दिन मेशिनमा हाजिरी गर्नुभएको छ। प्रशासक (Admin) ले अनुमोदन गर्न बाँकी छ।
+                Notice: {kpiHolidayPending} employees punched on holiday / week-off today. Approval required from Admin.
               </span>
             </div>
             <button
               onClick={() => setStatusFilter('HOLIDAY_PENDING')}
               className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold cursor-pointer"
             >
-              अनुमोदन सूची हेर्नुहोस् (Review)
+              Review Approvals
             </button>
           </div>
         )}
@@ -1830,7 +1828,7 @@ export default function AttendancePage() {
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  आज (Today)
+                  Today
                 </button>
                 <button
                   type="button"
@@ -1841,7 +1839,7 @@ export default function AttendancePage() {
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  हिजो (Yesterday)
+                  Yesterday
                 </button>
               </div>
 
@@ -1858,7 +1856,7 @@ export default function AttendancePage() {
                   ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                   : 'bg-amber-50 text-amber-800 border-amber-200'
               }`}>
-                {selectedDate === getLocalDateStr() ? '🟢 आजको हाजिरी' : '📅 हाजिरी'}: {bsDate ? bsDate.formattedNp : selectedDate}
+                {selectedDate === getLocalDateStr() ? '🟢 Today' : '📅 Selected'}: {bsDate ? bsDate.formattedEn || bsDate.formattedNp : selectedDate}
               </span>
             </div>
 
@@ -1871,7 +1869,7 @@ export default function AttendancePage() {
                 title="Download Daily Excel Sheet"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                <span>दैनिक Excel</span>
+                <span>Daily Excel</span>
               </button>
 
               <button
@@ -1880,7 +1878,7 @@ export default function AttendancePage() {
                 title="Download Official Daily PDF"
               >
                 <Download className="w-3.5 h-3.5 text-red-600" />
-                <span>दैनिक PDF</span>
+                <span>Daily PDF</span>
               </button>
 
               {/* Date Range Export Trigger */}
@@ -1890,10 +1888,10 @@ export default function AttendancePage() {
                   setShowMonthlyModal(true);
                 }}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors cursor-pointer"
-                title="कुनै निश्चित मिति दायरा (जस्तै कार्तिक २ देखि ५ सम्म) को हाजिरी निकाल्नुहोस्"
+                title="Export attendance for custom date range (e.g. Kartik 2 to 5)"
               >
                 <Calendar className="w-3.5 h-3.5" />
-                <span>मिति दायरा (Date Range)</span>
+                <span>Date Range Report</span>
               </button>
 
               {/* Monthly Export Trigger */}
@@ -1906,7 +1904,7 @@ export default function AttendancePage() {
                 title="Open Monthly Report Generator"
               >
                 <Calendar className="w-3.5 h-3.5" />
-                <span>मासिक रिपोर्ट (Monthly)</span>
+                <span>Monthly Report</span>
               </button>
 
               {records.length > 0 && (role === 'admin') && (
@@ -1928,7 +1926,7 @@ export default function AttendancePage() {
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="कर्मचारीको नाम वा PIN नम्बर खोज्नुहोस्..."
+                placeholder="Search staff by name or PIN number..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 font-medium"
@@ -1943,7 +1941,7 @@ export default function AttendancePage() {
                 onChange={(e) => setDepartmentFilter(e.target.value)}
                 className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-medium text-slate-700 cursor-pointer"
               >
-                <option value="ALL">सबै विभागहरू (All Departments)</option>
+                <option value="ALL">All Departments</option>
                 {uniqueDepartments.map(d => (
                   <option key={d} value={d}>{d}</option>
                 ))}
@@ -1958,15 +1956,15 @@ export default function AttendancePage() {
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-medium text-slate-700 cursor-pointer"
               >
-                <option value="ALL">सबै स्थिति (All Status)</option>
-                <option value="IN_OFFICE">🏢 अहिले अफिसमा (Currently In Office)</option>
-                <option value="PRESENT">✅ उपस्थित (Present)</option>
-                <option value="WEEK_OFF">🌴 साप्ताहिक बिदा (Rotational Week-Off)</option>
-                <option value="HOLIDAY_PENDING">⚠️ बिदामा काम (Approval Pending)</option>
-                <option value="LATE">⚠️ ढिलो (Late)</option>
-                <option value="HALF_DAY">🌓 हाफ डे (Half Day)</option>
-                <option value="ABSENT">❌ अनुपस्थित (Absent)</option>
-                <option value="ON_LEAVE">🏖️ बिदामा (On Leave)</option>
+                <option value="ALL">All Status</option>
+                <option value="IN_OFFICE">🏢 Currently In Office</option>
+                <option value="PRESENT">✅ Present</option>
+                <option value="WEEK_OFF">🌴 Weekly Off</option>
+                <option value="HOLIDAY_PENDING">⚠️ Holiday Work (Pending Approval)</option>
+                <option value="LATE">⚠️ Late</option>
+                <option value="HALF_DAY">🌓 Half Day</option>
+                <option value="ABSENT">❌ Absent</option>
+                <option value="ON_LEAVE">🏖️ On Leave</option>
               </select>
             </div>
           </div>
@@ -1980,14 +1978,14 @@ export default function AttendancePage() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
-                  <th className="py-3 px-4">कर्मचारी (Staff)</th>
-                  <th className="py-3 px-4">बायोमेट्रिक PIN</th>
-                  <th className="py-3 px-4">विभाग (Department)</th>
-                  <th className="py-3 px-4">इन-टाइम (Check-In)</th>
-                  <th className="py-3 px-4">आउट-टाइम (Check-Out)</th>
-                  <th className="py-3 px-4">अवधि (Worked)</th>
-                  <th className="py-3 px-4">स्थिति (Status)</th>
-                  <th className="py-3 px-4 text-right">कार्य (Actions)</th>
+                  <th className="py-3 px-4">Staff Member</th>
+                  <th className="py-3 px-4">Machine ID</th>
+                  <th className="py-3 px-4">Department</th>
+                  <th className="py-3 px-4">Punch In</th>
+                  <th className="py-3 px-4">Punch Out</th>
+                  <th className="py-3 px-4">Work Hours</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -2016,7 +2014,7 @@ export default function AttendancePage() {
                               {r.employee_name}
                               {isUnassigned && (
                                 <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
-                                  अनरजिस्टर्ड
+                                  Unregistered
                                 </span>
                               )}
                             </p>
@@ -2071,7 +2069,7 @@ export default function AttendancePage() {
                           <span>{r.worked_hours} hrs</span>
                         ) : r.in_time && !r.out_time ? (
                           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                            ⏳ अधुरो (In Progress)
+                            ⏳ In Progress
                           </span>
                         ) : (
                           <span className="text-slate-400">-</span>
@@ -2101,7 +2099,7 @@ export default function AttendancePage() {
                           {r.holiday_work_status === 'PENDING_APPROVAL' && (
                             <div className="flex items-center gap-1.5 mt-1 bg-amber-50 p-1 rounded-lg border border-amber-300">
                               <span className="text-[10px] font-bold text-amber-900 animate-pulse">
-                                ⚠️ बिदामा काम (स्वीकृति बाँकी)
+                                ⚠️ Off-Day Work (Pending Approval)
                               </span>
                               {(role === 'admin' || role === 'hr') && (
                                 <div className="flex items-center gap-1">
@@ -2128,13 +2126,13 @@ export default function AttendancePage() {
 
                           {r.holiday_work_status === 'APPROVED' && (
                             <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
-                              ✓ बिदामा काम स्वीकृत
+                              ✓ Approved Off Work
                             </span>
                           )}
 
                           {r.holiday_work_status === 'REJECTED' && (
                             <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
-                              ✕ बिदामा काम अस्वीकृत
+                              ✕ Rejected Off Work
                             </span>
                           )}
                         </div>
@@ -2156,7 +2154,7 @@ export default function AttendancePage() {
                                 designation: r.designation
                               })}
                               className="px-2 py-1 text-[11px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md transition-colors cursor-pointer flex items-center gap-1"
-                              title="आजको दिन यो कर्मचारीलाई साप्ताहिक बिदा (Week-Off) मार्क गर्नुहोस्"
+                              title="Mark as weekly off for today"
                             >
                               <span>🌴</span>
                               <span className="hidden sm:inline">Week-Off</span>
@@ -2168,7 +2166,7 @@ export default function AttendancePage() {
                               className="px-2 py-1 text-[11px] font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-md transition-colors cursor-pointer"
                               title="Assign PIN to Staff"
                             >
-                              जोड्नुहोस्
+                              Assign
                             </button>
                           )}
                           {matchedStaff && (
@@ -2181,7 +2179,7 @@ export default function AttendancePage() {
                                 rawBiometricLogs
                               )}
                               className="p-1.5 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                              title={`${matchedStaff.full_name} को यस महिनाको दैनिक हाजिरी Excel डाउनलोड गर्नुहोस्`}
+                              title={`Download ${matchedStaff.full_name}'s monthly attendance Excel`}
                             >
                               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
                             </button>
@@ -2191,7 +2189,7 @@ export default function AttendancePage() {
                               <button
                                 onClick={() => setEditRecord(r)}
                                 className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                                title="सच्याउनुहोस् (Manual Correction)"
+                                title="Adjust Attendance Entry"
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
                               </button>
@@ -2217,10 +2215,10 @@ export default function AttendancePage() {
                         <Clock className="w-6 h-6" />
                       </div>
                       <p className="font-bold text-slate-800 text-sm">
-                        कुनै हाजिरी रेकर्ड फेला परेन
+                        No Attendance Records Found
                       </p>
                       <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                        बायोमेट्रिक मेशिनमा औंठा हान्ने बित्तिकै यहाँ रियल-टाइममा हाजिरी देखिनेछ।
+                        Punches will appear in real time as staff scan on the biometric device.
                       </p>
                     </td>
                   </tr>
@@ -2243,10 +2241,10 @@ export default function AttendancePage() {
                   </div>
                   <div>
                     <h3 className="font-bold text-slate-900 text-sm">
-                      मेशिन PIN #{assignPinModal} कर्मचारीसँग जोड्नुहोस्
+                      Assign Machine PIN #{assignPinModal} to Staff
                     </h3>
                     <p className="text-[11px] text-slate-500">
-                      मेशिनबाट आएको यो औंठा पञ्च कसको हो छान्नुहोस्
+                      Link this biometric scan ID to an existing employee profile
                     </p>
                   </div>
                 </div>
@@ -2258,24 +2256,24 @@ export default function AttendancePage() {
               <div className="mt-4 space-y-4 text-xs">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1.5">
-                    कर्मचारी छान्नुहोस् (Select Employee):
+                    Select Employee:
                   </label>
                   <select
                     value={assignStaffId}
                     onChange={(e) => setAssignStaffId(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 font-medium text-slate-800"
                   >
-                    <option value="">-- कर्मचारी छान्नुहोस् --</option>
+                    <option value="">-- Select Employee --</option>
                     {staffList.map(emp => (
                       <option key={emp.id} value={emp.id}>
-                        {emp.full_name} ({emp.designation}) - हालको PIN: #{emp.biometric_pin || 'छैन'}
+                        {emp.full_name} ({emp.designation}) - Current PIN: #{emp.biometric_pin || 'None'}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 text-blue-800 text-[11px] leading-relaxed">
-                  💡 यसो गर्दा अब उप्रान्त यो कर्मचारीले मेशिनमा औंठा हान्ने बित्तिकै उहाँको नाम र फोटो सहित हाजिरी स्वतः देखिनेछ।
+                  💡 Once linked, subsequent punches with this biometric PIN will automatically display the employee's name and photo.
                 </div>
 
                 <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
@@ -2288,7 +2286,7 @@ export default function AttendancePage() {
                     disabled={isAssigningPin}
                     className="px-4 py-2 rounded-lg font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer disabled:opacity-50"
                   >
-                    रद्द गर्नुहोस्
+                    Cancel
                   </button>
                   <button
                     type="button"
@@ -2303,10 +2301,10 @@ export default function AttendancePage() {
                     {isAssigningPin ? (
                       <>
                         <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                        <span>सेभ गर्दैछ...</span>
+                        <span>Saving...</span>
                       </>
                     ) : (
-                      <span>सेभ गरी जोड्नुहोस्</span>
+                      <span>Save and Link</span>
                     )}
                   </button>
                 </div>
@@ -2328,10 +2326,10 @@ export default function AttendancePage() {
                   </div>
                   <div>
                     <h3 className="font-bold text-slate-900 text-sm">
-                      साप्ताहिक बिदा तालिका (Weekly Off Roster)
+                      Weekly Off Roster Management
                     </h3>
                     <p className="text-[11px] text-slate-500">
-                      प्रत्येक कर्मचारीको हप्ताको १ दिन बिदा तोक्नुहोस्। बिदाको दिन काम गरेमा सिस्टमले स्वतः अर्को नआएको दिनलाई बिदा मान्नेछ।
+                      Configure rotating 1-day weekly off for each employee. Working on off-day is tracked for compensatory off / overtime.
                     </p>
                   </div>
                 </div>
@@ -2346,7 +2344,7 @@ export default function AttendancePage() {
                   <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="कर्मचारी खोज्नुहोस्..."
+                    placeholder="Search staff by name, PIN..."
                     value={rosterSearch}
                     onChange={(e) => setRosterSearch(e.target.value)}
                     className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-purple-500"
@@ -2354,20 +2352,20 @@ export default function AttendancePage() {
                 </div>
 
                 <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
-                  <span className="text-[11px] font-bold text-slate-500">एकमुष्ठ तोक्नुहोस्:</span>
+                  <span className="text-[11px] font-bold text-slate-500">Bulk Assign:</span>
                   <button
                     type="button"
                     onClick={() => handleBulkSetOffDay('Saturday')}
                     className="px-2 py-1 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-200 cursor-pointer"
                   >
-                    सबै शनिबार
+                    All Saturday
                   </button>
                   <button
                     type="button"
                     onClick={() => handleBulkSetOffDay('Sunday')}
                     className="px-2 py-1 text-[10px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded border border-indigo-200 cursor-pointer"
                   >
-                    सबै आइतबार
+                    All Sunday
                   </button>
                 </div>
               </div>
@@ -2399,13 +2397,13 @@ export default function AttendancePage() {
                           }}
                           className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-indigo-900 focus:outline-none focus:border-purple-500 cursor-pointer"
                         >
-                          <option value="Saturday">शनिबार (Saturday)</option>
-                          <option value="Sunday">आइतबार (Sunday)</option>
-                          <option value="Monday">सोमबार (Monday)</option>
-                          <option value="Tuesday">मंगलबार (Tuesday)</option>
-                          <option value="Wednesday">बुधबार (Wednesday)</option>
-                          <option value="Thursday">बिहीबार (Thursday)</option>
-                          <option value="Friday">शुक्रबार (Friday)</option>
+                          <option value="Saturday">Saturday</option>
+                          <option value="Sunday">Sunday</option>
+                          <option value="Monday">Monday</option>
+                          <option value="Tuesday">Tuesday</option>
+                          <option value="Wednesday">Wednesday</option>
+                          <option value="Thursday">Thursday</option>
+                          <option value="Friday">Friday</option>
                         </select>
                       </div>
                     </div>
@@ -2415,7 +2413,7 @@ export default function AttendancePage() {
               {/* Footer */}
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between shrink-0">
                 <span className="text-[11px] text-slate-500">
-                  कुल {rosterStaffList.length} जना कर्मचारी
+                  Total {rosterStaffList.length} Employees
                 </span>
                 <div className="flex items-center gap-2">
                   <button
@@ -2424,7 +2422,7 @@ export default function AttendancePage() {
                     disabled={isSavingRoster}
                     className="px-4 py-2 rounded-lg font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs cursor-pointer"
                   >
-                    रद्द गर्नुहोस्
+                    Cancel
                   </button>
                   <button
                     type="button"
@@ -2435,10 +2433,10 @@ export default function AttendancePage() {
                     {isSavingRoster ? (
                       <>
                         <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                        <span>सेभ गर्दैछ...</span>
+                        <span>Saving...</span>
                       </>
                     ) : (
-                      <span>रोस्टर सुरक्षित गर्नुहोस् (Save Roster)</span>
+                      <span>Save Roster</span>
                     )}
                   </button>
                 </div>
@@ -2460,10 +2458,10 @@ export default function AttendancePage() {
                   </div>
                   <div>
                     <h3 className="font-bold text-slate-900 text-sm">
-                      साप्ताहिक बिदा तोक्नुहोस् (Assign Week-Off)
+                      Assign Rotational Week-Off
                     </h3>
                     <p className="text-[11px] text-slate-500">
-                      रोटेसनल सिफ्ट अनुसार कर्मचारीको साप्ताहिक बिदा मार्क गर्नुहोस्
+                      Mark scheduled weekly off-day for selected staff
                     </p>
                   </div>
                 </div>
@@ -2474,14 +2472,14 @@ export default function AttendancePage() {
 
               <form onSubmit={handleAssignWeekOffSubmit} className="space-y-4 mt-4 text-xs">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">कर्मचारी छान्नुहोस्</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Select Employee</label>
                   <select
                     value={weekOffStaffId}
                     onChange={(e) => setWeekOffStaffId(e.target.value)}
                     required
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500 font-medium"
                   >
-                    <option value="">-- कर्मचारी छान्नुहोस् --</option>
+                    <option value="">-- Select Employee --</option>
                     {staffList.map(s => (
                       <option key={s.id} value={s.id}>
                         {s.full_name} ({s.designation}) - PIN #{s.biometric_pin}
@@ -2491,9 +2489,9 @@ export default function AttendancePage() {
                 </div>
 
                 <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-200 text-indigo-900 space-y-1">
-                  <p className="font-bold">मिति: {selectedDate} {bsDate ? `(${bsDate.formattedNp})` : ''}</p>
+                  <p className="font-bold">Date: {selectedDate} {bsDate ? `(${bsDate.formattedEn || bsDate.formattedNp})` : ''}</p>
                   <p className="text-[11px] text-indigo-700">
-                    साप्ताहिक बिदा (Week-Off) मार्क गरेपछि यो दिन तलब नकाटिने गरी (Paid Leave) सुरक्षित हुनेछ। यदि उक्त दिन कर्मचारी आएर औंठा हान्नुभयो भने Admin ले अतिरिक्त ड्युटी (Overtime) स्वीकृति दिन सक्नुहुनेछ।
+                    Marking this day as Week-Off protects the employee from salary deduction (Paid Leave). If the employee punches on this day, Admin can approve additional overtime/holiday compensation.
                   </p>
                 </div>
 
@@ -2503,13 +2501,13 @@ export default function AttendancePage() {
                     onClick={() => setShowWeekOffModal(false)}
                     className="px-4 py-2 rounded-lg font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700"
                   >
-                    रद्द गर्नुहोस्
+                    Cancel
                   </button>
                   <button
                     type="submit"
                     className="px-4 py-2 rounded-lg font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs cursor-pointer"
                   >
-                    साप्ताहिक बिदा सुरक्षित गर्नुहोस्
+                    Confirm Week-Off
                   </button>
                 </div>
               </form>
@@ -2530,10 +2528,10 @@ export default function AttendancePage() {
                   </div>
                   <div>
                     <h3 className="font-bold text-slate-900 text-sm">
-                      नयाँ म्यानुअल हाजिरी थप्नुहोस्
+                      Add Manual Attendance Entry
                     </h3>
                     <p className="text-[11px] text-slate-500">
-                      फिल्ड ड्युटी वा छुटेको हाजिरी प्रविष्टि गर्नुहोस्
+                      Record punch entry for field duty or missed biometric scan
                     </p>
                   </div>
                 </div>
@@ -2544,14 +2542,14 @@ export default function AttendancePage() {
 
               <form onSubmit={handleAddManualPunch} className="space-y-3.5 mt-4 text-xs">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">कर्मचारी</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Employee</label>
                   <select
                     value={manualForm.staffId}
                     onChange={(e) => setManualForm({ ...manualForm, staffId: e.target.value })}
                     required
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 font-medium"
                   >
-                    <option value="">-- कर्मचारी छान्नुहोस् --</option>
+                    <option value="">-- Select Employee --</option>
                     {staffList.map(s => (
                       <option key={s.id} value={s.id}>
                         {s.full_name} ({s.designation}) - PIN #{s.biometric_pin}
@@ -2562,7 +2560,7 @@ export default function AttendancePage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">नेपाली मिति (Date)</label>
+                    <label className="block font-semibold text-slate-700 mb-1">BS Date</label>
                     <NepaliDatePicker
                       value={manualForm.date}
                       onChange={(d) => setManualForm({ ...manualForm, date: d })}
@@ -2570,24 +2568,24 @@ export default function AttendancePage() {
                     />
                   </div>
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">स्थिति</label>
+                    <label className="block font-semibold text-slate-700 mb-1">Status</label>
                     <select
                       value={manualForm.status}
                       onChange={(e) => setManualForm({ ...manualForm, status: e.target.value })}
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none"
                     >
-                      <option value="PRESENT">PRESENT (उपस्थित)</option>
-                      <option value="WEEK_OFF">WEEK_OFF (साप्ताहिक बिदा)</option>
-                      <option value="LATE">LATE (ढिलो)</option>
-                      <option value="HALF_DAY">HALF_DAY (हाफ डे)</option>
-                      <option value="ON_LEAVE">ON_LEAVE (बिदामा)</option>
+                      <option value="PRESENT">Present</option>
+                      <option value="WEEK_OFF">Weekly Off</option>
+                      <option value="LATE">Late Arrival</option>
+                      <option value="HALF_DAY">Half Day</option>
+                      <option value="ON_LEAVE">On Leave</option>
                     </select>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">इन-टाइम (Check-In)</label>
+                    <label className="block font-semibold text-slate-700 mb-1">Punch In Time</label>
                     <input
                       type="time"
                       value={manualForm.inTime}
@@ -2597,7 +2595,7 @@ export default function AttendancePage() {
                     />
                   </div>
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">आउट-टाइम (Check-Out)</label>
+                    <label className="block font-semibold text-slate-700 mb-1">Punch Out Time</label>
                     <input
                       type="time"
                       value={manualForm.outTime}
@@ -2608,10 +2606,10 @@ export default function AttendancePage() {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">कैफियत / कारण (Remarks)</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Remarks / Reason</label>
                   <input
                     type="text"
-                    placeholder="उदा: सिंहदरबार लाइभ रिपोर्टिङ / बिरामी बिदा"
+                    placeholder="e.g. Field reporting / Live assignment / Missed scan"
                     value={manualForm.remarks}
                     onChange={(e) => setManualForm({ ...manualForm, remarks: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none"
@@ -2624,13 +2622,13 @@ export default function AttendancePage() {
                     onClick={() => setShowManualModal(false)}
                     className="px-4 py-2 rounded-lg font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700"
                   >
-                    रद्द गर्नुहोस्
+                    Cancel
                   </button>
                   <button
                     type="submit"
                     className="px-4 py-2 rounded-lg font-bold bg-blue-600 hover:bg-blue-500 text-white"
                   >
-                    सुरक्षित गर्नुहोस्
+                    Save Attendance
                   </button>
                 </div>
               </form>
@@ -2652,10 +2650,10 @@ export default function AttendancePage() {
                   </div>
                   <div>
                     <h3 className="font-bold text-slate-900 text-base">
-                      {modalPeriodType === 'range' ? 'अनुकूल मिति दायरा हाजिरी रिपोर्ट' : 'मासिक हाजिरी रिपोर्ट जेनेरेटर'}
+                      {modalPeriodType === 'range' ? 'Custom BS Date Range Attendance Report' : 'Monthly Attendance Report Generator'}
                     </h3>
                     <p className="text-[11px] text-slate-500">
-                      विक्रम संवत् (BS) नेपाली क्यालेन्डर अनुसार Excel र PDF रिपोर्ट निकाल्नुहोस्
+                      Generate professional Excel & PDF reports in Bikram Sambat (BS) format
                     </p>
                   </div>
                 </div>
@@ -2671,7 +2669,7 @@ export default function AttendancePage() {
                 {/* 1. Period Switcher: Date Range vs Full Month */}
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
-                    रिपोर्ट अवधि छनोट (Report Period):
+                    Report Period:
                   </label>
                   <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-xl">
                     <button
@@ -2684,7 +2682,7 @@ export default function AttendancePage() {
                       }`}
                     >
                       <Calendar className="w-3.5 h-3.5" />
-                      <span>📆 मिति दायरा (Date Range)</span>
+                      <span>📆 Date Range</span>
                     </button>
                     <button
                       type="button"
@@ -2696,7 +2694,7 @@ export default function AttendancePage() {
                       }`}
                     >
                       <Clock className="w-3.5 h-3.5" />
-                      <span>📅 पूरा महिना (Full Month)</span>
+                      <span>📅 Full Month</span>
                     </button>
                   </div>
                 </div>
@@ -2704,7 +2702,7 @@ export default function AttendancePage() {
                 {/* 2. Scope Switcher: All Staff vs Department-wise vs Individual */}
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
-                    कर्मचारी छनोट दायरा (Target Scope):
+                    Target Scope:
                   </label>
                   <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl">
                     <button
@@ -2716,7 +2714,7 @@ export default function AttendancePage() {
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      🏢 सबै कर्मचारी
+                      🏢 All Staff
                     </button>
                     <button
                       type="button"
@@ -2727,7 +2725,7 @@ export default function AttendancePage() {
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      🏛️ विभाग अनुसार
+                      🏛️ Department
                     </button>
                     <button
                       type="button"
@@ -2743,7 +2741,7 @@ export default function AttendancePage() {
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      👤 व्यक्तिगत
+                      👤 Individual
                     </button>
                   </div>
                 </div>
@@ -2752,14 +2750,14 @@ export default function AttendancePage() {
                 {modalScope === 'dept' && (
                   <div className="p-2.5 bg-blue-50/70 border border-blue-200 rounded-xl">
                     <label className="block font-bold text-blue-900 text-xs mb-1">
-                      विभाग छनोट गर्नुहोस् (Select Department):
+                      Select Department:
                     </label>
                     <select
                       value={modalSelectedDept}
                       onChange={(e) => setModalSelectedDept(e.target.value)}
                       className="w-full px-3 py-2 bg-white border border-blue-200 rounded-lg focus:outline-none font-bold text-slate-900 cursor-pointer text-xs"
                     >
-                      <option value="ALL">सबै विभागहरू (All Departments)</option>
+                      <option value="ALL">All Departments</option>
                       {uniqueDepartments.map(dept => (
                         <option key={dept} value={dept}>{dept}</option>
                       ))}
@@ -2771,7 +2769,7 @@ export default function AttendancePage() {
                 {modalScope === 'individual' && (
                   <div className="p-2.5 bg-purple-50/70 border border-purple-200 rounded-xl">
                     <label className="block font-bold text-purple-900 text-xs mb-1">
-                      कर्मचारी छनोट गर्नुहोस् (Select Employee):
+                      Select Employee:
                     </label>
                     <select
                       value={selectedIndividualStaffPin}
@@ -2795,7 +2793,7 @@ export default function AttendancePage() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block font-bold text-slate-700 mb-1">
-                          साल (BS Year):
+                          BS Year:
                         </label>
                         <select
                           value={selectedMonthlyBsYear}
@@ -2803,31 +2801,31 @@ export default function AttendancePage() {
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-bold text-slate-900 cursor-pointer text-xs"
                         >
                           {AVAILABLE_BS_YEARS.map(y => (
-                            <option key={y} value={y}>{toNepaliDigits(y)} साल (BS)</option>
+                            <option key={y} value={y}>{y} BS</option>
                           ))}
                         </select>
                       </div>
 
                       <div>
                         <label className="block font-bold text-slate-700 mb-1">
-                          महिना (BS Month):
+                          BS Month:
                         </label>
                         <select
                           value={selectedMonthlyBsMonth}
                           onChange={(e) => setSelectedMonthlyBsMonth(Number(e.target.value))}
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-bold text-slate-900 cursor-pointer text-xs"
                         >
-                          {NEPALI_MONTHS_NP.map((m, idx) => (
-                            <option key={idx + 1} value={idx + 1}>{m} ({NEPALI_MONTHS_EN[idx]})</option>
+                          {NEPALI_MONTHS_EN.map((m, idx) => (
+                            <option key={idx + 1} value={idx + 1}>{m} ({NEPALI_MONTHS_NP[idx]})</option>
                           ))}
                         </select>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg text-purple-900 font-bold text-xs">
-                      <span>छानिएको नेपाली महिना:</span>
+                      <span>Selected BS Month:</span>
                       <span className="px-2.5 py-0.5 bg-purple-600 text-white rounded text-[11px]">
-                        {NEPALI_MONTHS_NP[selectedMonthlyBsMonth - 1]} {toNepaliDigits(selectedMonthlyBsYear)} (वि.सं.)
+                        {NEPALI_MONTHS_EN[selectedMonthlyBsMonth - 1]} {selectedMonthlyBsYear} BS
                       </span>
                     </div>
                   </div>
@@ -2836,42 +2834,42 @@ export default function AttendancePage() {
                     {/* From Date */}
                     <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                       <span className="block font-bold text-blue-700 text-[11px] mb-1.5">
-                        ▶ सुरु मिति (From BS Date):
+                        ▶ From BS Date:
                       </span>
                       <div className="grid grid-cols-3 gap-2">
                         <div>
-                          <label className="block text-[10px] text-slate-500 mb-0.5">साल (Year)</label>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">Year</label>
                           <select
                             value={modalRangeFromYear}
                             onChange={(e) => setModalRangeFromYear(Number(e.target.value))}
                             className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded font-bold text-slate-900 text-xs"
                           >
                             {AVAILABLE_BS_YEARS.map(y => (
-                              <option key={y} value={y}>{toNepaliDigits(y)}</option>
+                              <option key={y} value={y}>{y}</option>
                             ))}
                           </select>
                         </div>
                         <div>
-                          <label className="block text-[10px] text-slate-500 mb-0.5">महिना (Month)</label>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">Month</label>
                           <select
                             value={modalRangeFromMonth}
                             onChange={(e) => setModalRangeFromMonth(Number(e.target.value))}
                             className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded font-bold text-slate-900 text-xs"
                           >
-                            {NEPALI_MONTHS_NP.map((m, idx) => (
+                            {NEPALI_MONTHS_EN.map((m, idx) => (
                               <option key={idx + 1} value={idx + 1}>{m}</option>
                             ))}
                           </select>
                         </div>
                         <div>
-                          <label className="block text-[10px] text-slate-500 mb-0.5">गते (Day)</label>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">Day</label>
                           <select
                             value={modalRangeFromDay}
                             onChange={(e) => setModalRangeFromDay(Number(e.target.value))}
                             className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded font-bold text-slate-900 text-xs"
                           >
                             {Array.from({ length: modalDaysInFromMonth }, (_, i) => i + 1).map(d => (
-                              <option key={d} value={d}>{toNepaliDigits(d)} गते</option>
+                              <option key={d} value={d}>{d}</option>
                             ))}
                           </select>
                         </div>
@@ -2881,42 +2879,42 @@ export default function AttendancePage() {
                     {/* To Date */}
                     <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                       <span className="block font-bold text-blue-700 text-[11px] mb-1.5">
-                        ⏹ अन्तिम मिति (To BS Date):
+                        ⏹ To BS Date:
                       </span>
                       <div className="grid grid-cols-3 gap-2">
                         <div>
-                          <label className="block text-[10px] text-slate-500 mb-0.5">साल (Year)</label>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">Year</label>
                           <select
                             value={modalRangeToYear}
                             onChange={(e) => setModalRangeToYear(Number(e.target.value))}
                             className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded font-bold text-slate-900 text-xs"
                           >
                             {AVAILABLE_BS_YEARS.map(y => (
-                              <option key={y} value={y}>{toNepaliDigits(y)}</option>
+                              <option key={y} value={y}>{y}</option>
                             ))}
                           </select>
                         </div>
                         <div>
-                          <label className="block text-[10px] text-slate-500 mb-0.5">महिना (Month)</label>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">Month</label>
                           <select
                             value={modalRangeToMonth}
                             onChange={(e) => setModalRangeToMonth(Number(e.target.value))}
                             className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded font-bold text-slate-900 text-xs"
                           >
-                            {NEPALI_MONTHS_NP.map((m, idx) => (
+                            {NEPALI_MONTHS_EN.map((m, idx) => (
                               <option key={idx + 1} value={idx + 1}>{m}</option>
                             ))}
                           </select>
                         </div>
                         <div>
-                          <label className="block text-[10px] text-slate-500 mb-0.5">गते (Day)</label>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">Day</label>
                           <select
                             value={modalRangeToDay}
                             onChange={(e) => setModalRangeToDay(Number(e.target.value))}
                             className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded font-bold text-slate-900 text-xs"
                           >
                             {Array.from({ length: modalDaysInToMonth }, (_, i) => i + 1).map(d => (
-                              <option key={d} value={d}>{toNepaliDigits(d)} गते</option>
+                              <option key={d} value={d}>{d}</option>
                             ))}
                           </select>
                         </div>
@@ -2927,7 +2925,7 @@ export default function AttendancePage() {
                     <div className="flex items-center justify-between px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-950 font-bold text-xs">
                       <span className="truncate">{modalRangeLabel}</span>
                       <span className="px-2 py-0.5 bg-blue-600 text-white rounded text-[11px] whitespace-nowrap ml-2">
-                        कुल {toNepaliDigits(modalRangeCount)} दिन
+                        Total {modalRangeCount} Days
                       </span>
                     </div>
                   </div>
@@ -2935,19 +2933,19 @@ export default function AttendancePage() {
 
                 {/* Scope Description Box */}
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-slate-600 text-[11px] space-y-1">
-                  <p className="font-bold text-slate-800">📊 रिपोर्ट ढाँचा विवरण:</p>
+                  <p className="font-bold text-slate-800">📊 Report Breakdown:</p>
                   {modalScope === 'individual' ? (
                     <>
-                      <p>• छानिएको कर्मचारीको प्रत्येक दिनको इन/आउट समय र कार्य घण्टा</p>
-                      <p>• ढिलो आएको मिनेट, साप्ताहिक बिदा, र आधिकारिक हाजिरी स्थिति</p>
-                      <p>• Excel मा व्यक्तिगत विस्तृत लग तथा PDF मा आधिकारिक कार्य तालिका</p>
+                      <p>• Day-by-day punch log with in/out times and worked hours</p>
+                      <p>• Late minutes, scheduled weekly offs, and attendance status</p>
+                      <p>• Detailed personal log in Excel and timeline register in PDF</p>
                     </>
                   ) : (
                     <>
-                      <p>• {modalScope === 'dept' ? `छानिएको विभाग (${modalSelectedDept})` : 'सम्पूर्ण कम्पनीका सबै कर्मचारी'} को हाजिरी सारांश</p>
-                      <p>• उपस्थित, हप्ता बिदा, ढिलो, बिदा, र काम गरेको घण्टा विश्लेषण</p>
-                      <p>• Excel मा कर्मचारी सारांश + दैनिक विस्तृत लग (२ वटा Sheet)</p>
-                      <p>• PDF मा व्यवस्थापकीय हस्ताक्षर ढाँचा सहितको औपचारिक रिपोर्ट</p>
+                      <p>• Aggregated attendance summary for {modalScope === 'dept' ? modalSelectedDept : 'all company employees'}</p>
+                      <p>• Present days, weekly offs, late count, leaves, and total work hours</p>
+                      <p>• Excel includes both Summary and Detailed Daily Logs (2 sheets)</p>
+                      <p>• Formal PDF with managerial signature blocks</p>
                     </>
                   )}
                 </div>
@@ -2960,7 +2958,7 @@ export default function AttendancePage() {
                     className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer text-xs transition-colors"
                   >
                     <FileSpreadsheet className="w-4 h-4" />
-                    <span>Excel (.xlsx) डाउनलोड</span>
+                    <span>Download Excel (.xlsx)</span>
                   </button>
 
                   <button
@@ -2969,7 +2967,7 @@ export default function AttendancePage() {
                     className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-bold bg-red-600 hover:bg-red-700 text-white shadow-xs cursor-pointer text-xs transition-colors"
                   >
                     <Download className="w-4 h-4" />
-                    <span>PDF (.pdf) डाउनलोड</span>
+                    <span>Download PDF (.pdf)</span>
                   </button>
                 </div>
               </div>
@@ -2986,7 +2984,7 @@ export default function AttendancePage() {
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
                   <Edit3 className="w-4 h-4 text-blue-600" />
-                  <span>हाजिरी सच्याउनुहोस् (Manual Adjustment)</span>
+                  <span>Adjust Attendance Entry</span>
                 </h3>
                 <button onClick={() => setEditRecord(null)} className="text-slate-400 hover:text-slate-600">
                   <X className="w-5 h-5" />
@@ -2995,23 +2993,23 @@ export default function AttendancePage() {
 
               <form onSubmit={handleUpdateRecord} className="space-y-4 mt-4 text-xs">
                 <div>
-                  <span className="text-slate-500 font-medium">कर्मचारी:</span>
+                  <span className="text-slate-500 font-medium">Employee:</span>
                   <p className="font-bold text-slate-900 text-sm mt-0.5">{editRecord.employee_name} (PIN #{editRecord.employee_pin})</p>
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">स्थिति (Attendance Status)</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Attendance Status</label>
                   <select
                     value={editRecord.status}
                     onChange={(e) => setEditRecord({ ...editRecord, status: e.target.value as any })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 font-medium"
                   >
-                    <option value="PRESENT">PRESENT (उपस्थित)</option>
-                    <option value="WEEK_OFF">WEEK_OFF (साप्ताहिक बिदा)</option>
-                    <option value="LATE">LATE (ढिलो)</option>
-                    <option value="HALF_DAY">HALF_DAY (हाफ डे)</option>
-                    <option value="ABSENT">ABSENT (अनुपस्थित)</option>
-                    <option value="ON_LEAVE">ON_LEAVE (बिदामा)</option>
+                    <option value="PRESENT">Present</option>
+                    <option value="WEEK_OFF">Weekly Off</option>
+                    <option value="LATE">Late Arrival</option>
+                    <option value="HALF_DAY">Half Day</option>
+                    <option value="ABSENT">Absent</option>
+                    <option value="ON_LEAVE">On Leave</option>
                   </select>
                 </div>
 
@@ -3030,12 +3028,12 @@ export default function AttendancePage() {
                       className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
                     />
                     <label htmlFor="edit_is_holiday_work" className="font-bold text-slate-800 text-xs cursor-pointer">
-                      बिदाको दिन काम गरेको ड्युटी (Holiday / Week-Off Work)
+                      Worked on Holiday / Week-Off
                     </label>
                   </div>
                   {editRecord.is_holiday_work && (
                     <div className="pt-2 border-t border-amber-200/60 flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-semibold text-amber-900">स्वीकृति स्थिति (Approval Status):</span>
+                      <span className="text-[11px] font-semibold text-amber-900">Approval Status:</span>
                       <select
                         value={editRecord.holiday_work_status || 'PENDING_APPROVAL'}
                         onChange={(e) => setEditRecord({
@@ -3046,9 +3044,9 @@ export default function AttendancePage() {
                         })}
                         className="px-2 py-1 bg-white border border-amber-300 rounded text-xs font-bold text-slate-800"
                       >
-                        <option value="PENDING_APPROVAL">⚠️ PENDING_APPROVAL (स्वीकृति बाँकी)</option>
-                        <option value="APPROVED">✅ APPROVED (स्वीकृत)</option>
-                        <option value="REJECTED">❌ REJECTED (अस्वीकृत)</option>
+                        <option value="PENDING_APPROVAL">⚠️ Pending Approval</option>
+                        <option value="APPROVED">✅ Approved</option>
+                        <option value="REJECTED">❌ Rejected</option>
                       </select>
                     </div>
                   )}
@@ -3056,7 +3054,7 @@ export default function AttendancePage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">कार्य घण्टा (Worked Hours)</label>
+                    <label className="block font-semibold text-slate-700 mb-1">Worked Hours</label>
                     <input
                       type="number"
                       step="0.1"
@@ -3066,7 +3064,7 @@ export default function AttendancePage() {
                     />
                   </div>
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">ढिलो मिनेट (Late Minutes)</label>
+                    <label className="block font-semibold text-slate-700 mb-1">Late Minutes</label>
                     <input
                       type="number"
                       value={editRecord.late_minutes}
@@ -3077,10 +3075,10 @@ export default function AttendancePage() {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">सच्याउनुको कारण / कैफियत (Remarks)</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Remarks / Reason</label>
                   <input
                     type="text"
-                    placeholder="उदा: फिल्ड ड्युटी / मेशिन रिडरमा औंठा नटिपेको"
+                    placeholder="e.g. Field assignment / Reader issue"
                     value={editRecord.remarks || ''}
                     onChange={(e) => setEditRecord({ ...editRecord, remarks: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none"
@@ -3093,13 +3091,13 @@ export default function AttendancePage() {
                     onClick={() => setEditRecord(null)}
                     className="px-4 py-2 rounded-lg font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700"
                   >
-                    {t.cancel}
+                    Cancel
                   </button>
                   <button
                     type="submit"
                     className="px-4 py-2 rounded-lg font-semibold bg-blue-600 hover:bg-blue-500 text-white"
                   >
-                    {t.save}
+                    Save Changes
                   </button>
                 </div>
               </form>

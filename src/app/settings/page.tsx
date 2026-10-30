@@ -73,14 +73,14 @@ export default function SettingsPage() {
         if (data.targetPhone) setAdminTargetPhone(data.targetPhone);
         setAdminMessage({
           type: 'success',
-          text: `सुरक्षा कोड (OTP) सफलतापूर्वक ${data.targetPhone || '+977-9715400400'} मा पठाइयो। कृपया मोबाइल चेक गर्नुहोस्।`
+          text: `Security code (OTP) sent successfully to ${data.targetPhone || '+977-9715400400'}. Please check your phone.`
         });
         setAdminResendCountdown(60);
       } else {
-        setAdminMessage({ type: 'error', text: data.error || 'OTP कोड पठाउन सकिएन।' });
+        setAdminMessage({ type: 'error', text: data.error || 'Failed to send OTP code.' });
       }
     } catch (e: any) {
-      setAdminMessage({ type: 'error', text: 'सर्भरसँग सम्पर्क हुन सकेन।' });
+      setAdminMessage({ type: 'error', text: 'Failed to connect to server.' });
     } finally {
       setAdminOtpSending(false);
     }
@@ -91,17 +91,17 @@ export default function SettingsPage() {
     setAdminMessage(null);
 
     if (!adminOtp || adminOtp.trim().length < 6) {
-      setAdminMessage({ type: 'error', text: 'कृपया 9715400400 मा प्राप्त भएको ६-अंकको OTP कोड हाल्नुहोस्।' });
+      setAdminMessage({ type: 'error', text: 'Please enter the 6-digit OTP code received on 9715400400.' });
       return;
     }
 
     if (!adminNewPassword || adminNewPassword.length < 5) {
-      setAdminMessage({ type: 'error', text: 'नयाँ पासवर्ड कम्तीमा ५ क्यारेक्टरको हुनुपर्छ।' });
+      setAdminMessage({ type: 'error', text: 'New password must be at least 5 characters.' });
       return;
     }
 
     if (adminNewPassword !== adminConfirmPassword) {
-      setAdminMessage({ type: 'error', text: 'दुबै पासवर्ड मिलेनन् (Passwords do not match)।' });
+      setAdminMessage({ type: 'error', text: 'Passwords do not match.' });
       return;
     }
 
@@ -124,24 +124,24 @@ export default function SettingsPage() {
         }
         setAdminMessage({
           type: 'success',
-          text: '✅ Master Admin पासवर्ड सफलतापूर्वक परिवर्तन भयो! अब यही नयाँ पासवर्डबाट लगइन गर्न सक्नुहुन्छ।'
+          text: '✅ Master Admin password updated successfully! You can now log in with the new password.'
         });
         setAdminOtp('');
         setAdminNewPassword('');
         setAdminConfirmPassword('');
         setAdminOtpSent(false);
       } else {
-        setAdminMessage({ type: 'error', text: data.error || 'पासवर्ड परिवर्तन असफल भयो।' });
+        setAdminMessage({ type: 'error', text: data.error || 'Password update failed.' });
       }
     } catch (e: any) {
-      setAdminMessage({ type: 'error', text: 'सर्भर त्रुटि भएकोले पासवर्ड अपडेट हुन सकेन।' });
+      setAdminMessage({ type: 'error', text: 'Server error: unable to update password.' });
     } finally {
       setAdminUpdating(false);
     }
   };
 
   const handleFactoryReset = async () => {
-    if (!confirm('चेतावनी: के तपाईं साँच्चिकै सबै स्टाफ, हाजिरी र डाटा मेटाएर ० (Zero) बाट नयाँ सुरु गर्न चाहनुहुन्छ? यो कार्य फिर्ता गर्न सकिँदैन।')) return;
+    if (!confirm('Warning: Are you sure you want to wipe all staff directory, attendance punches and data to start completely fresh from 0? This action cannot be undone.')) return;
     try {
       await fetch('/api/staff', {
         method: 'POST',
@@ -161,7 +161,7 @@ export default function SettingsPage() {
       localStorage.setItem('goinfi_clean_reset_2026_v2', 'true');
     }
 
-    alert('✅ सफ्टवेयर पूर्ण रूपमा रिसेट भयो! Total Staff = 0. अब ड्यासबोर्ड खुल्नेछ।');
+    alert('✅ Software successfully factory reset! Total Staff = 0. Redirecting to dashboard.');
     window.location.href = '/dashboard';
   };
 
@@ -385,7 +385,7 @@ export default function SettingsPage() {
                 <Monitor className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="font-bold text-slate-900 text-base">Office PC Desktop Workstation (अफिस कम्प्युटर सफ्टवेयर)</h4>
+                <h4 className="font-bold text-slate-900 text-base">Office PC Desktop Workstation</h4>
                 <p className="text-xs text-slate-500">
                   Run AP1 Television HRMS as a standalone native desktop application without browser tabs
                 </p>
@@ -406,25 +406,25 @@ export default function SettingsPage() {
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
               <p className="font-bold text-slate-900 flex items-center gap-1.5">
                 <Laptop className="w-4 h-4 text-purple-700" />
-                <span>विधि १: १-क्लिक Windows Desktop App इन्स्टलर (सिफारिस गरिएको):</span>
+                <span>Method 1: 1-Click Windows Desktop App Setup (Recommended):</span>
               </p>
               <ol className="list-decimal list-inside space-y-1 text-slate-600 pl-1 leading-relaxed">
-                <li>माथिको <strong>"Download 1-Click Desktop Setup (.bat)"</strong> बटनमा क्लिक गर्नुहोस्।</li>
-                <li>डाउनलोड भएको <code className="px-1.5 py-0.5 bg-slate-200 rounded text-slate-800 font-mono">Install_AP1_HRMS.bat</code> फाइललाई अफिस PC मा Double-Click गरी खोल्नुहोस्।</li>
-                <li>तपाईंको कम्प्युटरको Desktop मा <strong>"AP1 Television HRMS"</strong> को आधिकारिक आइकन बन्नेछ।</li>
-                <li>अब सो आइकन डबल-क्लिक गर्नासाथ ब्राउजरका ट्याब वा ठेगाना बार बिना सिधै सफ्टवेयर जस्तै खुल्नेछ।</li>
+                <li>Click the <strong>&quot;Download 1-Click Desktop Setup (.bat)&quot;</strong> button above.</li>
+                <li>Double-click the downloaded <code className="px-1.5 py-0.5 bg-slate-200 rounded text-slate-800 font-mono">Install_AP1_HRMS.bat</code> file on your office PC.</li>
+                <li>An official <strong>&quot;AP1 Television HRMS&quot;</strong> desktop shortcut will be created.</li>
+                <li>Double-clicking this icon opens the software directly without browser tabs or address bar.</li>
               </ol>
             </div>
 
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
               <p className="font-bold text-slate-900 flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span>विधि २: Chrome वा Edge ब्राउजरबाट सिधै App इन्स्टल गर्नुहोस्:</span>
+                <span>Method 2: Install directly from Chrome or Edge Browser:</span>
               </p>
               <ol className="list-decimal list-inside space-y-1 text-slate-600 pl-1 leading-relaxed">
-                <li>कम्प्युटरमा Microsoft Edge वा Google Chrome खोली <code className="px-1.5 py-0.5 bg-slate-200 rounded text-slate-800 font-mono">https://hr.ap1hdtv.com</code> खोल्नुहोस्।</li>
-                <li>ब्राउजरको URL (Address Bar) को दायाँ छेउमा रहेको <strong>"Install app" (कम्प्युटरमा इन्स्टल)</strong> आइकनमा क्लिक गर्नुहोस्।</li>
-                <li><strong>"Install"</strong> मा क्लिक गरेपछि यो प्रणाली Windows Taskbar र Start Menu मा सफ्टवेयरको रूपमा पिन हुन्छ।</li>
+                <li>Open <code className="px-1.5 py-0.5 bg-slate-200 rounded text-slate-800 font-mono">https://hr.ap1hdtv.com</code> in Google Chrome or Microsoft Edge.</li>
+                <li>Click the <strong>&quot;Install app&quot;</strong> icon on the right side of the URL address bar.</li>
+                <li>Click <strong>&quot;Install&quot;</strong> to pin the software to the Windows Taskbar and Start Menu.</li>
               </ol>
             </div>
           </div>
@@ -439,11 +439,11 @@ export default function SettingsPage() {
               </div>
               <div>
                 <h4 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                  <span>Master Admin पासवर्ड परिवर्तन (Change Password)</span>
+                  <span>Change Master Admin Password</span>
                   <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-extrabold border border-purple-200">2FA OTP Secured</span>
                 </h4>
                 <p className="text-xs text-slate-500">
-                  सुरक्षाका लागि Master Admin को पासवर्ड परिवर्तन गर्दा OTP कोड सिधै मोबाइल नम्बर <span className="font-mono font-bold text-purple-700">+977-9715400400</span> मा जानेछ।
+                  For security, changing the Master Admin password sends an OTP code directly to mobile number <span className="font-mono font-bold text-purple-700">+977-9715400400</span>.
                 </p>
               </div>
             </div>
@@ -456,7 +456,7 @@ export default function SettingsPage() {
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 text-white rounded-xl font-bold text-xs transition-all shadow-xs self-start sm:self-auto cursor-pointer disabled:opacity-60"
               >
                 <Smartphone className={`w-4 h-4 ${adminOtpSending ? 'animate-pulse' : ''}`} />
-                <span>{adminOtpSending ? 'OTP पठाउँदै...' : 'OTP कोड पठाउनुहोस् (9715400400)'}</span>
+                <span>{adminOtpSending ? 'Sending OTP...' : 'Send OTP Code (9715400400)'}</span>
               </button>
             ) : (
               <button
@@ -466,7 +466,7 @@ export default function SettingsPage() {
                 className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors self-start sm:self-auto cursor-pointer disabled:opacity-50"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${adminOtpSending ? 'animate-spin' : ''}`} />
-                <span>{adminResendCountdown > 0 ? `पुनः पठाउनुहोस् (${adminResendCountdown}s)` : 'OTP पुनः पठाउनुहोस्'}</span>
+                <span>{adminResendCountdown > 0 ? `Resend OTP (${adminResendCountdown}s)` : 'Resend OTP'}</span>
               </button>
             )}
           </div>
@@ -494,7 +494,7 @@ export default function SettingsPage() {
                 {/* OTP Input */}
                 <div>
                   <label className="block font-bold text-slate-700 text-xs mb-1">
-                    ६-अंकको OTP कोड (9715400400 मा आएको) *
+                    6-Digit OTP Code (Sent to 9715400400) *
                   </label>
                   <div className="relative">
                     <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -503,19 +503,19 @@ export default function SettingsPage() {
                       maxLength={6}
                       value={adminOtp}
                       onChange={(e) => setAdminOtp(e.target.value.replace(/[^0-9]/g, ''))}
-                      placeholder="उदा. 481920"
+                      placeholder="e.g. 481920"
                       className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-mono tracking-widest text-slate-900 focus:outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
                     />
                   </div>
                   <span className="text-[10px] text-slate-500 mt-1 block">
-                    सिस्टमले +977-9715400400 मा OTP पठाएको छ।
+                    System sent OTP to +977-9715400400.
                   </span>
                 </div>
 
                 {/* New Password */}
                 <div>
                   <label className="block font-bold text-slate-700 text-xs mb-1">
-                    नयाँ पासवर्ड (New Password) *
+                    New Password *
                   </label>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -523,7 +523,7 @@ export default function SettingsPage() {
                       type={adminShowPass ? 'text' : 'password'}
                       value={adminNewPassword}
                       onChange={(e) => setAdminNewPassword(e.target.value)}
-                      placeholder="कम्तीमा ५ क्यारेक्टर"
+                      placeholder="At least 5 characters"
                       className="w-full pl-9 pr-9 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
                     />
                     <button
@@ -539,7 +539,7 @@ export default function SettingsPage() {
                 {/* Confirm New Password */}
                 <div>
                   <label className="block font-bold text-slate-700 text-xs mb-1">
-                    पासवर्ड पुष्टि (Confirm Password) *
+                    Confirm Password *
                   </label>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -547,7 +547,7 @@ export default function SettingsPage() {
                       type={adminShowPass ? 'text' : 'password'}
                       value={adminConfirmPassword}
                       onChange={(e) => setAdminConfirmPassword(e.target.value)}
-                      placeholder="पुनः नयाँ पासवर्ड हाल्नुहोस्"
+                      placeholder="Re-enter new password"
                       className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
                     />
                   </div>
@@ -562,7 +562,7 @@ export default function SettingsPage() {
                   className="inline-flex items-center gap-2 px-5 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-xl font-bold text-xs transition-colors shadow-sm cursor-pointer disabled:opacity-60"
                 >
                   <ShieldCheck className="w-4 h-4" />
-                  <span>{adminUpdating ? 'प्रमाणीकरण गर्दै...' : 'पासवर्ड सुरक्षित सेभ गर्नुहोस्'}</span>
+                  <span>{adminUpdating ? 'Verifying...' : 'Save Password Securely'}</span>
                 </button>
               </div>
             </div>
@@ -577,7 +577,7 @@ export default function SettingsPage() {
                 <Trash2 className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="font-bold text-rose-900 text-base">Factory Reset Database (पूर्ण क्लिन स्लेट - ० बाट सुरु)</h4>
+                <h4 className="font-bold text-rose-900 text-base">Factory Reset Database (Clean Slate - Start from 0)</h4>
                 <p className="text-xs text-rose-700">
                   Wipe all staff directory, attendance punches, and requests to start 100% fresh from 0.
                 </p>

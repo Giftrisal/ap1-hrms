@@ -58,7 +58,7 @@ export default function LoginPage() {
 
   const handleSendResetOtp = async () => {
     if (!resetIdentifier.trim()) {
-      setResetMessage({ type: 'error', text: 'कृपया आफ्नो Username, Email वा Biometric PIN प्रविष्टि गर्नुहोस्।' });
+      setResetMessage({ type: 'error', text: 'Please enter your Username, Email, or Biometric PIN.' });
       return;
     }
 
@@ -92,14 +92,14 @@ export default function LoginPage() {
         setResetAccountName(data.accountName || '');
         setResetMessage({
           type: 'success',
-          text: `OTP कोड सफलतापूर्वक दर्ता भएको नम्बर ${data.targetPhone} मा पठाइयो। कृपया मोबाइल चेक गर्नुहोस्।`
+          text: `OTP code successfully sent to registered mobile number ${data.targetPhone}. Please check your phone.`
         });
         setResetCountdown(60);
       } else {
-        setResetMessage({ type: 'error', text: data.error || 'OTP कोड पठाउन सकिएन।' });
+        setResetMessage({ type: 'error', text: data.error || 'Failed to send OTP code.' });
       }
     } catch (e) {
-      setResetMessage({ type: 'error', text: 'सर्भरसँग सम्पर्क हुन सकेन।' });
+      setResetMessage({ type: 'error', text: 'Unable to connect to server.' });
     } finally {
       setResetOtpSending(false);
     }
@@ -110,17 +110,17 @@ export default function LoginPage() {
     setResetMessage(null);
 
     if (!resetOtp || resetOtp.trim().length < 6) {
-      setResetMessage({ type: 'error', text: 'कृपया दर्ता भएको मोबाइलमा आएको पूरा ६-अंकको OTP हाल्नुहोस्।' });
+      setResetMessage({ type: 'error', text: 'Please enter the complete 6-digit OTP received on your mobile.' });
       return;
     }
 
     if (!resetNewPassword || resetNewPassword.length < 5) {
-      setResetMessage({ type: 'error', text: 'नयाँ पासवर्ड कम्तीमा ५ क्यारेक्टरको हुनुपर्छ।' });
+      setResetMessage({ type: 'error', text: 'New password must be at least 5 characters long.' });
       return;
     }
 
     if (resetNewPassword !== resetConfirmPassword) {
-      setResetMessage({ type: 'error', text: 'दुबै पासवर्ड मिलेनन्।' });
+      setResetMessage({ type: 'error', text: 'Passwords do not match.' });
       return;
     }
 
@@ -154,7 +154,7 @@ export default function LoginPage() {
         setPassword(resetNewPassword.trim());
         setResetMessage({
           type: 'success',
-          text: '✅ पासवर्ड सफलतापूर्वक परिवर्तन भयो! अब नयाँ पासवर्ड स्वतः भरिएको छ, Sign In गर्न सक्नुहुन्छ।'
+          text: '✓ Password changed successfully! You can now sign in.'
         });
         setTimeout(() => {
           setShowResetModal(false);
@@ -164,10 +164,10 @@ export default function LoginPage() {
           setResetConfirmPassword('');
         }, 1800);
       } else {
-        setResetMessage({ type: 'error', text: data.error || 'पासवर्ड परिवर्तन असफल भयो।' });
+        setResetMessage({ type: 'error', text: data.error || 'Password update failed.' });
       }
     } catch (e) {
-      setResetMessage({ type: 'error', text: 'सर्भर त्रुटि भयो।' });
+      setResetMessage({ type: 'error', text: 'Server error occurred.' });
     } finally {
       setResetUpdating(false);
     }
@@ -185,12 +185,12 @@ export default function LoginPage() {
     setError('');
 
     if (!identifier.trim()) {
-      setError('कृपया आफ्नो Admin Email, Username, वा Biometric PIN प्रविष्टि गर्नुहोस्');
+      setError('Please enter your Admin Email, Username, or Biometric PIN');
       return;
     }
 
     if (!password) {
-      setError('कृपया आफ्नो पासवर्ड (Password) प्रविष्टि गर्नुहोस्');
+      setError('Please enter your password');
       return;
     }
 
@@ -221,11 +221,11 @@ export default function LoginPage() {
       if (success) {
         router.push('/dashboard');
       } else {
-        setError('गलत विवरण (Invalid credentials)। कृपया Email/Username र सुरक्षित पासवर्ड पुनः जाँच्नुहोस्।');
+        setError('Invalid credentials. Please verify your Email/Username and password.');
         setIsSubmitting(false);
       }
     } catch {
-      setError('लगइन प्रक्रियामा त्रुटि भयो। कृपया पुनः प्रयास गर्नुहोस्।');
+      setError('Login failed. Please try again.');
       setIsSubmitting(false);
     }
   };
@@ -279,7 +279,7 @@ export default function LoginPage() {
                 type="text"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="Username वा PIN प्रविष्टि गर्नुहोस्"
+                placeholder="Enter Username, Email, or PIN"
                 className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
                 autoComplete="off"
               />
@@ -296,7 +296,7 @@ export default function LoginPage() {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="सुरक्षित पासवर्ड प्रविष्टि गर्नुहोस्"
+                placeholder="Enter your password"
                 className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
                 autoComplete="current-password"
               />
@@ -393,9 +393,9 @@ export default function LoginPage() {
                 <KeyRound className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-bold text-white text-base">पासवर्ड परिवर्तन (Change Password)</h3>
+                <h3 className="font-bold text-white text-base">Change Password</h3>
                 <p className="text-[11px] text-slate-400">
-                  २FA सुरक्षा: दर्ता भएको आधिकारिक मोबाइल नम्बरमा OTP कोड पठाइनेछ।
+                  2FA Security: A 6-digit OTP will be sent to the registered mobile number.
                 </p>
               </div>
             </div>
@@ -419,7 +419,7 @@ export default function LoginPage() {
               <div className="space-y-4 pt-1 text-xs">
                 <div>
                   <label className="block font-bold text-slate-300 mb-1.5">
-                    Username, Email वा Biometric PIN *
+                    Username, Email or Biometric PIN *
                   </label>
                   <div className="relative">
                     <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -427,7 +427,7 @@ export default function LoginPage() {
                       type="text"
                       value={resetIdentifier}
                       onChange={(e) => setResetIdentifier(e.target.value)}
-                      placeholder="Username वा Biometric PIN"
+                      placeholder="Enter Username or Biometric PIN"
                       className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500"
                       autoComplete="off"
                     />
@@ -435,7 +435,7 @@ export default function LoginPage() {
                 </div>
 
                 <p className="text-slate-400 text-[11px] leading-relaxed">
-                  प्रणालीमा खाता पहिचान गरी सोही खातामा दर्ता भएको आधिकारिक मोबाइल नम्बरमा ६-अंकको सुरक्षा OTP कोड पठाइनेछ।
+                  Account will be verified and a 6-digit OTP code will be sent to your officially registered mobile number.
                 </p>
 
                 <button
@@ -445,26 +445,26 @@ export default function LoginPage() {
                   className="w-full py-3 bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-purple-900/30 disabled:opacity-60"
                 >
                   <Smartphone className="w-4 h-4" />
-                  <span>{resetOtpSending ? 'OTP पठाउँदै...' : 'दर्ता नम्बरमा OTP कोड पठाउनुहोस्'}</span>
+                  <span>{resetOtpSending ? 'Sending OTP...' : 'Send OTP to Registered Mobile'}</span>
                 </button>
               </div>
             ) : (
               <form onSubmit={handleUpdatePassword} className="space-y-3.5 pt-1 text-xs">
                 <div className="p-2.5 bg-purple-950/40 border border-purple-800/40 rounded-xl flex items-center justify-between">
-                  <span className="text-slate-400 text-[11px]">दर्ता भएको मोबाइल:</span>
+                  <span className="text-slate-400 text-[11px]">Registered Mobile:</span>
                   <span className="font-mono font-bold text-purple-300 text-xs">{resetTargetPhone}</span>
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="font-bold text-slate-300">६-अंकको OTP कोड (SMS बाट आएको) *</label>
+                    <label className="font-bold text-slate-300">6-Digit OTP Code (from SMS) *</label>
                     <button
                       type="button"
                       onClick={handleSendResetOtp}
                       disabled={resetCountdown > 0 || resetOtpSending}
                       className="text-[10px] text-purple-400 hover:text-purple-300 disabled:opacity-50"
                     >
-                      {resetCountdown > 0 ? `पुनः पठाउनुहोस् (${resetCountdown}s)` : 'OTP फेरि पठाउनुहोस्'}
+                      {resetCountdown > 0 ? `Resend OTP (${resetCountdown}s)` : 'Resend OTP'}
                     </button>
                   </div>
                   <div className="relative">
@@ -474,21 +474,21 @@ export default function LoginPage() {
                       maxLength={6}
                       value={resetOtp}
                       onChange={(e) => setResetOtp(e.target.value.replace(/[^0-9]/g, ''))}
-                      placeholder="उदा. 583921"
+                      placeholder="e.g. 583921"
                       className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm font-mono tracking-widest text-white focus:outline-none focus:border-purple-500"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-300 mb-1">नयाँ पासवर्ड (New Password) *</label>
+                  <label className="block font-bold text-slate-300 mb-1">New Password *</label>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type={resetShowPassword ? 'text' : 'password'}
                       value={resetNewPassword}
                       onChange={(e) => setResetNewPassword(e.target.value)}
-                      placeholder="कम्तीमा ५ क्यारेक्टर"
+                      placeholder="At least 5 characters"
                       className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500"
                     />
                     <button
@@ -502,14 +502,14 @@ export default function LoginPage() {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-300 mb-1">पासवर्ड पुष्टि (Confirm Password) *</label>
+                  <label className="block font-bold text-slate-300 mb-1">Confirm Password *</label>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type={resetShowPassword ? 'text' : 'password'}
                       value={resetConfirmPassword}
                       onChange={(e) => setResetConfirmPassword(e.target.value)}
-                      placeholder="पुनः नयाँ पासवर्ड हाल्नुहोस्"
+                      placeholder="Re-enter new password"
                       className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500"
                     />
                   </div>
@@ -521,7 +521,7 @@ export default function LoginPage() {
                     onClick={() => setShowResetModal(false)}
                     className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold cursor-pointer"
                   >
-                    रद्द गर्नुहोस्
+                    Cancel
                   </button>
                   <button
                     type="submit"
@@ -531,12 +531,12 @@ export default function LoginPage() {
                     {resetUpdating ? (
                       <>
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>जाँच्दै...</span>
+                        <span>Verifying...</span>
                       </>
                     ) : (
                       <>
                         <ShieldCheck className="w-4 h-4" />
-                        <span>पासवर्ड सेभ गर्नुहोस्</span>
+                        <span>Save Password</span>
                       </>
                     )}
                   </button>

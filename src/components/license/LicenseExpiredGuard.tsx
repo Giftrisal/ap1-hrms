@@ -39,7 +39,7 @@ export default function LicenseExpiredGuard({ children, forceDemo = false, onClo
   const handleActivate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!key.trim()) {
-      setMessage({ type: 'error', text: 'कृपया लाइसेन्स की प्रविष्ट गर्नुहोस्।' });
+      setMessage({ type: 'error', text: 'Please enter a valid license key.' });
       return;
     }
 
@@ -50,7 +50,7 @@ export default function LicenseExpiredGuard({ children, forceDemo = false, onClo
     setActivating(false);
 
     if (res.success) {
-      setMessage({ type: 'success', text: 'लाइसेन्स सफलतापूर्वक नवीकरण भयो! पेज लोड हुँदैछ...' });
+      setMessage({ type: 'success', text: 'License successfully activated! Reloading page...' });
       setTimeout(() => {
         if (typeof window !== 'undefined') {
           const url = new URL(window.location.href);
@@ -59,7 +59,7 @@ export default function LicenseExpiredGuard({ children, forceDemo = false, onClo
         }
       }, 1500);
     } else {
-      setMessage({ type: 'error', text: res.error || 'लाइसेन्स प्रमाणीकरण हुन सकेन।' });
+      setMessage({ type: 'error', text: res.error || 'License activation failed.' });
     }
   };
 
@@ -83,7 +83,7 @@ export default function LicenseExpiredGuard({ children, forceDemo = false, onClo
           <div className="flex items-center gap-2">
             <Eye className="w-4 h-4 text-amber-400 shrink-0" />
             <span>
-              <strong>[डेमो मोड]</strong> ८:०० PM पछि लाइसेन्स समाप्त हुँदा देखिने स्क्रिन:
+              <strong>[Demo Mode]</strong> Preview of lock screen when license expires:
             </span>
           </div>
           <button
@@ -92,7 +92,7 @@ export default function LicenseExpiredGuard({ children, forceDemo = false, onClo
             className="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold rounded-lg text-[11px] flex items-center gap-1 transition-all cursor-pointer"
           >
             <X className="w-3.5 h-3.5" />
-            <span>डेमो बन्द गर्नुहोस्</span>
+            <span>Close Demo</span>
           </button>
         </div>
       )}
@@ -103,19 +103,19 @@ export default function LicenseExpiredGuard({ children, forceDemo = false, onClo
           <ShieldAlert className="w-9 h-9" />
         </div>
 
-        <h2 className="text-xl font-black text-white tracking-tight">सफ्टवेयर लाइसेन्स समाप्त भएको छ</h2>
+        <h2 className="text-xl font-black text-white tracking-tight">Software License Expired</h2>
         <p className="text-xs text-red-400 font-semibold mt-1 uppercase tracking-wider">
-          Software License Expired
+          Action Required to Continue Service
         </p>
 
         <p className="text-xs text-slate-300 mt-3 leading-relaxed">
-          AP1 Television HRMS को आधिकारिक सदस्यता म्याद सकिएको छ। सेवा सुचारु राख्न कृपया नयाँ लाइसेन्स की प्रविष्ट गर्नुहोस्।
+          The AP1 Television HRMS license subscription has ended. To resume normal operations, please enter an authorized license renewal key.
         </p>
 
         <form onSubmit={handleActivate} className="mt-5 space-y-3 text-left">
           <div>
             <label className="block text-[11px] font-bold text-slate-300 mb-1">
-              नयाँ लाइसेन्स की (Enter License Key):
+              Enter License Key:
             </label>
             <input
               type="text"
@@ -140,7 +140,7 @@ export default function LicenseExpiredGuard({ children, forceDemo = false, onClo
             className="w-full py-2.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-red-600/30 transition-all cursor-pointer flex items-center justify-center gap-2"
           >
             <KeyRound className="w-4 h-4" />
-            <span>{activating ? 'प्रमाणीकरण हुँदैछ...' : 'लाइसेन्स सक्रिय गर्नुहोस् (Activate)'}</span>
+            <span>{activating ? 'Verifying...' : 'Activate License'}</span>
           </button>
         </form>
 

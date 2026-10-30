@@ -14,50 +14,50 @@ export const LICENSE_TIERS: Record<LicenseTier, LicenseTierInfo> = {
   '1_DAY': {
     tier: '1_DAY',
     code: '1D',
-    label: '1 Day Trial (परीक्षण)',
-    labelNp: '१ दिन परीक्षण',
+    label: '1 Day Trial',
+    labelNp: '1 Day Trial',
     days: 1
   },
   '1_WEEK': {
     tier: '1_WEEK',
     code: '1W',
-    label: '1 Week Demo (१ हप्ता)',
-    labelNp: '१ हप्ता परीक्षण',
+    label: '1 Week Demo',
+    labelNp: '1 Week Demo',
     days: 7
   },
   '1_MONTH': {
     tier: '1_MONTH',
     code: '1M',
-    label: '1 Month (मासिक)',
-    labelNp: '१ महिना सदस्यता',
+    label: '1 Month Subscription',
+    labelNp: '1 Month Subscription',
     days: 30
   },
   '6_MONTHS': {
     tier: '6_MONTHS',
     code: '6M',
-    label: '6 Months Semi-Annual (६ महिना)',
-    labelNp: '६ महिना अर्ध-वार्षिक',
+    label: '6 Months Semi-Annual',
+    labelNp: '6 Months Semi-Annual',
     days: 180
   },
   '1_YEAR': {
     tier: '1_YEAR',
     code: '1Y',
-    label: '1 Year Annual (वार्षिक)',
-    labelNp: '१ वर्ष वार्षिक',
+    label: '1 Year Annual License',
+    labelNp: '1 Year Annual License',
     days: 365
   },
   '2_YEARS': {
     tier: '2_YEARS',
     code: '2Y',
-    label: '2 Years Enterprise (२ वर्षे)',
-    labelNp: '२ वर्ष इन्टरप्राइज',
+    label: '2 Years Enterprise License',
+    labelNp: '2 Years Enterprise License',
     days: 730
   },
   '5_YEARS': {
     tier: '5_YEARS',
     code: '5Y',
-    label: '5 Years Long-Term (५ वर्षे)',
-    labelNp: '५ वर्ष दीर्घकालीन',
+    label: '5 Years Long-Term License',
+    labelNp: '5 Years Long-Term License',
     days: 1825
   }
 };
@@ -140,7 +140,7 @@ export function verifyLicenseKey(
   licenseKey: string
 ): { valid: boolean; error?: string; payload?: LicensePayload } {
   if (!licenseKey || typeof licenseKey !== 'string') {
-    return { valid: false, error: 'लाइसेन्स की खाली हुन सक्दैन (License key cannot be empty)' };
+    return { valid: false, error: 'License key cannot be empty' };
   }
 
   const cleanKey = licenseKey.trim().toUpperCase();
@@ -148,7 +148,7 @@ export function verifyLicenseKey(
 
   // Format: GFHR-CLIENT-TIER-ISSUEDHEX-SIG1-SIG2-SIG3 (7 parts)
   if (parts.length !== 7 || parts[0] !== 'GFHR') {
-    return { valid: false, error: 'अमान्य लाइसेन्स ढाँचा (Invalid license key structure. Expected GFHR-CLIENT-TIER-XXXX-XXXX-XXXX-XXXX)' };
+    return { valid: false, error: 'Invalid license key structure. Expected GFHR-CLIENT-TIER-XXXX-XXXX-XXXX-XXXX' };
   }
 
   const [_, clientCode, tierCode, issuedHex, s1, s2, s3] = parts;
@@ -156,7 +156,7 @@ export function verifyLicenseKey(
   // Find tier by code
   const tierEntry = Object.values(LICENSE_TIERS).find(t => t.code === tierCode);
   if (!tierEntry) {
-    return { valid: false, error: 'अमान्य लाइसेन्स अवधि कोड (Invalid tier duration code)' };
+    return { valid: false, error: 'Invalid tier duration code' };
   }
 
   // Validate HMAC-SHA256
@@ -165,7 +165,7 @@ export function verifyLicenseKey(
   const providedSig = (s1 + s2 + s3).toUpperCase();
 
   if (!expectedHmac.startsWith(providedSig)) {
-    return { valid: false, error: 'लाइसेन्स की प्रमाणीकरण असफल भयो (Invalid signature or forged license key)' };
+    return { valid: false, error: 'Invalid signature or forged license key' };
   }
 
   const now = Date.now();

@@ -245,7 +245,8 @@ export function getBsDateRange(
 
     const bsMonthPadded = String(bs.bsMonth).padStart(2, '0');
     const bsDayPadded = String(bs.bsDay).padStart(2, '0');
-    const bsDateStr = `${toNepaliDigits(bs.bsYear)}/${toNepaliDigits(bsMonthPadded)}/${toNepaliDigits(bsDayPadded)}`;
+    const bsDateStr = `${bs.bsYear}/${bsMonthPadded}/${bsDayPadded}`;
+    const weekdaysEn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
     items.push({
       bsYear: bs.bsYear,
@@ -255,7 +256,7 @@ export function getBsDateRange(
       formattedNp: bs.formattedNp,
       adDateStr,
       dayNameNp: bs.dayNameNp,
-      dayNameEn: bs.dayNameNp,
+      dayNameEn: weekdaysEn[cur.getUTCDay()],
       dayOfWeek: cur.getUTCDay()
     });
 
@@ -277,18 +278,18 @@ export function formatBsDateRangeLabel(
   toMonth: number,
   toDay: number
 ): string {
-  const fromMonthName = NEPALI_MONTHS_NP[fromMonth - 1] || 'बैशाख';
-  const toMonthName = NEPALI_MONTHS_NP[toMonth - 1] || 'बैशाख';
+  const fromMonthName = NEPALI_MONTHS_EN[fromMonth - 1] || 'Kartik';
+  const toMonthName = NEPALI_MONTHS_EN[toMonth - 1] || 'Kartik';
   
   if (fromYear === toYear && fromMonth === toMonth) {
     if (fromDay === toDay) {
-      return `${toNepaliDigits(fromYear)} ${fromMonthName} ${toNepaliDigits(fromDay)} गते`;
+      return `${fromYear} ${fromMonthName} ${fromDay} BS`;
     }
-    return `${toNepaliDigits(fromYear)} ${fromMonthName} ${toNepaliDigits(fromDay)} देखि ${toNepaliDigits(toDay)} गते सम्म`;
+    return `${fromYear} ${fromMonthName} ${fromDay} - ${toDay} BS`;
   } else if (fromYear === toYear) {
-    return `${toNepaliDigits(fromYear)} ${fromMonthName} ${toNepaliDigits(fromDay)} देखि ${toMonthName} ${toNepaliDigits(toDay)} सम्म`;
+    return `${fromYear} ${fromMonthName} ${fromDay} - ${toMonthName} ${toDay} BS`;
   }
-  return `${toNepaliDigits(fromYear)} ${fromMonthName} ${toNepaliDigits(fromDay)} देखि ${toNepaliDigits(toYear)} ${toMonthName} ${toNepaliDigits(toDay)} सम्म`;
+  return `${fromYear} ${fromMonthName} ${fromDay} - ${toYear} ${toMonthName} ${toDay} BS`;
 }
 
 export function formatDualDate(adDateInput: Date | string = new Date(), lang: 'ne' | 'en' = 'ne'): string {
