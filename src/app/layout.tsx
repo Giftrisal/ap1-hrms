@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n/context";
+import { ThemeProvider } from "@/lib/theme/context";
 import { AuthProvider } from "@/lib/auth/auth-context";
 
 const poppins = Poppins({
@@ -49,7 +50,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`h-full ${poppins.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`h-full ${poppins.variable}`}>
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -75,11 +76,13 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full bg-slate-100 text-slate-900 font-sans antialiased flex flex-col overscroll-y-none">
-        <AuthProvider>
-          <LanguageProvider>
-            {children}
-          </LanguageProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <LanguageProvider>
+              {children}
+            </LanguageProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
