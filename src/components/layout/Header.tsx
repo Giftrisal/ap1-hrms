@@ -10,8 +10,7 @@ import {
   Menu, 
   Calendar,
   Sun,
-  Moon,
-  Globe
+  Moon
 } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n/context';
 import { useTheme } from '@/lib/theme/context';
@@ -30,7 +29,7 @@ export default function Header({
   onSyncTriggered,
   onToggleMobileMenu 
 }: HeaderProps) {
-  const { t, language, setLanguage, toggleLanguage } = useLanguage();
+  const { t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncSuccess, setSyncSuccess] = useState(false);
@@ -139,24 +138,14 @@ export default function Header({
           </div>
         </div>
 
-        {/* Mobile Quick Actions: Language + Theme + Sync */}
+        {/* Mobile Quick Actions: Theme + Sync */}
         <div className="flex md:hidden items-center gap-1.5">
-          {/* Mobile Language Switcher */}
-          <button
-            type="button"
-            onClick={toggleLanguage}
-            className="px-2 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 cursor-pointer transition-colors"
-            title={language === 'en' ? 'नेपाली भाषामा बदल्नुहोस्' : 'Switch to English'}
-          >
-            {language === 'en' ? '🇳🇵 NE' : '🇬🇧 EN'}
-          </button>
-
           {/* Mobile Theme Toggle */}
           <button
             type="button"
             onClick={toggleTheme}
             className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg text-slate-700 cursor-pointer transition-colors"
-            title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
             {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-600" />}
           </button>
@@ -177,36 +166,6 @@ export default function Header({
 
       {/* Right Actions & Biometric Status (Desktop / Tablet) */}
       <div className="hidden md:flex items-center flex-wrap gap-2.5">
-        {/* Language Switcher (English / Nepali) */}
-        <div className="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200 text-xs font-semibold shadow-2xs">
-          <button
-            type="button"
-            onClick={() => setLanguage('en')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-              language === 'en'
-                ? 'bg-white text-purple-700 font-bold shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-            title="Switch to English"
-          >
-            <span>🇬🇧</span>
-            <span>English</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setLanguage('ne')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-              language === 'ne'
-                ? 'bg-white text-purple-700 font-bold shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-            title="नेपाली भाषामा बदल्नुहोस्"
-          >
-            <span>🇳🇵</span>
-            <span>नेपाली</span>
-          </button>
-        </div>
-
         {/* Dark / Light Mode Switcher */}
         <button
           type="button"
@@ -217,20 +176,20 @@ export default function Header({
           {theme === 'dark' ? (
             <>
               <Sun className="w-3.5 h-3.5 text-amber-400" />
-              <span>Light</span>
+              <span>Light Mode</span>
             </>
           ) : (
             <>
               <Moon className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Dark</span>
+              <span>Dark Mode</span>
             </>
           )}
         </button>
 
-        {/* Bikram Sambat Nepali Date */}
+        {/* Bikram Sambat (BS) Date in English */}
         <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50/90 rounded-lg border border-red-200/80 text-xs font-bold text-red-900 shadow-2xs">
           <Calendar className="w-3.5 h-3.5 text-red-600" />
-          <span>{language === 'ne' ? currentNepaliDate.formattedNp : currentNepaliDate.formattedEn}</span>
+          <span>{currentNepaliDate.formattedEn}</span>
         </div>
 
         {/* Live Clock */}
@@ -246,7 +205,7 @@ export default function Header({
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
           <span className="text-xs text-emerald-900 font-semibold">
-            {language === 'ne' ? 'पछिल्लो सिङ्क:' : 'Last Synced:'} {lastSyncText}
+            Last Synced: {lastSyncText}
           </span>
         </div>
 
@@ -263,7 +222,7 @@ export default function Header({
           {syncSuccess ? (
             <>
               <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-              <span>{language === 'ne' ? 'सिङ्क भयो!' : 'Synced!'}</span>
+              <span>Synced!</span>
             </>
           ) : (
             <>
