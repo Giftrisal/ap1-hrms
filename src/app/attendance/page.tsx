@@ -39,7 +39,8 @@ import {
   Sparkles,
   Link as LinkIcon,
   Check,
-  Briefcase
+  Briefcase,
+  Eye
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -48,7 +49,8 @@ import { exportIndividualStaffMonthlyExcel } from '@/lib/individual-staff-excel'
 import { 
   buildDateRangeReportData, 
   exportDateRangeExcel, 
-  exportDateRangePdf 
+  exportDateRangePdf,
+  DateRangeReportData
 } from '@/lib/date-range-export';
 import NepaliDatePicker from '@/components/common/NepaliDatePicker';
 
@@ -379,6 +381,11 @@ export default function AttendancePage() {
   const [modalSelectedDept, setModalSelectedDept] = useState<string>('ALL');
   const [selectedIndividualStaffPin, setSelectedIndividualStaffPin] = useState<string>('');
   const [rawBiometricLogs, setRawBiometricLogs] = useState<any[]>([]);
+
+  // Report Preview Modal State
+  const [previewReportData, setPreviewReportData] = useState<DateRangeReportData | null>(null);
+  const [previewTab, setPreviewTab] = useState<'summary' | 'daily'>('summary');
+  const [previewSearch, setPreviewSearch] = useState<string>('');
 
   const modalDaysInFromMonth = useMemo(() => getDaysInBsMonth(modalRangeFromYear, modalRangeFromMonth), [modalRangeFromYear, modalRangeFromMonth]);
   const modalDaysInToMonth = useMemo(() => getDaysInBsMonth(modalRangeToYear, modalRangeToMonth), [modalRangeToYear, modalRangeToMonth]);
@@ -1492,8 +1499,8 @@ export default function AttendancePage() {
     setShowMonthlyModal(false);
   };
 
-  // Date Range Report Modal Generator (Excel & PDF for arbitrary BS date range)
-  const exportDateRangeReportModal = (format: 'excel' | 'pdf') => {
+  // Compile Report Data (used by both Live Preview and Instant Exports)
+  const getCompiledReportData = (): DateRangeReportData | null => {
     let dateRange: any[] = [];
     let rangeLabel = '';
 
@@ -1530,9 +1537,17 @@ export default function AttendancePage() {
     }
 
     const deptFilter = modalScope === 'dept' ? modalSelectedDept : 'ALL';
-    const staffFilter = modalScope === 'individual' ? selectedIndividualStaffPin : 'ALL';
+    let staffFilter = 'ALL';
+    if (modalScope === 'individual') {
+      if (selectedIndividualStaffPin) {
+        staffFilter = selectedIndividualStaffPin;
+      } else {
+        const firstStaff = staffList.find(s => String(s.biometric_pin) !== '999' && !s.is_master_admin && s.id !== 'emp-master');
+        staffFilter = firstStaff ? String(firstStaff.biometric_pin || firstStaff.id) : 'ALL';
+      }
+    }
 
-    const data = buildDateRangeReportData({
+    return buildDateRangeReportData({
       dateRange,
       rangeLabel,
       employees: staffList,
@@ -1541,6 +1556,21 @@ export default function AttendancePage() {
       departmentFilter: deptFilter,
       staffPinFilter: staffFilter
     });
+  };
+
+  // Open Interactive Report Preview Modal
+  const handlePreviewReport = () => {
+    const data = getCompiledReportData();
+    if (!data) return;
+    setPreviewReportData(data);
+    setPreviewTab(data.isIndividual ? 'daily' : 'summary');
+    setPreviewSearch('');
+  };
+
+  // Date Range Report Modal Generator (Excel & PDF for arbitrary BS date range)
+  const exportDateRangeReportModal = (format: 'excel' | 'pdf', precompiledData?: DateRangeReportData) => {
+    const data = precompiledData || getCompiledReportData();
+    if (!data) return;
 
     if (format === 'excel') {
       exportDateRangeExcel(data);
@@ -1548,7 +1578,9 @@ export default function AttendancePage() {
       exportDateRangePdf(data);
     }
 
-    setShowMonthlyModal(false);
+    if (!precompiledData) {
+      setShowMonthlyModal(false);
+    }
   };
 
   return (
@@ -2950,8 +2982,17 @@ export default function AttendancePage() {
                   )}
                 </div>
 
-                {/* Download Actions */}
+                {/* Download & Preview Actions */}
                 <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={handlePreviewReport}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer text-xs transition-colors"
+                  >
+                    <Eye className="w-4 h-4" />
+                    <span>View / Preview Report</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => exportDateRangeReportModal('excel')}
@@ -2971,6 +3012,403 @@ export default function AttendancePage() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* 8.5 MODAL: REPORT PREVIEW (EXCEL & PDF BEFORE DOWNLOAD)           */}
+        {/* ================================================================= */}
+        {previewReportData && (
+          <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-50 animate-fade-in">
+            <div className="bg-white rounded-2xl max-w-6xl w-full p-4 sm:p-6 shadow-2xl border border-slate-200 flex flex-col max-h-[92vh]">
+              
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-blue-100 text-blue-700 shrink-0">
+                    <Eye className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-bold text-slate-900 text-base sm:text-lg">
+                        Attendance Report Preview
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                        {previewReportData.rangeLabel}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                        {previewReportData.totalDays} Days
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {previewReportData.isIndividual ? (
+                        <span>
+                          Target: <strong className="text-slate-800">{previewReportData.selectedStaffName}</strong> (PIN #{previewReportData.staffFilter})
+                        </span>
+                      ) : previewReportData.department !== 'ALL' ? (
+                        <span>
+                          Target Department: <strong className="text-slate-800">{previewReportData.department}</strong> ({previewReportData.totalEmployees} Employees)
+                        </span>
+                      ) : (
+                        <span>
+                          Target: <strong className="text-slate-800">All Company Staff</strong> ({previewReportData.totalEmployees} Employees)
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Header Action Buttons */}
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                  <button
+                    type="button"
+                    onClick={() => exportDateRangeReportModal('excel', previewReportData)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer transition-colors"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                    <span>Download Excel</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => exportDateRangeReportModal('pdf', previewReportData)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-red-600 hover:bg-red-700 text-white shadow-xs cursor-pointer transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+                    title="Print Document"
+                  >
+                    <Printer className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPreviewReportData(null)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                    title="Close Preview"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* KPI Metric Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 py-3 shrink-0">
+                {previewReportData.isIndividual && previewReportData.summaries[0] ? (
+                  <>
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                      <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Days</p>
+                      <p className="text-lg font-black text-slate-900 mt-0.5">{previewReportData.totalDays}</p>
+                      <span className="text-[10px] text-slate-500">Period Length</span>
+                    </div>
+                    <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
+                      <p className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">Present</p>
+                      <p className="text-lg font-black text-emerald-900 mt-0.5">{previewReportData.summaries[0].presentDays}</p>
+                      <span className="text-[10px] text-emerald-700">Days Active</span>
+                    </div>
+                    <div className="bg-purple-50 p-2.5 rounded-xl border border-purple-200">
+                      <p className="text-[10px] uppercase font-bold text-purple-700 tracking-wider">Weekly Off</p>
+                      <p className="text-lg font-black text-purple-900 mt-0.5">{previewReportData.summaries[0].weekOffDays}</p>
+                      <span className="text-[10px] text-purple-700">Rostered Off</span>
+                    </div>
+                    <div className="bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+                      <p className="text-[10px] uppercase font-bold text-amber-700 tracking-wider">Late Arrival</p>
+                      <p className="text-lg font-black text-amber-900 mt-0.5">{previewReportData.summaries[0].lateDays}</p>
+                      <span className="text-[10px] text-amber-700">{previewReportData.summaries[0].totalLateMinutes} mins late</span>
+                    </div>
+                    <div className="bg-blue-50 p-2.5 rounded-xl border border-blue-200">
+                      <p className="text-[10px] uppercase font-bold text-blue-700 tracking-wider">Total Worked</p>
+                      <p className="text-lg font-black text-blue-900 mt-0.5">{previewReportData.summaries[0].totalWorkedHours.toFixed(1)}h</p>
+                      <span className="text-[10px] text-blue-700">Cumulative Time</span>
+                    </div>
+                    <div className="bg-teal-50 p-2.5 rounded-xl border border-teal-200">
+                      <p className="text-[10px] uppercase font-bold text-teal-700 tracking-wider">Attendance Rate</p>
+                      <p className="text-lg font-black text-teal-900 mt-0.5">{previewReportData.summaries[0].attendancePct}%</p>
+                      <span className="text-[10px] text-teal-700">Present + Week Off</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                      <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Staff</p>
+                      <p className="text-lg font-black text-slate-900 mt-0.5">{previewReportData.totalEmployees}</p>
+                      <span className="text-[10px] text-slate-500">In Scope</span>
+                    </div>
+                    <div className="bg-blue-50 p-2.5 rounded-xl border border-blue-200">
+                      <p className="text-[10px] uppercase font-bold text-blue-700 tracking-wider">Period</p>
+                      <p className="text-lg font-black text-blue-900 mt-0.5">{previewReportData.totalDays}</p>
+                      <span className="text-[10px] text-blue-700">Days</span>
+                    </div>
+                    <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
+                      <p className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">Avg Attendance</p>
+                      <p className="text-lg font-black text-emerald-900 mt-0.5">{previewReportData.overallAttendanceRate}%</p>
+                      <span className="text-[10px] text-emerald-700">Overall Rate</span>
+                    </div>
+                    <div className="bg-purple-50 p-2.5 rounded-xl border border-purple-200">
+                      <p className="text-[10px] uppercase font-bold text-purple-700 tracking-wider">Total Worked</p>
+                      <p className="text-lg font-black text-purple-900 mt-0.5">{previewReportData.overallWorkedHours.toFixed(1)}h</p>
+                      <span className="text-[10px] text-purple-700">All Employees</span>
+                    </div>
+                    <div className="bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+                      <p className="text-[10px] uppercase font-bold text-amber-700 tracking-wider">Late Count</p>
+                      <p className="text-lg font-black text-amber-900 mt-0.5">{previewReportData.overallLateCount}</p>
+                      <span className="text-[10px] text-amber-700">Total Incidents</span>
+                    </div>
+                    <div className="bg-indigo-50 p-2.5 rounded-xl border border-indigo-200">
+                      <p className="text-[10px] uppercase font-bold text-indigo-700 tracking-wider">Total Records</p>
+                      <p className="text-lg font-black text-indigo-900 mt-0.5">{previewReportData.dailyEntries.length}</p>
+                      <span className="text-[10px] text-indigo-700">Daily Logs</span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Tabs Switcher & Realtime Filter */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 py-2.5 border-y border-slate-200 shrink-0">
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTab('summary')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      previewTab === 'summary'
+                        ? 'bg-white text-blue-700 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Staff Summary ({previewReportData.summaries.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTab('daily')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      previewTab === 'daily'
+                        ? 'bg-white text-blue-700 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Daily Punch Logs ({previewReportData.dailyEntries.length})
+                  </button>
+                </div>
+
+                {/* Search Input */}
+                <div className="relative w-full sm:w-72">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={previewSearch}
+                    onChange={(e) => setPreviewSearch(e.target.value)}
+                    placeholder={previewTab === 'summary' ? 'Search employee, PIN, dept...' : 'Search date, employee, status...'}
+                    className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 font-medium"
+                  />
+                  {previewSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setPreviewSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Scrollable Table Area */}
+              <div className="flex-1 overflow-auto rounded-xl border border-slate-200 my-2 text-xs">
+                {previewTab === 'summary' ? (
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-slate-100 text-[11px] font-bold text-slate-700 uppercase tracking-wider sticky top-0 z-10">
+                      <tr>
+                        <th className="py-2.5 px-3 border-b border-slate-200 text-center w-12">#</th>
+                        <th className="py-2.5 px-3 border-b border-slate-200">Employee</th>
+                        <th className="py-2.5 px-3 border-b border-slate-200 text-center">PIN</th>
+                        <th className="py-2.5 px-3 border-b border-slate-200">Department</th>
+                        <th className="py-2.5 px-3 border-b border-slate-200 text-center">Present</th>
+                        <th className="py-2.5 px-3 border-b border-slate-200 text-center">Week-Off</th>
+                        <th className="py-2.5 px-3 border-b border-slate-200 text-center">Late</th>
+                        <th className="py-2.5 px-3 border-b border-slate-200 text-center">Late (M)</th>
+                        <th className="py-2.5 px-3 border-b border-slate-200 text-center">Leave</th>
+                        <th className="py-2.5 px-3 border-b border-slate-200 text-center">Absent</th>
+                        <th className="py-2.5 px-3 border-b border-slate-200 text-right">Worked</th>
+                        <th className="py-2.5 px-3 border-b border-slate-200 text-right">Rate</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white font-medium">
+                      {previewReportData.summaries
+                        .filter(s => {
+                          const q = previewSearch.toLowerCase().trim();
+                          if (!q) return true;
+                          return (
+                            s.name.toLowerCase().includes(q) ||
+                            s.pin.includes(q) ||
+                            s.department.toLowerCase().includes(q) ||
+                            s.designation.toLowerCase().includes(q)
+                          );
+                        })
+                        .map((s, idx) => (
+                          <tr key={s.pin || idx} className="hover:bg-slate-50 transition-colors">
+                            <td className="py-2 px-3 text-center text-slate-400 font-bold">{idx + 1}</td>
+                            <td className="py-2 px-3">
+                              <p className="font-bold text-slate-900">{s.name}</p>
+                              <p className="text-[10px] text-slate-500">{s.designation}</p>
+                            </td>
+                            <td className="py-2 px-3 text-center font-bold text-slate-700">#{s.pin}</td>
+                            <td className="py-2 px-3 text-slate-600">{s.department}</td>
+                            <td className="py-2 px-3 text-center font-bold text-emerald-700">{s.presentDays}</td>
+                            <td className="py-2 px-3 text-center font-bold text-purple-700">{s.weekOffDays}</td>
+                            <td className="py-2 px-3 text-center font-bold text-amber-700">{s.lateDays}</td>
+                            <td className="py-2 px-3 text-center text-amber-800">{s.totalLateMinutes}m</td>
+                            <td className="py-2 px-3 text-center text-blue-700">{s.leaveDays}</td>
+                            <td className="py-2 px-3 text-center font-bold text-rose-600">{s.absentDays}</td>
+                            <td className="py-2 px-3 text-right font-bold text-slate-800">{s.totalWorkedHours.toFixed(1)} hrs</td>
+                            <td className="py-2 px-3 text-right">
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                                s.attendancePct >= 90
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : s.attendancePct >= 75
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : 'bg-rose-100 text-rose-800'
+                              }`}>
+                                {s.attendancePct}%
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-slate-100 text-[11px] font-bold text-slate-700 uppercase tracking-wider sticky top-0 z-10">
+                      <tr>
+                        <th className="py-2.5 px-3 border-b border-slate-200 text-center w-12">#</th>
+                        <th className="py-2.5 px-3 border-b border-slate-200">BS Date</th>
+                        <th className="py-2.5 px-3 border-b border-slate-200">Day</th>
+                        {!previewReportData.isIndividual && (
+                          <>
+                            <th className="py-2.5 px-3 border-b border-slate-200">Employee</th>
+                            <th className="py-2.5 px-3 border-b border-slate-200">Dept</th>
+                          </>
+                        )}
+                        <th className="py-2.5 px-3 border-b border-slate-200 text-center">In Time</th>
+                        <th className="py-2.5 px-3 border-b border-slate-200 text-center">Out Time</th>
+                        <th className="py-2.5 px-3 border-b border-slate-200 text-center">Worked</th>
+                        <th className="py-2.5 px-3 border-b border-slate-200 text-center">Late</th>
+                        <th className="py-2.5 px-3 border-b border-slate-200 text-center">Status</th>
+                        <th className="py-2.5 px-3 border-b border-slate-200">Remarks</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white font-medium">
+                      {previewReportData.dailyEntries
+                        .filter(row => {
+                          const q = previewSearch.toLowerCase().trim();
+                          if (!q) return true;
+                          return (
+                            row.employeeName.toLowerCase().includes(q) ||
+                            row.employeePin.includes(q) ||
+                            row.department.toLowerCase().includes(q) ||
+                            row.bsDateStr.includes(q) ||
+                            row.dayNameNp.toLowerCase().includes(q) ||
+                            row.statusNp.toLowerCase().includes(q) ||
+                            row.remarks.toLowerCase().includes(q)
+                          );
+                        })
+                        .map((row, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                            <td className="py-2 px-3 text-center text-slate-400 font-bold">{idx + 1}</td>
+                            <td className="py-2 px-3 font-bold text-slate-900 whitespace-nowrap">
+                              {row.bsDateStr}
+                              <span className="block text-[10px] font-normal text-slate-400">{row.adDateStr}</span>
+                            </td>
+                            <td className="py-2 px-3 text-slate-700 whitespace-nowrap">{row.dayNameNp}</td>
+                            {!previewReportData.isIndividual && (
+                              <>
+                                <td className="py-2 px-3">
+                                  <p className="font-bold text-slate-900">{row.employeeName}</p>
+                                  <p className="text-[10px] text-slate-500">PIN #{row.employeePin}</p>
+                                </td>
+                                <td className="py-2 px-3 text-slate-600">{row.department}</td>
+                              </>
+                            )}
+                            <td className="py-2 px-3 text-center font-bold text-slate-800 whitespace-nowrap">{row.inTimeStr}</td>
+                            <td className="py-2 px-3 text-center font-bold text-slate-800 whitespace-nowrap">{row.outTimeStr}</td>
+                            <td className="py-2 px-3 text-center font-bold text-slate-700 whitespace-nowrap">{row.workedHoursStr}</td>
+                            <td className="py-2 px-3 text-center text-amber-700 font-bold whitespace-nowrap">
+                              {row.lateMinutes > 0 ? `${row.lateMinutes}m` : '-'}
+                            </td>
+                            <td className="py-2 px-3 text-center whitespace-nowrap">
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                row.statusKey === 'PRESENT'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : row.statusKey === 'LATE'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : row.statusKey === 'WEEK_OFF'
+                                      ? 'bg-purple-100 text-purple-800'
+                                      : row.statusKey === 'WEEK_OFF_WORK'
+                                        ? 'bg-indigo-100 text-indigo-800'
+                                        : row.statusKey === 'LEAVE'
+                                          ? 'bg-blue-100 text-blue-800'
+                                          : row.statusKey === 'ABSENT'
+                                            ? 'bg-rose-100 text-rose-800'
+                                            : 'bg-slate-100 text-slate-600'
+                              }`}>
+                                {row.statusNp}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-slate-500 text-[11px] max-w-xs truncate" title={row.remarks}>
+                              {row.remarks || '-'}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              {/* Bottom Footer Actions */}
+              <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 text-xs">
+                <div className="text-slate-500">
+                  {previewTab === 'summary' ? (
+                    <span>Showing summary for <strong>{previewReportData.summaries.length}</strong> employees</span>
+                  ) : (
+                    <span>Showing <strong>{previewReportData.dailyEntries.length}</strong> daily punch entries</span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewReportData(null)}
+                    className="px-4 py-2 rounded-lg font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+                  >
+                    Close Preview
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => exportDateRangeReportModal('excel', previewReportData)}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer transition-colors"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    <span>Download Excel (.xlsx)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => exportDateRangeReportModal('pdf', previewReportData)}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg font-bold bg-red-600 hover:bg-red-700 text-white shadow-xs cursor-pointer transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download PDF (.pdf)</span>
+                  </button>
+                </div>
+              </div>
+
             </div>
           </div>
         )}
